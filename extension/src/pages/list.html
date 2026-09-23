@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>یارچین — ثبت‌شده‌ها</title>
+  <link rel="stylesheet" href="../ui/theme.css" />
+  <link rel="stylesheet" href="list.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg class="arc" viewBox="0 0 120 20" aria-hidden="true">
+        <defs>
+          <linearGradient id="g" x1="0" x2="1">
+            <stop offset="0" stop-color="#2F7D5C" />
+            <stop offset="1" stop-color="#FF7A00" />
+          </linearGradient>
+        </defs>
+        <path d="M4 16 Q60 -6 116 16" fill="none" stroke="url(#g)" stroke-width="4" stroke-linecap="round" />
+      </svg>
+      <div class="name">یارچین</div>
+      <div class="tagline">پل واردات از چین به ایران</div>
+    </div>
+    <div class="actions">
+      <span id="summary" class="summary"></span>
+      <button id="export" class="btn-primary" type="button">خروجی JSON</button>
+    </div>
+  </header>
+
+  <main>
+    <div id="empty" class="empty" hidden>
+      <p>هنوز صفحه‌ای ثبت نشده.</p>
+      <p class="hint">یک صفحه از علی‌بابا را باز کنید و دکمه‌ی «ثبت این صفحه» پایین صفحه را بزنید.</p>
+    </div>
+    <ul id="list" class="list"></ul>
+  </main>
+
+  <template id="row">
+    <li class="card">
+      <div class="info">
+        <div class="group"></div>
+        <a class="title" target="_blank" rel="noopener noreferrer"></a>
+        <div class="meta"></div>
+      </div>
+      <button class="btn-danger del" type="button">حذف</button>
+    </li>
+  </template>
+
+  <script type="module" src="list.js"></script>
+</body>
+</html>
