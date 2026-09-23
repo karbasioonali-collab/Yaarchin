@@ -1,0 +1,60 @@
+.form { display: flex; flex-direction: column; gap: 14px; }
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.label { font-size: 13px; font-weight: 600; }
+.hint { font-size: 12px; color: var(--muted); }
+
+.input, .select, .textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid rgba(34, 34, 34, .12);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  outline: none;
+  transition: border-color .15s, background .15s;
+}
+.input:focus, .select:focus, .textarea:focus { border-color: var(--green); background: var(--surface); }
+.ltr { direction: ltr; text-align: left; }
+
+.primary, .secondary, .danger {
+  border: 0;
+  border-radius: var(--radius-sm);
+  padding: 10px 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+}
+.primary { background: var(--orange); color: #FFFFFF; }
+.primary:hover { background: var(--orange-dark); }
+.secondary { background: var(--bg); color: var(--green-dark); }
+.secondary:hover { background: rgba(34, 34, 34, .06); }
+.danger { background: transparent; color: var(--orange-dark); border: 1.5px solid rgba(232, 106, 0, .35); }
+.danger:hover { background: rgba(232, 106, 0, .08); }
+.primary:disabled, .secondary:disabled, .danger:disabled { opacity: .6; cursor: default; }
+
+.error {
+  margin: 0; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: rgba(232, 106, 0, .08); color: var(--orange-dark); font-size: 14px;
+}
+.success {
+  margin: 0; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: rgba(47, 125, 92, .08); color: var(--green-dark); font-size: 14px;
+}
+
+.checkbox { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.checkbox input { width: 18px; height: 18px; accent-color: var(--green); }
+
+/* کلید روشن/خاموش */
+.toggle {
+  appearance: none; -webkit-appearance: none; margin: 0; cursor: pointer; flex: none;
+  width: 44px; height: 24px; border-radius: 999px; position: relative;
+  background: rgba(34, 34, 34, .18); transition: background .2s;
+}
+.toggle::after {
+  content: ""; position: absolute; top: 3px; right: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: #FFFFFF; box-shadow: 0 1px 3px rgba(34, 34, 34, .25); transition: transform .2s;
+}
+.toggle:checked { background: var(--green); }
+.toggle:checked::after { transform: translateX(-20px); }
+.toggle:disabled { opacity: .6; cursor: default; }
+.toggle:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }

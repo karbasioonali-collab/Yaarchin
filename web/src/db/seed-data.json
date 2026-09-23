@@ -1,0 +1,76 @@
+{
+  "roles": [
+    {
+      "key": "admin",
+      "nameFa": "ادمین",
+      "nameEn": "Admin",
+      "description": "دسترسی کامل به همه‌چیز",
+      "isSystem": true,
+      "requires2fa": true,
+      "isStaff": true
+    },
+    {
+      "key": "expert",
+      "nameFa": "کارشناس",
+      "nameEn": "Expert",
+      "description": "پیگیری مشتری‌ها و تأمین‌کننده‌ها؛ دسترسی‌ها قابل تنظیم",
+      "isSystem": true,
+      "requires2fa": true,
+      "isStaff": true
+    },
+    {
+      "key": "customer",
+      "nameFa": "مشتری",
+      "nameEn": "Customer",
+      "description": "مشتری سایت",
+      "isSystem": true,
+      "requires2fa": false,
+      "isStaff": false
+    },
+    {
+      "key": "company",
+      "nameFa": "شرکت",
+      "nameEn": "Company",
+      "description": "کاربر شرکت (فاز ۲، فعلاً بدون استفاده)",
+      "isSystem": true,
+      "requires2fa": false,
+      "isStaff": false
+    }
+  ],
+  "permissions": [
+    { "key": "dashboard.view", "groupKey": "dashboard", "nameFa": "دیدن داشبورد" },
+    { "key": "users.view", "groupKey": "users", "nameFa": "دیدن کاربران" },
+    { "key": "users.manage", "groupKey": "users", "nameFa": "ساخت و ویرایش کاربران" },
+    { "key": "roles.manage", "groupKey": "roles", "nameFa": "مدیریت نقش‌ها و دسترسی‌ها" },
+    { "key": "settings.manage", "groupKey": "settings", "nameFa": "مدیریت تنظیمات و سوئیچ‌ها" },
+    { "key": "activity.view", "groupKey": "activity", "nameFa": "دیدن لاگ فعالیت" },
+    { "key": "impersonate", "groupKey": "users", "nameFa": "دیدن سایت به‌جای مشتری" }
+  ],
+  "rolePermissions": {
+    "admin": "*",
+    "expert": ["dashboard.view"]
+  },
+  "settings": [
+    { "key": "auth.enforce_permissions", "groupKey": "auth", "value": false, "labelFa": "اعمال واقعی دسترسی نقش‌ها", "description": "خاموش: هر کاربر پنل به همه‌چیز دسترسی دارد (فعلاً). روشن: فقط دسترسی‌های نقش." },
+    { "key": "auth.session_hours", "groupKey": "auth", "value": 72, "labelFa": "مدت اعتبار نشست پنل (ساعت)" },
+
+    { "key": "features.extension_import", "groupKey": "features", "value": true, "labelFa": "دریافت داده از اکستنشن" },
+    { "key": "features.public_site", "groupKey": "features", "value": true, "labelFa": "سایت عمومی" },
+    { "key": "features.customer_signup", "groupKey": "features", "value": true, "labelFa": "ثبت‌نام مشتری" },
+    { "key": "features.chat", "groupKey": "features", "value": true, "labelFa": "چت مشتری" },
+    { "key": "features.ai_agent", "groupKey": "features", "value": true, "labelFa": "ایجنت هوش مصنوعی" },
+    { "key": "features.favorites", "groupKey": "features", "value": true, "labelFa": "علاقه‌مندی" },
+    { "key": "features.proposals", "groupKey": "features", "value": true, "labelFa": "پروپوزال" },
+    { "key": "features.reports", "groupKey": "features", "value": true, "labelFa": "گزارش روزانه‌ی AI" },
+    { "key": "features.payments", "groupKey": "features", "value": false, "labelFa": "درگاه پرداخت" },
+    { "key": "features.sms", "groupKey": "features", "value": false, "labelFa": "پیامک" },
+    { "key": "features.email", "groupKey": "features", "value": false, "labelFa": "ایمیل" },
+
+    { "key": "ai.task.customer_chat", "groupKey": "ai", "value": { "provider": "", "model": "" }, "labelFa": "مدل AI: چت مشتری" },
+    { "key": "ai.task.page_extraction", "groupKey": "ai", "value": { "provider": "", "model": "" }, "labelFa": "مدل AI: استخراج اطلاعات صفحه" },
+    { "key": "ai.task.price_extraction", "groupKey": "ai", "value": { "provider": "", "model": "" }, "labelFa": "مدل AI: استخراج قیمت" },
+    { "key": "ai.task.negotiation_translation", "groupKey": "ai", "value": { "provider": "", "model": "" }, "labelFa": "مدل AI: ترجمه‌ی مذاکره" },
+    { "key": "ai.task.hs_code_suggestion", "groupKey": "ai", "value": { "provider": "", "model": "" }, "labelFa": "مدل AI: پیشنهاد HS code" },
+    { "key": "ai.task.daily_report", "groupKey": "ai", "value": { "provider": "", "model": "" }, "labelFa": "مدل AI: گزارش روزانه" }
+  ]
+}
