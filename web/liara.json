@@ -1,0 +1,8 @@
+{
+  "app": "yaarchin",
+  "platform": "next",
+  "port": 3000,
+  "next": {
+    "nodeVersion": "22"
+  }
+}

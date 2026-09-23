@@ -1,0 +1,43 @@
+/* توکن‌های هویت بصری یارچین — فقط رنگ‌های پالت. */
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("../../assets/fonts/Vazirmatn-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  --green: #2F7D5C;
+  --green-dark: #1B4D3E;
+  --orange: #FF7A00;
+  --orange-dark: #E86A00;
+  --bg: #F7F7F5;
+  --text: #222222;
+  --surface: #FFFFFF;
+  --line: rgba(34, 34, 34, .08);
+  --muted: rgba(34, 34, 34, .6);
+  --radius: 14px;
+  --shadow: 0 6px 20px rgba(34, 34, 34, .07);
+  --font: "Vazirmatn", Tahoma, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+button { font: inherit; cursor: pointer; border: 0; border-radius: 10px; }
+
+.btn-primary { background: var(--orange); color: #FFFFFF; padding: 9px 18px; font-weight: 700; }
+.btn-primary:hover { background: var(--orange-dark); }
+.btn-primary:disabled { opacity: .6; cursor: default; }
+.btn-ghost { background: transparent; color: var(--green-dark); padding: 6px 12px; }
+.btn-ghost:hover { background: var(--bg); }
+.btn-danger { background: transparent; color: var(--orange-dark); padding: 6px 12px; }
+.btn-danger:hover { background: rgba(232, 106, 0, .08); }

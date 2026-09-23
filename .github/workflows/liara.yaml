@@ -1,0 +1,46 @@
+# استقرار سایت (پوشه‌ی web/) روی لیارا.
+# اجرا: با push روی main (وقتی web/ تغییر کرده) یا دستی از تب Actions ← «Deploy to Liara» ← Run workflow.
+# پیش‌نیاز: Secret به نام LIARA_API_TOKEN در تنظیمات ریپو (Settings ← Secrets and variables ← Actions).
+name: Deploy to Liara
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/liara.yaml"
+  workflow_dispatch:
+
+concurrency:
+  group: liara-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # قبل از ارسال، همان بررسی‌های محلی: اگر خطا باشد استقرار انجام نمی‌شود.
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+
+      - name: Deploy
+        env:
+          LIARA_API_TOKEN: ${{ secrets.LIARA_API_TOKEN }}
+        run: |
+          if [ -z "$LIARA_API_TOKEN" ]; then
+            echo "::error::Secret LIARA_API_TOKEN تنظیم نشده است."
+            exit 1
+          fi
+          npx --yes @liara/cli@9 deploy --api-token "$LIARA_API_TOKEN" --no-app-logs --message "${GITHUB_SHA::7}"

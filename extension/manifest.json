@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "یارچین — ثبت صفحه",
+  "short_name": "یارچین",
+  "version": "0.1.0",
+  "description": "ثبت دستی صفحه‌های علی‌بابا (HTML، متن، عکس و ویدیو) به‌صورت محلی. نسخه‌ی صفر، بدون سرور.",
+  "minimum_chrome_version": "110",
+  "permissions": ["storage", "unlimitedStorage", "downloads"],
+  "host_permissions": ["*://*.alibaba.com/*", "*://alibaba.com/*"],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.alibaba.com/*", "*://alibaba.com/*"],
+      "js": ["src/content/capture.js", "src/content/ui.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "یارچین — لیست ثبت‌شده‌ها",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png",
+      "48": "assets/icons/icon-48.png",
+      "128": "assets/icons/icon-128.png"
+    }
+  },
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/fonts/Vazirmatn-Variable.woff2"],
+      "matches": ["*://*.alibaba.com/*", "*://alibaba.com/*"]
+    }
+  ]
+}

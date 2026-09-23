@@ -1,0 +1,7 @@
+.logo { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.2; }
+.arc { width: 5.5em; height: .9em; }
+.name { font-weight: 800; color: var(--green); font-size: 1.6em; letter-spacing: -.01em; }
+.tagline { font-size: .55em; color: var(--muted); margin-top: .35em; }
+.sm { font-size: 14px; }
+.md { font-size: 18px; }
+.lg { font-size: 30px; }

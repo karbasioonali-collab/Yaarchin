@@ -1,0 +1,37 @@
+/* هویت بصری یارچین — فقط رنگ‌های پالت (docs/infoyaarchin.md بخش ۳) */
+:root {
+  --green: #2F7D5C;
+  --green-dark: #1B4D3E;
+  --orange: #FF7A00;
+  --orange-dark: #E86A00;
+  --bg: #F7F7F5;
+  --text: #222222;
+  --surface: #FFFFFF;
+
+  --line: rgba(34, 34, 34, .08);
+  --muted: rgba(34, 34, 34, .6);
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --shadow: 0 6px 20px rgba(34, 34, 34, .07);
+  --shadow-lg: 0 12px 32px rgba(34, 34, 34, .12);
+  --brand-gradient: linear-gradient(90deg, var(--green), var(--orange));
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-vazirmatn), Tahoma, sans-serif;
+  font-size: 15px;
+  line-height: 1.8;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--green); text-decoration: none; }
+a:hover { color: var(--orange-dark); }
+
+button, input, select, textarea { font: inherit; color: inherit; }
