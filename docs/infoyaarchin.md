@@ -1,7 +1,7 @@
 # یارچین (Yarchin) — مستند مرجع پروژه
 
 > این فایل همیشه به‌روز نگه داشته می‌شود. با هر تغییر مهم: بخش «وضعیت» و «نکات» را به‌روز کن و تغییر را در `CHANGELOG.md` هم ثبت کن.
-> آخرین به‌روزرسانی: 2026-09-23 (اکستنشن نسخه‌ی صفر)
+> آخرین به‌روزرسانی: 2026-09-23 (مرحله‌ی ۲: اسکلت سایت و پیشنهاد migration پایه)
 
 ---
 
@@ -64,16 +64,26 @@
 docs/
   infoyaarchin.md     همین فایل
   CHANGELOG.md        تاریخچه‌ی تغییرات
+  db/                 پیشنهاد و توضیح هر migration (مثل 0000-foundation.md)
 extension/            اکستنشن کروم (جزئیات در extension/README.md)
-  manifest.json
-  assets/fonts, assets/icons
-  src/shared/         config.js، db.js (IndexedDB)، transport.js (خاموش)
-  src/background/     service-worker.js
-  src/content/        capture.js (جمع‌آوری خام)، ui.js (دکمه و کادر)
-  src/pages/          list.html/css/js
-  src/ui/theme.css
+web/                  سایت و پنل ادمین (Next.js 16، App Router، TypeScript)
+  drizzle/            فایل‌های SQL migration (تولیدشده، فقط بعد از تأیید اجرا می‌شوند)
+  src/db/schema/      تعریف جدول‌ها (Drizzle)
+  src/db/client.ts    اتصال Postgres
+  src/app/            صفحه‌ها (RTL، فونت وزیرمتن محلی)
+  src/components/     کامپوننت‌ها (Logo موقت)
+  .env.example        لیست متغیرهای محیطی (بدون مقدار واقعی)
 ```
-کد سایت (Next.js) هنوز ساخته نشده.
+
+### تصمیم‌های فنی سایت
+- **Next.js 16:** `middleware` به `proxy` تغییر نام داده و `cookies()` و `params` async هستند. قبل از نوشتن کد، راهنمای `web/node_modules/next/dist/docs/` را ببین.
+- **ORM:** Drizzle. دلیل: migrationها به‌شکل SQL خوانا تولید می‌شوند تا قبل از اجرا بررسی و تأیید شوند. pgvector و JSONB را هم پشتیبانی می‌کند.
+- **جریان migration:** تغییر schema ← `npm run db:generate` ← نوشتن توضیح در `docs/db/` ← **تأیید مالک** ← `npm run db:migrate`.
+- **ورود ادمین و کارشناس:** موبایل یا ایمیل + رمز (argon2id)، بعد کد TOTP (اپ Authenticator) + کدهای بازیابی.
+- **نشست:** کوکی httpOnly؛ در دیتابیس فقط هش توکن ذخیره می‌شود.
+- **ورود مشتری با پیامک:** مرحله‌ی ۵.
+- **دسترسی:** تابع مرکزی `can()`؛ فعلاً همیشه «بله» برای کاربر پنل. سوئیچ `auth.enforce_permissions` اعمال واقعی را روشن می‌کند.
+- **رازها:** `DATABASE_URL` و `APP_ENCRYPTION_KEY` فقط در env هستند.
 
 ## ۷. اکستنشن — طراحی نسخه‌ی صفر
 - **Content script** (`capture.js` و `ui.js`) روی `*.alibaba.com` اجرا می‌شود.
@@ -93,10 +103,13 @@ extension/            اکستنشن کروم (جزئیات در extension/READM
   - جلوگیری از ثبت تکراری با شناسه‌ی فروشنده. این تشخیص سمت سرور است.
   - پنل کنار چت و جواب پیشنهادی AI (ارسال فقط با خود کاربر).
 
-## ۸. دیتابیس (برنامه‌ریزی‌شده — هنوز ساخته نشده، قبل از ساخت نیاز به تأیید)
-پیش‌نویس گروه‌بندی جدول‌ها. اسم‌ها و ستون‌های دقیق در مرحله‌ی ۲ پیشنهاد و بعد از تأیید ساخته می‌شوند.
-- **کاربر و دسترسی:** `users`، `roles`، `permissions`، `role_permissions`، `teams`، `team_members`، `sessions`، `two_factor`، `activity_log`.
-- **تنظیمات:** `settings` (سوئیچ‌ها)، `feature_flags`، `site_blocks` (هدر/فوتر/اسلایدر)، `ai_task_models` (مدل هر وظیفه).
+## ۸. دیتابیس
+- **migration ۰۰۰۰ (پایه):** ⏸ پیشنهاد شده، منتظر تأیید. جزئیات: `docs/db/0000-foundation.md`. شامل ۱۴ جدول:
+  - کاربر و دسترسی: `users`، `roles`، `permissions`، `role_permissions`، `user_roles`، `teams`، `team_members`
+  - ورود و امنیت: `sessions`، `user_totp`، `user_recovery_codes`، `login_attempts`
+  - سیستم: `settings`، `activity_log`، `events`
+- **بقیه (برنامه‌ریزی‌شده):** هر گروه در migration مرحله‌ی خودش و با تأیید قبلی ساخته می‌شود. پیش‌نویس گروه‌بندی جدول‌ها:
+- **تنظیمات:** `site_blocks` (هدر، فوتر، اسلایدر). سوئیچ‌ها و مدل AI هر وظیفه داخل `settings` هستند (migration ۰۰۰۰).
 - **دسته‌بندی:** `categories` (درختی با عمق نامحدود)، `category_fields` (فیلدهای مخصوص هر دسته).
 - **شرکت و محصول:**
   - `companies` (با `company_type` و `user_id` برای فاز ۲)
@@ -109,7 +122,7 @@ extension/            اکستنشن کروم (جزئیات در extension/READM
 - **داده‌ی خام:** `raw_pages` (HTML و متن هر ثبت)، `raw_chats`، `extractions` (خروجی AI با نسخه‌ی مدل).
 - **قیمت:** `price_observations` (فقط افزودنی، با تاریخ، ارز و منبع).
 - **نرخ‌ها و هزینه‌ها:** بخش ۹.
-- **مشتری و تعامل:** `favorites`، `events` (بازدید، کلیک، علاقه‌مندی، پیام)، `inquiries`، `contact_messages`.
+- **مشتری و تعامل:** `favorites`، `inquiries`، `contact_messages`.
 - **چت و ایجنت:** `conversations`، `messages` (متن اصلی + ترجمه)، `handoffs`، `answer_flags`، `knowledge_base` (با embedding و تأیید انسانی)، `notifications`.
 - **پروپوزال:** `proposals`، `proposal_items`، `proposal_rate_snapshots` (نرخ‌های منجمد)، `sales_scenarios`.
 - **پرداخت (خاموش):** `payments`، `payment_events` (جلوگیری از اعمال دوباره با idempotency).
@@ -141,8 +154,8 @@ extension/            اکستنشن کروم (جزئیات در extension/READM
 ## ۱۰. ترتیب ساخت فاز ۱ و وضعیت
 | # | بخش | وضعیت |
 |---|---|---|
-| 1 | اکستنشن نسخه‌ی صفر (بدون سرور) | ✅ ساخته‌شده؛ منتظر تست مالک روی علی‌بابا |
-| 2 | دیتابیس، ورود، پنل ادمین | ⏳ باقی‌مانده |
+| 1 | اکستنشن نسخه‌ی صفر (بدون سرور) | ✅ ساخته‌شده؛ تست روی علی‌بابا عقب افتاده (کروم مالک قدیمی است) |
+| 2 | دیتابیس، ورود، پنل ادمین | 🟡 نیمه‌کاره: اسکلت سایت ساخته شده، migration پایه منتظر تأیید؛ ورود و پنل بعد از تأیید |
 | 3 | دسته‌بندی و ایمپورت داده‌ی اکستنشن | ⏳ باقی‌مانده |
 | 4 | سایت عمومی و صفحه‌ی محصول | ⏳ باقی‌مانده |
 | 5 | ثبت‌نام مشتری، چت و علاقه‌مندی | ⏳ باقی‌مانده |
@@ -156,3 +169,5 @@ extension/            اکستنشن کروم (جزئیات در extension/READM
 - خروجی‌های JSON داده‌ی واقعی هستند و نباید در ریپو قرار بگیرند (`samples/` در `.gitignore` است).
 - ثابت‌های پیام در `ui.js` تکرار `config.js` هستند، چون content script نمی‌تواند ماژول import کند. هر دو باید هم‌زمان تغییر کنند.
 - با تغییر ساختار رکورد اکستنشن، `CAPTURE_SCHEMA_VERSION` را بالا ببر.
+- اکستنشن هنوز روی علی‌بابای واقعی تست نشده. بعد از عوض‌شدن سیستم، اولین کار تست آن است؛ به‌خصوص تعداد عکس‌ها و حجم HTML.
+- pgvector روی Postgres سندباکس نصب نیست. باید قبل از مرحله‌ی چت (پایگاه دانش) مطمئن شویم Postgres لیارا pgvector دارد.
