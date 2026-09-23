@@ -3,6 +3,7 @@
   "platform": "next",
   "port": 3000,
   "next": {
-    "nodeVersion": "24"
+    "nodeVersion": "24",
+    "mirror": false
   }
 }
