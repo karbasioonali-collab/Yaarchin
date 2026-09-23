@@ -189,4 +189,4 @@ web/                  سایت و پنل ادمین (Next.js 16، App Router، T
   - دیتابیس `yaarchin-db` (PG 18.4) روی شبکه‌ی `yaarchin-net` است و برنامه‌ی `yaarchin` باید در همین شبکه باشد.
   - `DATABASE_URL` = URI شبکه‌ی خصوصی.
   - `APP_ENCRYPTION_KEY` هرگز عوض نشود.
-  - Node روی لیارا و CI نسخه‌ی ۲۴ است. با Node 22 در build لیارا، `npm ci` با خطای «Exit handler never called» از کار افتاد.
+  - در `web/liara.json` مقدار `"mirror": false` است (mirror npm لیارا در `npm ci` گیر کرد). Node روی لیارا و CI نسخه‌ی ۲۴ است. با Node 22 در build لیارا، `npm ci` با خطای «Exit handler never called» از کار افتاد.
