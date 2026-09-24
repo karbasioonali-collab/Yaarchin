@@ -20,6 +20,7 @@ const required = [
   "drizzle/meta/_journal.json",
   "src/db/seed-data.json",
   "src/lib/auth/password-policy.mjs",
+  "src/lib/contact.mjs",
 ];
 const missing = required.filter((p) => !existsSync(new URL(p, root)));
 if (missing.length) {
@@ -37,6 +38,7 @@ const probe = `
   await import("pg");
   await import("@node-rs/argon2");
   await import("../src/lib/auth/password-policy.mjs");
+  await import("../src/lib/contact.mjs");
 `;
 const r = spawnSync(process.execPath, ["--input-type=module", "-e", probe], {
   cwd: fileURLToPath(new URL("scripts/", root)),

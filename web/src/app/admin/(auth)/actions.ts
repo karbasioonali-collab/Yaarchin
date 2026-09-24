@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db/client";
 import { roles, userRoles, users } from "@/db/schema";
@@ -28,7 +28,8 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   const [user] = await db
     .select()
     .from(users)
-    .where(parsed.kind === "mobile" ? eq(users.mobile, identifier) : eq(users.email, identifier));
+    // ایمیل بدون حساسیت به حروف بزرگ/کوچک (هم‌راستا با ایندکس یکتای lower(email)).
+    .where(parsed.kind === "mobile" ? eq(users.mobile, identifier) : sql`lower(${users.email}) = ${identifier}`);
 
   if (!user) {
     await burnPasswordCheck(password);

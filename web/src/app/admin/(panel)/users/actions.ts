@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray, ne } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { db } from "@/db/client";
@@ -34,7 +34,7 @@ async function duplicateError(p: Profile, exceptId?: string): Promise<string | n
     if (d) return "این موبایل قبلاً ثبت شده.";
   }
   if (p.email) {
-    const [d] = await db.select({ id: users.id }).from(users).where(and(eq(users.email, p.email), not));
+    const [d] = await db.select({ id: users.id }).from(users).where(and(sql`lower(${users.email}) = ${p.email}`, not));
     if (d) return "این ایمیل قبلاً ثبت شده.";
   }
   return null;

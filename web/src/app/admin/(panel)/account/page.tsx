@@ -17,7 +17,17 @@ export default async function AccountPage() {
         <div>
           <h1 className={styles.pageTitle}>حساب من</h1>
           <p className={styles.pageSub}>
-            {a.user.fullName} · <span className={styles.ltr}>{a.user.mobile ?? a.user.email}</span>
+            {a.user.fullName}
+            {a.user.mobile && (
+              <>
+                {" · "}موبایل: <span className={styles.ltr}>{a.user.mobile}</span>
+              </>
+            )}
+            {a.user.email && (
+              <>
+                {" · "}ایمیل: <span className={styles.ltr}>{a.user.email}</span>
+              </>
+            )}
           </p>
         </div>
       </div>
