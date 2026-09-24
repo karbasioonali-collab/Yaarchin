@@ -23,6 +23,9 @@ export function UserFields({
         <Field label="موبایل" name="mobile" defaultValue={user?.mobile ?? ""} ltr inputMode="tel" placeholder="09xxxxxxxxx" />
         <Field label="ایمیل" name="email" type="email" defaultValue={user?.email ?? ""} ltr />
       </div>
+      <p className={ui.hint} style={{ margin: "-6px 0 0" }}>
+        موبایل یا ایمیل، حداقل یکی لازم است (هر دو هم می‌شود). کاربر با هر کدام که ثبت شده باشد می‌تواند وارد شود.
+      </p>
       {withPassword && (
         <Field
           label="رمز عبور"

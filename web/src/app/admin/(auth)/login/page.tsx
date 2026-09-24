@@ -17,7 +17,15 @@ export default async function LoginPage() {
       <h1 className={styles.title}>ورود به پنل</h1>
       <p className={styles.subtitle}>ادمین و کارشناس</p>
       <ActionForm action={loginAction} submitLabel="ورود">
-        <Field label="موبایل یا ایمیل" name="identifier" autoComplete="username" required ltr inputMode="email" />
+        <Field
+          label="موبایل یا ایمیل"
+          name="identifier"
+          autoComplete="username"
+          required
+          ltr
+          inputMode="email"
+          hint="هر کدام که برای حسابتان ثبت شده."
+        />
         <Field label="رمز عبور" name="password" type="password" autoComplete="current-password" required ltr />
       </ActionForm>
     </>
