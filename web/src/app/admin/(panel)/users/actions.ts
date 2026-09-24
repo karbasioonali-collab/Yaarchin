@@ -8,9 +8,8 @@ import { roles, userRoles, users } from "@/db/schema";
 import type { FormState } from "@/components/ui/ActionForm";
 import { logActivity } from "@/lib/activity";
 import { requirePermission } from "@/lib/auth/can";
-import { hashPassword, MIN_PASSWORD_LENGTH } from "@/lib/auth/password";
+import { hashPassword, passwordError } from "@/lib/auth/password";
 import { revokeAllSessions, updateSession } from "@/lib/auth/session";
-import { resetTwoFactor } from "@/lib/auth/two-factor";
 import { normalizeEmail, normalizeMobile } from "@/lib/validation";
 
 type Profile = { fullName: string; mobile: string | null; email: string | null };
@@ -55,8 +54,16 @@ export async function createUserAction(_prev: FormState, fd: FormData): Promise<
   const dup = await duplicateError(p);
   if (dup) return { error: dup };
   const password = String(fd.get("password") ?? "");
-  if (password && password.length < MIN_PASSWORD_LENGTH) return { error: `رمز حداقل ${MIN_PASSWORD_LENGTH} کاراکتر باشد.` };
   const roleIds = await readRoleIds(fd);
+  // ادمین و کارشناس فقط با رمز وارد می‌شوند؛ پس برای نقش‌های پنل رمز اجباری است.
+  const staffRoles = roleIds.length
+    ? await db.select({ id: roles.id }).from(roles).where(and(inArray(roles.id, roleIds), eq(roles.isStaff, true)))
+    : [];
+  if (staffRoles.length && !password) return { error: "برای ادمین و کارشناس، رمز عبور لازم است." };
+  if (password) {
+    const policy = passwordError(password);
+    if (policy) return { error: policy };
+  }
 
   const [created] = await db
     .insert(users)
@@ -120,21 +127,12 @@ export async function setPasswordAction(_prev: FormState, fd: FormData): Promise
   const a = await requirePermission("users.manage");
   const id = String(fd.get("id"));
   const password = String(fd.get("password") ?? "");
-  if (password.length < MIN_PASSWORD_LENGTH) return { error: `رمز حداقل ${MIN_PASSWORD_LENGTH} کاراکتر باشد.` };
+  const policy = passwordError(password);
+  if (policy) return { error: policy };
   await db.update(users).set({ passwordHash: await hashPassword(password) }).where(eq(users.id, id));
   await revokeAllSessions(id, id === a.user.id ? a.session.id : undefined);
   await logActivity({ actorUserId: a.user.id, action: "user.set_password", entityType: "user", entityId: id });
   return { ok: "رمز تغییر کرد و نشست‌های دیگر این کاربر بسته شدند." };
-}
-
-export async function resetTwoFactorAction(_prev: FormState, fd: FormData): Promise<FormState> {
-  const a = await requirePermission("users.manage");
-  const id = String(fd.get("id"));
-  if (id === a.user.id) return { error: "برای حساب خودتان از «حساب من» استفاده کنید." };
-  await resetTwoFactor(id);
-  await revokeAllSessions(id);
-  await logActivity({ actorUserId: a.user.id, action: "user.reset_2fa", entityType: "user", entityId: id });
-  return { ok: "ورود دومرحله‌ای ریست شد. کاربر در ورود بعدی دوباره راه‌اندازی می‌کند." };
 }
 
 export async function revokeSessionsAction(_prev: FormState, fd: FormData): Promise<FormState> {

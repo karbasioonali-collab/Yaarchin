@@ -15,9 +15,10 @@ try {
 
   for (const r of seed.roles) {
     await client.query(
-      `insert into roles (key, name_fa, name_en, description, is_system, requires_2fa, is_staff)
-       values ($1,$2,$3,$4,$5,$6,$7) on conflict (key) do nothing`,
-      [r.key, r.nameFa, r.nameEn, r.description, r.isSystem, r.requires2fa, r.isStaff],
+      // ستون requires_2fa دیگر استفاده نمی‌شود (ورود دومرحله‌ای حذف شد) و مقدار پیش‌فرض false می‌گیرد.
+      `insert into roles (key, name_fa, name_en, description, is_system, is_staff)
+       values ($1,$2,$3,$4,$5,$6) on conflict (key) do nothing`,
+      [r.key, r.nameFa, r.nameEn, r.description, r.isSystem, r.isStaff],
     );
   }
 

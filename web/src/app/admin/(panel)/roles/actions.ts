@@ -20,7 +20,7 @@ export async function createRoleAction(_prev: FormState, fd: FormData): Promise<
   if (dup) return { error: "این کلید قبلاً وجود دارد." };
   const [r] = await db
     .insert(roles)
-    .values({ key, nameFa, nameEn, isStaff: true, requires2fa: true })
+    .values({ key, nameFa, nameEn, isStaff: true })
     .returning({ id: roles.id });
   await logActivity({ actorUserId: a.user.id, action: "role.create", entityType: "role", entityId: r.id, after: { key, nameFa } });
   redirect(`/admin/roles/${r.id}`);
@@ -40,7 +40,7 @@ export async function updateRoleAction(_prev: FormState, fd: FormData): Promise<
     nameEn: String(fd.get("nameEn") ?? "").trim() || role.nameEn,
     description: String(fd.get("description") ?? "").trim() || null,
     // ویژگی‌های پایه‌ی نقش‌های سیستمی ثابت می‌ماند.
-    ...(role.isSystem ? {} : { isStaff: fd.get("isStaff") === "on", requires2fa: fd.get("requires2fa") === "on" }),
+    ...(role.isSystem ? {} : { isStaff: fd.get("isStaff") === "on" }),
   };
   const all = (await db.select({ key: permissions.key }).from(permissions)).map((p) => p.key);
   const selected = fd.getAll("permissions").map(String).filter((k) => all.includes(k));
@@ -56,7 +56,7 @@ export async function updateRoleAction(_prev: FormState, fd: FormData): Promise<
     action: "role.update",
     entityType: "role",
     entityId: id,
-    before: { nameFa: role.nameFa, isStaff: role.isStaff, requires2fa: role.requires2fa, permissions: before },
+    before: { nameFa: role.nameFa, isStaff: role.isStaff, permissions: before },
     after: { ...patch, permissions: selected },
   });
   revalidatePath(`/admin/roles/${id}`);

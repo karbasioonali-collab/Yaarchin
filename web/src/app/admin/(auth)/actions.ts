@@ -9,14 +9,13 @@ import { logActivity } from "@/lib/activity";
 import { getAuth } from "@/lib/auth/current";
 import { burnPasswordCheck, verifyPassword } from "@/lib/auth/password";
 import { isLoginBlocked, recordLoginAttempt } from "@/lib/auth/rate-limit";
-import { createSession, destroySession, updateSession } from "@/lib/auth/session";
-import { checkTotp, consumeRecoveryCode, regenerateRecoveryCodes } from "@/lib/auth/two-factor";
+import { createSession, destroySession } from "@/lib/auth/session";
 import { parseIdentifier } from "@/lib/validation";
 
 const GENERIC_ERROR = "موبایل/ایمیل یا رمز اشتباه است.";
 const BLOCKED_ERROR = "تلاش‌های ناموفق زیاد بود. ۱۵ دقیقه‌ی دیگر دوباره امتحان کنید.";
 
-// مرحله‌ی اول: موبایل یا ایمیل + رمز
+// ورود: موبایل یا ایمیل + رمز
 export async function loginAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const rawId = String(formData.get("identifier") ?? "").trim();
   const password = String(formData.get("password") ?? "");
@@ -59,44 +58,7 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
 
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
   await logActivity({ actorUserId: user.id, action: "auth.login_password", entityType: "user", entityId: user.id });
-  // مرحله‌ی بعد (کد دومرحله‌ای یا راه‌اندازی آن) را requireStaff در /admin تعیین می‌کند.
   redirect("/admin");
-}
-
-// مرحله‌ی دوم: کد اپ Authenticator یا کد بازیابی
-export async function verifyTwoFactorAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const a = await getAuth();
-  if (!a) redirect("/admin/login");
-  const code = String(formData.get("code") ?? "").trim();
-  const mode = formData.get("mode") === "recovery" ? "recovery" : "totp";
-  const identifier = a.user.mobile ?? a.user.email ?? a.user.id;
-
-  if (await isLoginBlocked(identifier)) return { error: BLOCKED_ERROR };
-
-  const ok = mode === "recovery" ? await consumeRecoveryCode(a.user.id, code) : await checkTotp(a.user.id, code);
-  await recordLoginAttempt({ identifier, userId: a.user.id, step: mode, success: ok, reason: ok ? undefined : "bad_code" });
-  if (!ok) return { error: "کد درست نیست." };
-
-  await updateSession(a.session.id, { twoFactorVerifiedAt: new Date() });
-  await logActivity({ actorUserId: a.user.id, action: `auth.login_${mode}`, entityType: "user", entityId: a.user.id });
-  redirect("/admin");
-}
-
-// تأیید اولین کد در راه‌اندازی ورود دومرحله‌ای؛ کدهای بازیابی را برمی‌گرداند.
-export async function confirmTwoFactorSetupAction(
-  _prev: (FormState & { codes?: string[] }) | null,
-  formData: FormData,
-): Promise<(FormState & { codes?: string[] }) | null> {
-  const a = await getAuth();
-  if (!a) redirect("/admin/login");
-  if (a.user.totpConfirmed) redirect("/admin");
-  const code = String(formData.get("code") ?? "").trim();
-  const ok = await checkTotp(a.user.id, code, { confirming: true });
-  if (!ok) return { error: "کد درست نیست. ساعت گوشی را هم بررسی کنید." };
-  const codes = await regenerateRecoveryCodes(a.user.id);
-  await updateSession(a.session.id, { twoFactorVerifiedAt: new Date() });
-  await logActivity({ actorUserId: a.user.id, action: "auth.2fa_enabled", entityType: "user", entityId: a.user.id });
-  return { ok: "ورود دومرحله‌ای فعال شد.", codes };
 }
 
 export async function logoutAction(): Promise<void> {

@@ -52,7 +52,7 @@ export const roles = pgTable("roles", {
   description: text("description"),
   // نقش سیستمی حذف نمی‌شود.
   isSystem: boolean("is_system").notNull().default(false),
-  // ورود دومرحله‌ای برای این نقش اجباری است.
+  // بدون استفاده از 2026-09-24 (ورود دومرحله‌ای حذف شد). ستون حذف نمی‌شود (بدون migration مخرب).
   requires2fa: boolean("requires_2fa").notNull().default(false),
   // دسترسی به پنل ادمین/کارشناس
   isStaff: boolean("is_staff").notNull().default(false),
@@ -133,7 +133,7 @@ export const sessions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    // زمانی که مرحله‌ی دوم (TOTP) تأیید شد؛ تا آن موقع نشست «نیمه‌کاره» است.
+    // بدون استفاده از 2026-09-24 (ورود دومرحله‌ای حذف شد). ستون حذف نمی‌شود.
     twoFactorVerifiedAt: timestamp("two_factor_verified_at", { withTimezone: true }),
     // ادمین «به‌جای مشتری» می‌بیند.
     impersonatingUserId: uuid("impersonating_user_id").references(() => users.id, { onDelete: "set null" }),
@@ -147,7 +147,9 @@ export const sessions = pgTable(
   (t) => [index("sessions_user_idx").on(t.userId), index("sessions_expires_idx").on(t.expiresAt)],
 );
 
-// ---------- ورود دومرحله‌ای (TOTP، مثل Google Authenticator) ----------
+// ---------- ورود دومرحله‌ای (TOTP) — بدون استفاده از 2026-09-24 ----------
+// به درخواست مالک، ورود دومرحله‌ای از کد حذف شد. جدول‌ها برای پرهیز از migration مخرب
+// می‌مانند و اگر دوباره لازم شد، قابل استفاده‌اند. docs/infoyaarchin.md بخش ۱۳.
 export const userTotp = pgTable("user_totp", {
   userId: uuid("user_id")
     .primaryKey()

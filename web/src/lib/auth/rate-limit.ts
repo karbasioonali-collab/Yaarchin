@@ -28,7 +28,7 @@ export async function isLoginBlocked(identifier: string): Promise<boolean> {
 export async function recordLoginAttempt(a: {
   identifier: string;
   userId?: string | null;
-  step: "password" | "totp" | "recovery" | "sms";
+  step: "password" | "sms";
   success: boolean;
   reason?: string;
 }): Promise<void> {

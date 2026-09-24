@@ -58,7 +58,6 @@ export default async function RolePage({ params }: PageProps<"/admin/roles/[id]"
             {!role.isSystem && (
               <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
                 <Checkbox name="isStaff" defaultChecked={role.isStaff} label="دسترسی به پنل" />
-                <Checkbox name="requires2fa" defaultChecked={role.requires2fa} label="ورود دومرحله‌ای اجباری" />
               </div>
             )}
             <div>

@@ -42,7 +42,7 @@ export async function readSession(): Promise<SessionRow | null> {
   return row;
 }
 
-export async function updateSession(id: string, patch: Partial<Pick<SessionRow, "twoFactorVerifiedAt" | "impersonatingUserId">>) {
+export async function updateSession(id: string, patch: Partial<Pick<SessionRow, "impersonatingUserId">>) {
   await db.update(sessions).set(patch).where(eq(sessions.id, id));
 }
 

@@ -3,13 +3,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
-import { activityLog, roles, sessions, userRoles, users, userTotp } from "@/db/schema";
+import { activityLog, roles, sessions, userRoles, users } from "@/db/schema";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { Field } from "@/components/ui/Field";
 import { can, requirePermission } from "@/lib/auth/can";
+import { PASSWORD_HINT, PASSWORD_MIN_LENGTH } from "@/lib/auth/password";
 import { fmtDateTime } from "@/lib/format";
 import {
-  resetTwoFactorAction,
   revokeSessionsAction,
   setPasswordAction,
   startImpersonationAction,
@@ -33,7 +33,6 @@ export default async function UserPage({ params }: PageProps<"/admin/users/[id]"
   const mine = await db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, id));
   const roleIds = mine.map((r) => r.roleId);
   const isStaff = allRoles.some((r) => r.isStaff && roleIds.includes(r.id));
-  const [totp] = await db.select({ confirmedAt: userTotp.confirmedAt }).from(userTotp).where(eq(userTotp.userId, id));
   const activeSessions = await db
     .select()
     .from(sessions)
@@ -80,34 +79,25 @@ export default async function UserPage({ params }: PageProps<"/admin/users/[id]"
             <h2 className={styles.cardTitle}>تعیین رمز جدید</h2>
             <ActionForm action={setPasswordAction} submitLabel="ثبت رمز" submitVariant="secondary">
               <input type="hidden" name="id" value={u.id} />
-              <Field label="رمز جدید" name="password" type="password" autoComplete="new-password" required ltr minLength={10} />
+              <Field
+                label="رمز جدید"
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                required
+                ltr
+                minLength={PASSWORD_MIN_LENGTH}
+                hint={PASSWORD_HINT}
+              />
             </ActionForm>
           </div>
         )}
 
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>امنیت</h2>
-          <p style={{ marginTop: 0 }}>
-            ورود دومرحله‌ای:{" "}
-            {totp?.confirmedAt ? (
-              <span className={styles.badge}>فعال از {fmtDateTime(totp.confirmedAt)}</span>
-            ) : (
-              <span className={`${styles.badge} ${styles.badgeWarn}`}>{isStaff ? "راه‌اندازی نشده" : "ندارد"}</span>
-            )}
-          </p>
-          <p>نشست‌های فعال: {activeSessions.length}</p>
+          <p style={{ marginTop: 0 }}>نشست‌های فعال: {activeSessions.length}</p>
           {canManage && (
             <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-              {totp && (
-                <ActionForm
-                  action={resetTwoFactorAction}
-                  submitLabel="ریست ورود دومرحله‌ای"
-                  submitVariant="danger"
-                  confirm="ورود دومرحله‌ای این کاربر ریست شود؟"
-                >
-                  <input type="hidden" name="id" value={u.id} />
-                </ActionForm>
-              )}
               <ActionForm action={revokeSessionsAction} submitLabel="بستن همه‌ی نشست‌ها" submitVariant="secondary">
                 <input type="hidden" name="id" value={u.id} />
               </ActionForm>
