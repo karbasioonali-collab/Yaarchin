@@ -3,6 +3,7 @@
 //   تعاملی:      npm run create-admin
 //   غیرتعاملی:   ADMIN_NAME=... ADMIN_MOBILE=... ADMIN_PASSWORD=... npm run create-admin
 import { hash } from "@node-rs/argon2";
+import { PASSWORD_HINT, passwordError } from "../src/lib/auth/password-policy.mjs";
 import pg from "pg";
 import readline from "node:readline/promises";
 import { stdin, stdout } from "node:process";
@@ -38,7 +39,7 @@ if (!name || !mobileRaw || !password) {
   const rl = readline.createInterface({ input: stdin, output: stdout });
   name ||= await ask(rl, "نام و نام خانوادگی: ");
   mobileRaw ||= await ask(rl, "موبایل (09xxxxxxxxx): ");
-  password ||= await ask(rl, "رمز (حداقل ۱۰ کاراکتر): ", { hidden: true });
+  password ||= await ask(rl, `رمز (${PASSWORD_HINT}): `, { hidden: true });
   rl.close();
 }
 const mobile = normalizeMobile(mobileRaw);
@@ -46,8 +47,9 @@ if (!name || !mobile) {
   console.error("نام یا موبایل معتبر نیست.");
   process.exit(1);
 }
-if (!password || password.length < 10) {
-  console.error("رمز باید حداقل ۱۰ کاراکتر باشد.");
+const policy = passwordError(password ?? "");
+if (policy) {
+  console.error(policy);
   process.exit(1);
 }
 
@@ -75,7 +77,7 @@ try {
     [userId],
   );
   await client.query("commit");
-  console.log(`ادمین آماده است: ${name} (${mobile}). در اولین ورود، ورود دومرحله‌ای راه‌اندازی می‌شود.`);
+  console.log(`ادمین آماده است: ${name} (${mobile}). با موبایل و همین رمز وارد /admin شوید.`);
 } catch (e) {
   await client.query("rollback");
   console.error("خطا:", e.message);

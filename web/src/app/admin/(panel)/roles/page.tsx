@@ -46,7 +46,6 @@ export default async function RolesPage() {
                 <th>نقش</th>
                 <th>کلید</th>
                 <th>پنل</th>
-                <th>دومرحله‌ای</th>
                 <th>کاربران</th>
                 <th>دسترسی‌ها</th>
               </tr>
@@ -60,7 +59,6 @@ export default async function RolesPage() {
                   </td>
                   <td className={styles.mono}>{r.key}</td>
                   <td>{r.isStaff ? "✓" : "—"}</td>
-                  <td>{r.requires2fa ? "اجباری" : "—"}</td>
                   <td>{fmtNum(members.find((m) => m.roleId === r.id)?.n ?? 0)}</td>
                   <td>{r.key === "admin" ? "همه" : fmtNum(perms.find((p) => p.roleId === r.id)?.n ?? 0)}</td>
                 </tr>

@@ -1,4 +1,5 @@
 import { Checkbox, Field } from "@/components/ui/Field";
+import { PASSWORD_HINT } from "@/lib/auth/password-policy.mjs";
 import ui from "@/components/ui/ui.module.css";
 import styles from "../panel.module.css";
 
@@ -29,7 +30,7 @@ export function UserFields({
           type="password"
           autoComplete="new-password"
           ltr
-          hint="برای ادمین و کارشناس لازم است (حداقل ۱۰ کاراکتر). برای مشتری خالی بگذارید."
+          hint={`برای ادمین و کارشناس اجباری است: ${PASSWORD_HINT} برای مشتری خالی بگذارید.`}
         />
       )}
       {user && (

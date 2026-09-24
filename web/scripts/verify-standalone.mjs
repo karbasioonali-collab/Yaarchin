@@ -16,6 +16,7 @@ const required = [
   "scripts/create-admin.mjs",
   "drizzle/meta/_journal.json",
   "src/db/seed-data.json",
+  "src/lib/auth/password-policy.mjs",
   "node_modules/drizzle-orm/node-postgres/migrator.js",
   "node_modules/pg/package.json",
   "node_modules/@node-rs/argon2/package.json",

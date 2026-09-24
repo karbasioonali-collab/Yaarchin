@@ -6,9 +6,8 @@ import { users } from "@/db/schema";
 import type { FormState } from "@/components/ui/ActionForm";
 import { logActivity } from "@/lib/activity";
 import { requireStaff } from "@/lib/auth/current";
-import { hashPassword, MIN_PASSWORD_LENGTH, verifyPassword } from "@/lib/auth/password";
+import { hashPassword, passwordError, verifyPassword } from "@/lib/auth/password";
 import { revokeAllSessions } from "@/lib/auth/session";
-import { checkTotp, regenerateRecoveryCodes } from "@/lib/auth/two-factor";
 
 export async function changeOwnPasswordAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requireStaff();
@@ -16,22 +15,11 @@ export async function changeOwnPasswordAction(_prev: FormState, fd: FormData): P
   const next = String(fd.get("next") ?? "");
   const [u] = await db.select({ hash: users.passwordHash }).from(users).where(eq(users.id, a.user.id));
   if (!(await verifyPassword(u?.hash ?? null, current))) return { error: "رمز فعلی درست نیست." };
-  if (next.length < MIN_PASSWORD_LENGTH) return { error: `رمز جدید حداقل ${MIN_PASSWORD_LENGTH} کاراکتر باشد.` };
+  const policy = passwordError(next);
+  if (policy) return { error: policy };
   if (next === current) return { error: "رمز جدید با رمز فعلی یکی است." };
   await db.update(users).set({ passwordHash: await hashPassword(next) }).where(eq(users.id, a.user.id));
   await revokeAllSessions(a.user.id, a.session.id);
   await logActivity({ actorUserId: a.user.id, action: "account.change_password", entityType: "user", entityId: a.user.id });
   return { ok: "رمز تغییر کرد. نشست‌های دیگر بسته شدند." };
-}
-
-export async function regenerateCodesAction(
-  _prev: (FormState & { codes?: string[] }) | null,
-  fd: FormData,
-): Promise<(FormState & { codes?: string[] }) | null> {
-  const a = await requireStaff();
-  if (!a.user.totpConfirmed) return { error: "ورود دومرحله‌ای فعال نیست." };
-  if (!(await checkTotp(a.user.id, String(fd.get("code") ?? "")))) return { error: "کد اپ درست نیست." };
-  const codes = await regenerateRecoveryCodes(a.user.id);
-  await logActivity({ actorUserId: a.user.id, action: "account.regenerate_recovery_codes", entityType: "user", entityId: a.user.id });
-  return { ok: "کدهای جدید ساخته شدند؛ کدهای قبلی دیگر کار نمی‌کنند.", codes };
 }

@@ -16,6 +16,7 @@ const nextConfig = {
       "./scripts/**/*",
       "./drizzle/**/*",
       "./src/db/seed-data.json",
+      "./src/lib/auth/password-policy.mjs",
       "./node_modules/drizzle-orm/**/*",
       "./node_modules/pg/**/*",
       "./node_modules/pg-*/**/*",
