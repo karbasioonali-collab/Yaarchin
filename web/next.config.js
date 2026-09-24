@@ -8,6 +8,9 @@
 const nextConfig = {
   // خروجی standalone: لیارا از همین پوشه ایمیج اجرا را می‌سازد.
   output: "standalone",
+  // بررسی TypeScript در گیت‌هاب اکشن (npm run typecheck) قبل از استقرار انجام می‌شود؛ تکرارش در build لیارا
+  // فقط وقت می‌گیرد و build پلن رایگان لیارا سقف ۵ دقیقه دارد (docs/infoyaarchin.md بخش ۱۲).
+  typescript: { ignoreBuildErrors: true },
   // اسکریپت‌های دیتابیس (migrate/seed/create-admin) و فایل‌های لازمشان داخل خروجی standalone
   // کپی شوند تا از کنسول لیارا با npm run قابل اجرا باشند.
   // اسکریپت یا وابستگی تازه‌ای اضافه شد؟ اینجا هم اضافه کن (scripts/verify-standalone.mjs چک می‌کند).
@@ -17,7 +20,9 @@ const nextConfig = {
       "./drizzle/**/*",
       "./src/db/seed-data.json",
       "./src/lib/auth/password-policy.mjs",
-      "./node_modules/drizzle-orm/**/*",
+      // فقط فایل‌هایی که Node واقعاً اجرا می‌کند (ESM .js)؛ .d.ts/.cjs/.map حذف شدند (۴۴۹ فایل به‌جای ۲۶۹۰).
+      "./node_modules/drizzle-orm/package.json",
+      "./node_modules/drizzle-orm/**/*.js",
       "./node_modules/pg/**/*",
       "./node_modules/pg-*/**/*",
       "./node_modules/@node-rs/**/*",
