@@ -6,7 +6,7 @@ Next.js 16 (App Router) + Postgres + Drizzle ORM.
 ```bash
 cd web
 cp .env.example .env      # مقدارها را پر کنید
-npm install
+npm ci --include=dev    # .npmrc روی omit=dev است (برای لیارا)؛ برای توسعه پکیج‌های dev لازم‌اند
 npm run db:migrate && npm run db:seed && npm run create-admin
 npm run dev               # پنل: http://localhost:3000/admin
 ```
