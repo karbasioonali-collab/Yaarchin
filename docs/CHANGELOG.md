@@ -2,6 +2,19 @@
 
 قالب: جدیدترین بالا. هر ورودی: تاریخ، بخش، چه تغییر کرد.
 
+## 2026-09-24 — رفع خطای `Cannot find module '/app/scripts/migrate.mjs'` در کنسول لیارا
+- **مشکل:** استقرار #۵ موفق بود و سایت بالا آمد، ولی `npm run db:migrate` در کنسول لیارا خطا داد، چون `scripts/migrate.mjs` در بسته‌ی نهایی نبود.
+- **علت:**
+  1. لیارا فقط `next.config.js` را می‌شناسد. ما `next.config.ts` داشتیم، پس لیارا یک `next.config.js` تازه فقط با `output: "standalone"` ساخت.
+  2. Next.js همیشه `next.config.js` را به `.ts` ترجیح می‌دهد، پس `outputFileTracingIncludes` ما نادیده گرفته شد و اسکریپت‌ها داخل standalone نرفتند.
+  3. این خطا در سندباکس هم دقیقاً بازتولید شد.
+- **رفع:**
+  - `web/next.config.ts` به `web/next.config.js` تبدیل شد (همان تنظیمات).
+  - `web/scripts/verify-standalone.mjs` اضافه شد و بعد از هر build (`postbuild`) اجرا می‌شود. اگر اسکریپت‌ها، migrationها یا پکیج‌های لازم در standalone نباشند، build متوقف می‌شود. تست شد که با پیکربندی‌ای مثل پیکربندی خودساخته‌ی لیارا، build را با خطا متوقف می‌کند.
+- **تست:** بسته‌ی standalone به‌تنهایی کپی شد و روی یک دیتابیس تست محلی (نه لیارا) با Node 24 اجرا شد: migrate، seed، create-admin، health و تست کامل پنل در مرورگر، همه موفق.
+- **مستندات:** بخش ۱۲ «درس‌های استقرار روی لیارا» به `docs/infoyaarchin.md` اضافه شد.
+- **دیتابیس:** هیچ تغییری در schema یا migration نیست. migration تأییدشده‌ی ۰۰۰۰ هنوز روی لیارا اجرا نشده و با دستور مالک از کنسول اجرا می‌شود.
+
 ## 2026-09-24 — رفع سوم خطای استقرار: پوشه‌ی public و خروجی standalone
 - **اجرای #۴ (با mirror خاموش):**
   - `npm ci` روی لیارا موفق شد (۲۳ ثانیه) و `next build` هم کامل شد.
@@ -11,7 +24,7 @@
   - لیارا خروجی Next را روی `standalone` می‌گذارد. در این حالت اسکریپت‌های `scripts/` و پوشه‌ی `drizzle/` به‌طور پیش‌فرض در بسته‌ی نهایی نیستند و `npm run db:migrate` و بقیه در کنسول کار نمی‌کردند.
 - **رفع:**
   - `web/public/robots.txt` اضافه شد: پوشه‌ی public حالا در گیت هست، و `/admin` و `/api/` از فهرست موتورهای جستجو خارج می‌شوند.
-  - `next.config.ts`: `output: "standalone"` صریح، به‌همراه `outputFileTracingIncludes` برای scripts، drizzle، seed-data.json، drizzle-orm، pg و @node-rs/argon2.
+  - `next.config.ts` (بعداً به `next.config.js` تبدیل شد): `output: "standalone"` صریح، به‌همراه `outputFileTracingIncludes` برای scripts، drizzle، seed-data.json، drizzle-orm، pg و @node-rs/argon2.
 - **تست:** نسخه‌ی standalone به‌تنهایی در یک پوشه‌ی جدا کپی شد (مثل ایمیج اجرای لیارا) و با Node 24 روی یک دیتابیس خالی اجرا شد: `db:migrate`، `db:seed` و `create-admin` موفق، health برابر `up`، و تست کامل ورود و پنل در مرورگر هم موفق.
 
 ## 2026-09-24 — رفع دوم خطای استقرار: خاموش کردن mirror لیارا
