@@ -1,0 +1,69 @@
+/* صفحه‌های محتوایی: درباره‌ی ما، تماس با ما، ورود موقت */
+.hero {
+  position: relative; overflow: hidden; margin-top: 16px; padding: 28px 20px; border-radius: var(--radius-lg);
+  background: linear-gradient(120deg, var(--green-dark), var(--green)); color: #FFFFFF;
+}
+.hero::after {
+  content: ""; position: absolute; width: 260px; height: 260px; border-radius: 50%;
+  inset-inline-end: -80px; bottom: -120px; background: var(--orange); opacity: .25;
+}
+.heroTitle { position: relative; margin: 0; font-size: 26px; font-weight: 900; }
+.heroText { position: relative; margin: 10px 0 0; max-width: 65ch; opacity: .92; }
+@media (min-width: 768px) { .hero { padding: 48px 44px; } .heroTitle { font-size: 34px; } .heroText { font-size: 17px; } }
+
+.features { display: grid; gap: 14px; margin-top: 20px; grid-template-columns: 1fr; }
+@media (min-width: 768px) { .features { grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 28px; } }
+.feature { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 20px; }
+.featureIcon { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: rgba(47, 125, 92, .1); color: var(--green); }
+.featureIconAlt { background: rgba(255, 122, 0, .1); color: var(--orange-dark); }
+.featureTitle { margin: 12px 0 6px; font-size: 17px; font-weight: 800; color: var(--green-dark); }
+.featureText { margin: 0; color: var(--muted); font-size: 14px; }
+
+.ctaBox {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px;
+  background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 18px 20px;
+  border-inline-start: 4px solid var(--orange);
+}
+.ctaBox strong { display: block; color: var(--green-dark); }
+.ctaBox span { color: var(--muted); font-size: 14px; }
+
+/* تماس با ما */
+.contactGrid { display: grid; gap: 18px; margin-top: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .contactGrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 28px; align-items: start; } }
+.infoList { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.infoItem { display: flex; gap: 12px; align-items: flex-start; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 16px; }
+.infoIcon { flex-shrink: 0; width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: rgba(47, 125, 92, .1); color: var(--green); }
+.infoLabel { display: block; font-size: 12px; color: var(--muted); }
+.infoValue { display: block; font-weight: 700; color: var(--text); }
+
+.formCard { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 20px; }
+@media (min-width: 768px) { .formCard { padding: 28px; } }
+.formTitle { margin: 0 0 4px; font-size: 18px; font-weight: 800; color: var(--green-dark); }
+.formSub { margin: 0 0 16px; font-size: 13px; color: var(--muted); }
+.form { display: grid; gap: 14px; }
+.row2 { display: grid; gap: 14px; grid-template-columns: 1fr; }
+@media (min-width: 600px) { .row2 { grid-template-columns: 1fr 1fr; } }
+.field { display: grid; gap: 6px; }
+.label { font-size: 13px; font-weight: 600; }
+.input, .select, .textarea {
+  width: 100%; min-height: 48px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid rgba(34, 34, 34, .12);
+  background: var(--surface); font-size: 16px; /* ۱۶px تا iOS موقع فوکوس زوم نکند */
+}
+.textarea { min-height: 140px; resize: vertical; line-height: 1.8; }
+.input:focus, .select:focus, .textarea:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(47, 125, 92, .12); }
+.hint { font-size: 12px; color: var(--muted); }
+.honey { position: absolute; inset-inline-start: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.error { margin: 0; padding: 10px 14px; border-radius: 12px; background: rgba(232, 106, 0, .1); color: var(--orange-dark); font-size: 14px; }
+.success {
+  display: grid; justify-items: center; gap: 8px; text-align: center; padding: 28px 12px;
+}
+.successIcon { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: rgba(47, 125, 92, .12); color: var(--green); }
+.successTitle { margin: 0; font-size: 20px; font-weight: 800; color: var(--green-dark); }
+.successText { margin: 0; color: var(--muted); }
+
+/* ورود موقت */
+.authCard { max-width: 460px; margin: 32px auto 0; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 28px 22px; text-align: center; }
+.authIcon { width: 64px; height: 64px; margin: 0 auto 12px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 122, 0, .1); color: var(--orange-dark); }
+.authTitle { margin: 0; font-size: 22px; font-weight: 900; color: var(--green-dark); }
+.authText { margin: 10px 0 20px; color: var(--muted); }
+.authActions { display: grid; gap: 8px; }

@@ -1,0 +1,68 @@
+/* پایه‌ی مشترک سایت عمومی. فقط رنگ‌های پالت (globals.css). موبایل‌اول: استایل پایه برای موبایل، بعد min-width. */
+
+.container { width: 100%; max-width: var(--container); margin-inline: auto; padding-inline: 16px; }
+@media (min-width: 768px) { .container { padding-inline: 24px; } }
+
+.main { min-height: 60dvh; padding-bottom: 32px; }
+/* فضای خالی زیر صفحه به اندازه‌ی نوار پایین موبایل (و نوار اقدام صفحه‌ی محصول) */
+.tabSpacer { height: calc(68px + env(safe-area-inset-bottom)); background: var(--surface); }
+@media (min-width: 768px) { .tabSpacer { display: none; } }
+
+.section { margin-top: 36px; }
+@media (min-width: 768px) { .section { margin-top: 56px; } }
+.sectionHead { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.sectionTitle { margin: 0; font-size: 20px; font-weight: 800; color: var(--green-dark); line-height: 1.4; }
+.sectionTitle::after {
+  content: ""; display: block; width: 44px; height: 4px; border-radius: 4px; margin-top: 8px;
+  background: var(--brand-gradient);
+}
+.sectionSub { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.sectionLink { font-size: 14px; font-weight: 600; white-space: nowrap; display: inline-flex; align-items: center; gap: 2px; }
+@media (min-width: 768px) { .sectionTitle { font-size: 24px; } }
+
+.card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); }
+
+/* دکمه‌ها */
+.btn, .btnGreen, .btnGhost, .btnOutline {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; padding: 0 20px; border-radius: 12px; border: 0;
+  font-weight: 700; font-size: 15px; cursor: pointer; text-align: center;
+  transition: background-color .15s, color .15s, box-shadow .15s, transform .15s;
+}
+.btn { background: var(--orange); color: #FFFFFF; box-shadow: 0 6px 16px rgba(255, 122, 0, .25); }
+.btn:hover { background: var(--orange-dark); color: #FFFFFF; }
+.btnGreen { background: var(--green); color: #FFFFFF; }
+.btnGreen:hover { background: var(--green-dark); color: #FFFFFF; }
+.btnGhost { background: rgba(47, 125, 92, .08); color: var(--green-dark); }
+.btnGhost:hover { background: rgba(47, 125, 92, .14); color: var(--green-dark); }
+.btnOutline { background: var(--surface); color: var(--green-dark); box-shadow: inset 0 0 0 1.5px rgba(47, 125, 92, .35); }
+.btnOutline:hover { box-shadow: inset 0 0 0 1.5px var(--green); color: var(--green-dark); }
+.btn:active, .btnGreen:active, .btnGhost:active, .btnOutline:active { transform: translateY(1px); }
+.btn:disabled, .btnGreen:disabled { opacity: .6; cursor: default; }
+
+.iconBtn {
+  display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 12px;
+  background: transparent; border: 0; color: var(--text); cursor: pointer;
+}
+.iconBtn:hover { background: rgba(47, 125, 92, .08); color: var(--green-dark); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px;
+  background: rgba(47, 125, 92, .08); color: var(--green-dark); font-size: 13px; font-weight: 500;
+}
+.chipOrange { background: rgba(255, 122, 0, .1); color: var(--orange-dark); }
+
+.breadcrumb { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; font-size: 13px; color: var(--muted); margin: 16px 0; }
+.breadcrumb a { color: var(--muted); }
+.breadcrumb a:hover { color: var(--green); }
+.breadcrumbSep { opacity: .5; }
+
+.pageHead { margin: 8px 0 20px; }
+.pageTitle { margin: 0; font-size: 24px; font-weight: 800; color: var(--green-dark); line-height: 1.5; }
+.pageLead { margin: 6px 0 0; color: var(--muted); max-width: 70ch; }
+@media (min-width: 768px) { .pageTitle { font-size: 30px; } }
+
+.empty { text-align: center; color: var(--muted); padding: 40px 16px; }
+
+.ltr { direction: ltr; unicode-bidi: isolate; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

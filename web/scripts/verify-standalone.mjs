@@ -17,6 +17,8 @@ const required = [
   "scripts/migrate.mjs",
   "scripts/seed.mjs",
   "scripts/create-admin.mjs",
+  "scripts/seed-demo.mjs",
+  "scripts/demo/demo-data.mjs",
   "drizzle/meta/_journal.json",
   "src/db/seed-data.json",
   "src/lib/auth/password-policy.mjs",
@@ -39,6 +41,7 @@ const probe = `
   await import("@node-rs/argon2");
   await import("../src/lib/auth/password-policy.mjs");
   await import("../src/lib/contact.mjs");
+  await import("./demo/demo-data.mjs");
 `;
 const r = spawnSync(process.execPath, ["--input-type=module", "-e", probe], {
   cwd: fileURLToPath(new URL("scripts/", root)),

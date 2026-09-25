@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800"><defs>
+<radialGradient id="bgportab0" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F7F7F5"/></radialGradient>
+<linearGradient id="bodyportab0" x1="0" x2="1"><stop offset="0" stop-color="#2F7D5C" stop-opacity="1"/><stop offset=".55" stop-color="#2F7D5C" stop-opacity=".88"/><stop offset="1" stop-color="#2F7D5C" stop-opacity="1"/></linearGradient>
+<linearGradient id="shineportab0" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/><stop offset=".3" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+<linearGradient id="glassportab0" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".75"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".35"/><stop offset="1" stop-color="#FFFFFF" stop-opacity=".7"/></linearGradient>
+<radialGradient id="glowportab0" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FF7A00" stop-opacity=".45"/><stop offset="1" stop-color="#FF7A00" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="800" height="800" fill="url(#bgportab0)"/>
+<g ><ellipse cx="400" cy="690" rx="150" ry="26" fill="#222222" fill-opacity=".10"/>
+<rect x="300" y="170" width="200" height="340" rx="36" fill="url(#glassportab0)" stroke="#222222" stroke-opacity=".18" stroke-width="4"/>
+<path d="M318 330 Q400 300 482 330 L482 480 Q482 500 462 500 L338 500 Q318 500 318 480Z" fill="#FF7A00" fill-opacity=".55"/>
+<path d="M318 350 Q400 325 482 350" fill="none" stroke="#FFFFFF" stroke-opacity=".6" stroke-width="6"/>
+<circle cx="360" cy="400" r="9" fill="#FFFFFF" fill-opacity=".7"/><circle cx="430" cy="440" r="6" fill="#FFFFFF" fill-opacity=".7"/><circle cx="395" cy="460" r="4" fill="#FFFFFF" fill-opacity=".7"/>
+<rect x="290" y="130" width="220" height="60" rx="22" fill="url(#bodyportab0)"/>
+<path d="M360 130 Q400 70 440 130" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+<rect x="286" y="500" width="228" height="170" rx="34" fill="url(#bodyportab0)"/>
+<rect x="300" y="505" width="40" height="160" rx="18" fill="url(#shineportab0)"/>
+<circle cx="400" cy="585" r="30" fill="#FFFFFF" fill-opacity=".9"/><path d="M400 568 v18 M388 578 a16 16 0 1 0 24 0" stroke="#FFFFFF" stroke-width="6" fill="none" stroke-linecap="round"/>
+<rect x="315" y="180" width="26" height="310" rx="13" fill="#FFFFFF" fill-opacity=".5"/></g></svg>

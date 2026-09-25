@@ -12,6 +12,7 @@
     "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "db:check": "drizzle-kit check",
     "db:seed": "node --env-file-if-exists=.env scripts/seed.mjs",
+    "db:seed-demo": "node --env-file-if-exists=.env scripts/seed-demo.mjs",
     "create-admin": "node --env-file-if-exists=.env scripts/create-admin.mjs",
     "postbuild": "node scripts/verify-standalone.mjs"
   },

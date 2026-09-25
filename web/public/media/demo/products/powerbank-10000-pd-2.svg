@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800"><defs>
+<radialGradient id="bgpowerb1" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F7F7F5"/></radialGradient>
+<linearGradient id="bodypowerb1" x1="0" x2="1"><stop offset="0" stop-color="#2F7D5C" stop-opacity="1"/><stop offset=".55" stop-color="#2F7D5C" stop-opacity=".88"/><stop offset="1" stop-color="#2F7D5C" stop-opacity="1"/></linearGradient>
+<linearGradient id="shinepowerb1" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/><stop offset=".3" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+<linearGradient id="glasspowerb1" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".75"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".35"/><stop offset="1" stop-color="#FFFFFF" stop-opacity=".7"/></linearGradient>
+<radialGradient id="glowpowerb1" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FF7A00" stop-opacity=".45"/><stop offset="1" stop-color="#FF7A00" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="800" height="800" fill="url(#bgpowerb1)"/><rect width="800" height="800" fill="#2F7D5C" fill-opacity=".06"/>
+<g transform="translate(400 420) scale(.9) rotate(-6) translate(-400 -420)"><ellipse cx="400" cy="690" rx="200" ry="26" fill="#222222" fill-opacity=".10"/>
+<g transform="rotate(-12 400 420)">
+<rect x="270" y="170" width="260" height="480" rx="44" fill="url(#bodypowerb1)"/>
+<rect x="290" y="185" width="60" height="450" rx="26" fill="url(#shinepowerb1)"/>
+<rect x="340" y="560" width="120" height="20" rx="10" fill="#222222" fill-opacity=".35"/>
+<g fill="#FF7A00"><circle cx="355" cy="250" r="9"/><circle cx="385" cy="250" r="9"/><circle cx="415" cy="250" r="9"/><circle cx="445" cy="250" r="9" fill-opacity=".35"/></g>
+<rect x="340" y="610" width="50" height="18" rx="6" fill="#222222" fill-opacity=".55"/><rect x="410" y="610" width="50" height="18" rx="6" fill="#222222" fill-opacity=".55"/>
+<path d="M392 380 l-26 54 h30 l-18 60 l52 -76 h-32 l20 -38z" fill="#FFFFFF" fill-opacity=".9"/>
+</g></g></svg>

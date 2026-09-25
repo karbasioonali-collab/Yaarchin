@@ -1,0 +1,55 @@
+.slider { position: relative; margin-top: 16px; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); background: var(--surface); }
+.track {
+  display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth;
+  scrollbar-width: none; overscroll-behavior-x: contain;
+}
+.track::-webkit-scrollbar { display: none; }
+.slide {
+  position: relative; flex: 0 0 100%; scroll-snap-align: center; scroll-snap-stop: always;
+  display: flex; flex-direction: column; min-height: 420px; overflow: hidden;
+}
+.image { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: 20% 50%; background: var(--bg); }
+.content {
+  position: relative; flex: 1; display: flex; flex-direction: column; align-items: flex-start; justify-content: center;
+  gap: 10px; padding: 18px 20px 44px; color: #FFFFFF;
+}
+.title { margin: 0; font-size: 21px; font-weight: 800; line-height: 1.45; }
+.text { margin: 0; font-size: 14px; opacity: .92; max-width: 42ch; }
+.cta { margin-top: 6px; min-height: 42px; }
+
+.green .content { background: var(--green); }
+.orange .content { background: var(--orange-dark); }
+.orange .cta { background: #FFFFFF; color: var(--orange-dark); box-shadow: none; }
+.orange .cta:hover { background: var(--bg); color: var(--orange-dark); }
+.dark .content { background: var(--green-dark); }
+
+.arrow {
+  display: none; position: absolute; top: 50%; transform: translateY(-50%); z-index: 2;
+  width: 44px; height: 44px; border-radius: 50%; border: 0; cursor: pointer;
+  background: rgba(255, 255, 255, .9); color: var(--green-dark); box-shadow: var(--shadow);
+  place-items: center;
+}
+.arrow:hover { background: #FFFFFF; color: var(--orange-dark); }
+.prev { inset-inline-start: 14px; }
+.next { inset-inline-end: 14px; }
+
+.dots { position: absolute; bottom: 14px; inset-inline: 0; display: flex; justify-content: center; gap: 6px; z-index: 2; }
+.dot { width: 8px; height: 8px; border-radius: 999px; border: 0; padding: 0; background: rgba(255, 255, 255, .55); cursor: pointer; transition: width .2s, background-color .2s; }
+.dotActive { width: 24px; background: #FFFFFF; }
+
+/* دسکتاپ: عکس کل اسلاید، متن روی نیمه‌ی راست با گرادیان رنگ برند */
+@media (min-width: 768px) {
+  .slide { min-height: 0; aspect-ratio: 16 / 6.2; }
+  .image { position: absolute; inset: 0; height: 100%; aspect-ratio: auto; object-position: left center; }
+  .content { width: 52%; padding: 32px 76px 48px 40px; background: none !important; }
+  .content::before { content: ""; position: absolute; inset: 0 0 0 -30%; z-index: -1; }
+  .green .content::before { background: linear-gradient(to left, var(--green) 55%, rgba(47, 125, 92, 0)); }
+  .orange .content::before { background: linear-gradient(to left, var(--orange-dark) 55%, rgba(232, 106, 0, 0)); }
+  .dark .content::before { background: linear-gradient(to left, var(--green-dark) 55%, rgba(27, 77, 62, 0)); }
+  .content { z-index: 1; isolation: isolate; }
+  .title { font-size: 32px; }
+  .text { font-size: 17px; }
+  .arrow { display: grid; }
+  .dots { bottom: 18px; }
+}
+@media (min-width: 1100px) { .title { font-size: 38px; } }

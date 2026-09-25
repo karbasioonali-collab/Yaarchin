@@ -1,0 +1,45 @@
+.heart { min-width: 0; }
+.heart svg { color: var(--orange-dark); }
+.heartCompact { flex-shrink: 0; color: var(--orange-dark); box-shadow: inset 0 0 0 1.5px rgba(255, 122, 0, .35); }
+.chatBtn { flex: 1; }
+.chatCompact { flex: 1; min-height: 44px; padding: 0 12px; font-size: 14px; }
+
+.chat { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden; scroll-margin-top: 90px; }
+.chatHead {
+  display: flex; align-items: center; gap: 12px; padding: 14px 16px; color: #FFFFFF;
+  background: linear-gradient(120deg, var(--green-dark), var(--green));
+}
+.avatar {
+  flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+  background: rgba(255, 255, 255, .15); color: var(--orange);
+}
+.chatTitle { margin: 0; font-size: 16px; font-weight: 800; }
+.chatSub { font-size: 12px; opacity: .85; }
+.messages { padding: 16px; display: flex; flex-direction: column; gap: 12px; background: var(--bg); min-height: 160px; }
+.bubble {
+  max-width: 88%; align-self: flex-start; background: var(--surface); padding: 10px 14px;
+  border-radius: 16px; border-start-start-radius: 4px; box-shadow: 0 2px 8px rgba(34, 34, 34, .05); font-size: 14px;
+}
+.suggestions { display: flex; flex-wrap: wrap; gap: 6px; }
+.suggestions button { border: 0; cursor: pointer; background: var(--surface); box-shadow: inset 0 0 0 1px rgba(47, 125, 92, .25); }
+.suggestions button:hover { background: rgba(47, 125, 92, .08); }
+.composer { display: flex; align-items: flex-end; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+.input {
+  flex: 1; resize: none; min-height: 44px; max-height: 140px; padding: 10px 14px; border-radius: 14px;
+  border: 1.5px solid rgba(34, 34, 34, .12); background: var(--surface); line-height: 1.7; field-sizing: content;
+}
+.input:focus { outline: none; border-color: var(--green); }
+.send {
+  flex-shrink: 0; width: 44px; height: 44px; border-radius: 14px; border: 0; cursor: pointer;
+  display: grid; place-items: center; background: var(--orange); color: #FFFFFF;
+}
+.send svg { transform: scaleX(-1); }
+.send:disabled { background: rgba(34, 34, 34, .15); cursor: default; }
+
+.mobileBar {
+  position: fixed; z-index: 45; inset-inline: 0; bottom: 0; display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, .97); box-shadow: 0 -1px 0 var(--line), 0 -6px 20px rgba(34, 34, 34, .06);
+}
+.mobilePrice { font-weight: 800; color: var(--orange-dark); font-size: 14px; white-space: nowrap; }
+@media (min-width: 768px) { .mobileBar { display: none; } }
