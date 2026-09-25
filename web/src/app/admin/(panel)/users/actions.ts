@@ -11,7 +11,12 @@ import { ADMIN_ONLY_MSG, adminRoleId, isAdminUser } from "@/lib/auth/admin-guard
 import { requirePermission } from "@/lib/auth/can";
 import { hashPassword, passwordError } from "@/lib/auth/password";
 import { revokeAllSessions, updateSession } from "@/lib/auth/session";
+import { hasCustomerRole } from "@/lib/customer/auth";
 import { normalizeEmail, normalizeMobile } from "@/lib/validation";
+
+// حساب مشتری فقط از بخش «مشتریان» (با دسترسی customers.manage) تغییر می‌کند.
+// بدون این چک، ذخیره‌ی فرم کاربر نقش «مشتری» را برمی‌داشت (فرم فقط نقش‌های پنل را دارد).
+const CUSTOMER_MSG = "این حساب مشتری است؛ از بخش «مشتریان» مدیریت می‌شود.";
 
 type Profile = { fullName: string; mobile: string | null; email: string | null };
 
@@ -83,6 +88,7 @@ export async function createUserAction(_prev: FormState, fd: FormData): Promise<
 export async function updateUserAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("users.manage");
   const id = String(fd.get("id"));
+  if (await hasCustomerRole(id)) return { error: CUSTOMER_MSG };
   const [before] = await db.select().from(users).where(eq(users.id, id));
   if (!before) return { error: "کاربر پیدا نشد." };
   // حساب یک ادمین فقط دست ادمین است
@@ -137,6 +143,7 @@ export async function updateUserAction(_prev: FormState, fd: FormData): Promise<
 export async function setPasswordAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("users.manage");
   const id = String(fd.get("id"));
+  if (await hasCustomerRole(id)) return { error: CUSTOMER_MSG };
   if (!a.user.isAdmin && (await isAdminUser(id))) return { error: ADMIN_ONLY_MSG.editAdmin };
   const password = String(fd.get("password") ?? "");
   const policy = passwordError(password);
@@ -150,6 +157,7 @@ export async function setPasswordAction(_prev: FormState, fd: FormData): Promise
 export async function revokeSessionsAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("users.manage");
   const id = String(fd.get("id"));
+  if (await hasCustomerRole(id)) return { error: CUSTOMER_MSG };
   if (!a.user.isAdmin && (await isAdminUser(id))) return { error: ADMIN_ONLY_MSG.editAdmin };
   await revokeAllSessions(id, id === a.user.id ? a.session.id : undefined);
   await logActivity({ actorUserId: a.user.id, action: "user.revoke_sessions", entityType: "user", entityId: id });

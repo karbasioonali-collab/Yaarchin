@@ -6,17 +6,17 @@ import { Icon, type IconName } from "./Icon";
 import styles from "./MobileTabBar.module.css";
 
 // نوار پایین موبایل (حس اپلیکیشن؛ آماده برای PWA). در صفحه‌ی محصول نوار اقدام خود محصول جایش را می‌گیرد.
-export function MobileTabBar({ favoritesEnabled }: { favoritesEnabled: boolean }) {
+export function MobileTabBar({ favoritesEnabled, customer }: { favoritesEnabled: boolean; customer: boolean }) {
   const path = usePathname();
   if (path.startsWith("/p/")) return null;
   const items: { href: string; label: string; icon: IconName; active: boolean }[] = [
     { href: "/", label: "خانه", icon: "home", active: path === "/" },
     { href: "/categories", label: "دسته‌بندی", icon: "grid", active: path === "/categories" || path.startsWith("/c/") },
     ...(favoritesEnabled
-      ? [{ href: "/login", label: "علاقه‌مندی", icon: "heart" as IconName, active: false }]
+      ? [{ href: "/favorites", label: "علاقه‌مندی", icon: "heart" as IconName, active: path === "/favorites" }]
       : []),
     { href: "/contact", label: "تماس", icon: "chat", active: path === "/contact" },
-    { href: "/login", label: "حساب", icon: "user", active: path === "/login" },
+    { href: customer ? "/account" : "/login", label: "حساب", icon: "user", active: path === "/login" || path.startsWith("/account") },
   ];
   return (
     <nav className={styles.bar} aria-label="پیمایش اصلی">

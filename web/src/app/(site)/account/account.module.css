@@ -1,0 +1,38 @@
+/* پنل مشتری (حساب من، علاقه‌مندی‌ها، بازدیدهای اخیر) */
+.head { margin-top: 20px; }
+.hello { margin: 0; color: var(--muted); font-size: 14px; }
+.title { margin: 2px 0 0; font-size: 24px; font-weight: 900; color: var(--green-dark); }
+
+.tabs { display: flex; gap: 6px; margin-top: 14px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab {
+  flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; min-height: 42px; padding: 8px 14px;
+  border-radius: 999px; background: var(--surface); box-shadow: var(--shadow); color: var(--green-dark); font-weight: 700; font-size: 14px;
+}
+.tab:hover { color: var(--green); }
+.tabActive, .tabActive:hover { background: var(--green); color: #FFFFFF; }
+
+.body { margin-top: 18px; }
+.grid { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; } }
+.card { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 20px; }
+.cardWide { grid-column: 1 / -1; }
+.cardTitle { margin: 0 0 4px; font-size: 18px; font-weight: 800; color: var(--green-dark); }
+.cardSub { margin: 0 0 16px; font-size: 13px; color: var(--muted); }
+
+.checks { display: flex; flex-wrap: wrap; gap: 8px; }
+.check { position: relative; }
+.check input { position: absolute; opacity: 0; inset: 0; }
+.check span {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 8px 14px; border-radius: 999px; cursor: pointer;
+  background: rgba(47, 125, 92, .08); color: var(--green-dark); font-size: 14px; font-weight: 600;
+}
+.check input:checked + span { background: var(--green); color: #FFFFFF; }
+.check input:focus-visible + span { outline: 2px solid var(--orange); outline-offset: 2px; }
+.radios { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.actionsRow { display: flex; flex-wrap: wrap; gap: 10px; }
+.empty { text-align: center; padding: 36px 16px; color: var(--muted); }
+.empty strong { display: block; margin-bottom: 6px; color: var(--green-dark); font-size: 17px; }
+.danger { background: rgba(232, 106, 0, .1); color: var(--orange-dark); }
+.danger:hover { background: rgba(232, 106, 0, .16); color: var(--orange-dark); }

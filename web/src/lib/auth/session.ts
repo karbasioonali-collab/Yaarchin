@@ -12,9 +12,10 @@ const TOUCH_INTERVAL_MS = 5 * 60 * 1000;
 
 export type SessionRow = typeof sessions.$inferSelect;
 
-export async function createSession(userId: string): Promise<void> {
+// hours: مدت اعتبار؛ پیش‌فرض تنظیم auth.session_hours (نشست پنل). مشتری‌ها مدت خودشان را می‌دهند (lib/customer/auth.ts).
+export async function createSession(userId: string, opts?: { hours?: number }): Promise<void> {
   const token = randomToken();
-  const hours = Number(await getSetting<number>("auth.session_hours")) || 72;
+  const hours = opts?.hours ?? (Number(await getSetting<number>("auth.session_hours")) || 72);
   const expiresAt = new Date(Date.now() + hours * 3600 * 1000);
   const { ip, userAgent } = await requestMeta();
   await db.insert(sessions).values({ id: sha256Hex(token), userId, expiresAt, ip, userAgent });

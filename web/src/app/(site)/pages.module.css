@@ -67,3 +67,12 @@
 .authTitle { margin: 0; font-size: 22px; font-weight: 900; color: var(--green-dark); }
 .authText { margin: 10px 0 20px; color: var(--muted); }
 .authActions { display: grid; gap: 8px; }
+
+/* ورود و ثبت‌نام مشتری */
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; margin-bottom: 16px; border-radius: 14px; background: rgba(47, 125, 92, .08); }
+.tab { display: block; padding: 10px; border-radius: 10px; font-weight: 700; color: var(--green-dark); }
+.tab:hover { color: var(--green-dark); background: rgba(47, 125, 92, .08); }
+.tabActive, .tabActive:hover { background: var(--surface); box-shadow: var(--shadow); }
+.authBody { text-align: start; }
+.notice { margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; background: rgba(47, 125, 92, .08); color: var(--green-dark); font-size: 14px; text-align: start; }
+.backLink { display: inline-block; margin-top: 16px; font-size: 14px; }
