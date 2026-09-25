@@ -18,10 +18,13 @@ const GROUP_FA: Record<string, string> = {
   roles: "نقش‌ها",
   settings: "تنظیمات",
   activity: "لاگ فعالیت",
+  site: "محتوای سایت",
+  contact: "پیام‌های تماس",
+  products: "محصولات",
 };
 
 export default async function RolePage({ params }: PageProps<"/admin/roles/[id]">) {
-  await requirePermission("roles.manage");
+  const a = await requirePermission("roles.manage");
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const [role] = await db.select().from(roles).where(eq(roles.id, id));
@@ -47,6 +50,27 @@ export default async function RolePage({ params }: PageProps<"/admin/roles/[id]"
       <div className={styles.card}>
         {isAdmin ? (
           <p style={{ margin: 0 }}>ادمین همیشه به همه‌چیز دسترسی دارد و این نقش قابل ویرایش نیست.</p>
+        ) : !a.user.isAdmin ? (
+          // فقط دیدن: ساخت/تغییر/حذف نقش فقط کار ادمین است (بخش ۱۷ مستندات)
+          <>
+            <p className={styles.impersonation} style={{ marginTop: 0 }}>
+              فقط ادمین می‌تواند دسترسی‌های این نقش را تغییر دهد؛ شما فقط می‌بینید.
+            </p>
+            {groups.map((g) => {
+              const list = all.filter((p) => p.groupKey === g && mine.has(p.key));
+              return list.length ? (
+                <div key={g}>
+                  <div className={styles.groupTitle}>{GROUP_FA[g] ?? g}</div>
+                  {list.map((p) => (
+                    <span key={p.key} className={styles.badge}>
+                      {p.nameFa}
+                    </span>
+                  ))}
+                </div>
+              ) : null;
+            })}
+            {mine.size === 0 && <p className={styles.muted}>این نقش هیچ دسترسی‌ای ندارد.</p>}
+          </>
         ) : (
           <ActionForm action={updateRoleAction} submitLabel="ذخیره">
             <input type="hidden" name="id" value={role.id} />
@@ -78,7 +102,7 @@ export default async function RolePage({ params }: PageProps<"/admin/roles/[id]"
         )}
       </div>
 
-      {!role.isSystem && (
+      {!role.isSystem && a.user.isAdmin && (
         <div className={styles.card}>
           <ActionForm action={deleteRoleAction} submitLabel="حذف این نقش" submitVariant="danger" confirm="این نقش حذف شود؟">
             <input type="hidden" name="id" value={role.id} />
