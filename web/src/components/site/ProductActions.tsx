@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useState } from "react";
 import { Icon } from "./Icon";
 import { callProtected, LoginPrompt, Toast } from "./LoginPrompt";
 import styles from "./ProductActions.module.css";
@@ -9,34 +10,71 @@ import s from "./site.module.css";
 const SOON = "این بخش به‌زودی فعال می‌شود.";
 const ERROR = "ارتباط برقرار نشد؛ دوباره تلاش کنید.";
 
-// دکمه‌ی قلب. قانون ورود در API (/api/v1/favorites) اعمال می‌شود؛ جواب 401 ← پنجره‌ی «باید وارد شوید».
-export function FavoriteButton({ slug, compact = false }: { slug: string; compact?: boolean }) {
+// دکمه‌ی قلب: افزودن/حذف علاقه‌مندی. قانون ورود در API (/api/v1/favorites) اعمال می‌شود؛
+// جواب 401 ← پنجره‌ی «باید وارد شوید» (بعد از ورود به همین صفحه برمی‌گردد).
+// initial: وضعیت فعلی برای مشتری واردشده (برای بقیه false). چند دکمه‌ی یک محصول در یک صفحه
+// (بالای صفحه و نوار موبایل) با رویداد yc:favorite هم‌زمان می‌شوند.
+const FAV_EVENT = "yc:favorite";
+
+export function FavoriteButton({
+  slug,
+  initial = false,
+  compact = false,
+  refreshOnChange = false,
+  className,
+}: {
+  slug: string;
+  initial?: boolean;
+  compact?: boolean;
+  refreshOnChange?: boolean;
+  className?: string;
+}) {
+  const router = useRouter();
+  const [on, setOn] = useState(initial);
   const [prompt, setPrompt] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const clearToast = useCallback(() => setToast(null), []);
 
+  useEffect(() => {
+    const sync = (e: Event) => {
+      const d = (e as CustomEvent<{ slug: string; on: boolean }>).detail;
+      if (d.slug === slug) setOn(d.on);
+    };
+    window.addEventListener(FAV_EVENT, sync);
+    return () => window.removeEventListener(FAV_EVENT, sync);
+  }, [slug]);
+
   async function onClick() {
     setBusy(true);
-    const r = await callProtected("/api/v1/favorites", { product: slug });
+    const want = !on;
+    const r = await callProtected("/api/v1/favorites", { product: slug }, want ? "POST" : "DELETE");
     setBusy(false);
-    if (r === "login") setPrompt(true);
+    if (r === "ok") {
+      window.dispatchEvent(new CustomEvent(FAV_EVENT, { detail: { slug, on: want } }));
+      setToast(want ? "به علاقه‌مندی‌ها اضافه شد." : "از علاقه‌مندی‌ها حذف شد.");
+      if (refreshOnChange) router.refresh();
+    } else if (r === "login") setPrompt(true);
+    else if (r === "forbidden") setToast("علاقه‌مندی مخصوص حساب مشتری است.");
     else if (r === "soon") setToast(SOON);
-    else if (r === "error") setToast(ERROR);
+    else setToast(ERROR);
   }
 
+  const label = on ? "حذف از علاقه‌مندی‌ها" : "افزودن به علاقه‌مندی‌ها";
   return (
     <>
       <button
         type="button"
-        className={compact ? `${s.iconBtn} ${styles.heartCompact}` : `${s.btnOutline} ${styles.heart}`}
+        className={className ?? (compact ? `${s.iconBtn} ${styles.heartCompact}` : `${s.btnOutline} ${styles.heart}`)}
         onClick={onClick}
         disabled={busy}
-        aria-label="افزودن به علاقه‌مندی‌ها"
-        title="افزودن به علاقه‌مندی‌ها"
+        aria-label={label}
+        aria-pressed={on}
+        title={label}
+        data-on={on || undefined}
       >
-        <Icon name="heart" />
-        {!compact && <span>علاقه‌مندی</span>}
+        <Icon name="heart" filled={on} />
+        {!compact && <span>{on ? "در علاقه‌مندی‌ها" : "علاقه‌مندی"}</span>}
       </button>
       <LoginPrompt open={prompt} onClose={() => setPrompt(false)} text="برای ذخیره‌ی محصول در علاقه‌مندی‌ها، وارد حساب کاربری شوید یا ثبت‌نام کنید." />
       <Toast text={toast} onDone={clearToast} />
@@ -135,10 +173,22 @@ export function ChatBox({ slug, title }: { slug: string; title: string }) {
 }
 
 // نوار ثابت پایین صفحه‌ی محصول در موبایل
-export function MobileProductBar({ slug, price, chat, favorite }: { slug: string; price: string | null; chat: boolean; favorite: boolean }) {
+export function MobileProductBar({
+  slug,
+  price,
+  chat,
+  favorite,
+  isFavorite = false,
+}: {
+  slug: string;
+  price: string | null;
+  chat: boolean;
+  favorite: boolean;
+  isFavorite?: boolean;
+}) {
   return (
     <div className={styles.mobileBar}>
-      {favorite && <FavoriteButton slug={slug} compact />}
+      {favorite && <FavoriteButton slug={slug} initial={isFavorite} compact />}
       {price && <span className={styles.mobilePrice}>{price}</span>}
       {chat && <ChatButton compact />}
     </div>

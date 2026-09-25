@@ -283,6 +283,41 @@ export async function listProductsInCategory(slug: string, limit = 48): Promise<
   return listProducts({ categoryIds: page.ids, limit });
 }
 
+// ---------- برای بخش مشتری (علاقه‌مندی‌ها، بازدیدهای اخیر، دسته‌های مورد علاقه) ----------
+// کارت محصولات منتشرشده با شناسه؛ ترتیب ورودی حفظ می‌شود (مثلاً «آخرین بازدید اول»).
+export async function productCardsByIds(ids: string[]): Promise<ProductCard[]> {
+  await connection();
+  if (!ids.length || !(await catalogReady())) return [];
+  const rows = await db
+    .select(await cardColumns())
+    .from(products)
+    .where(and(inArray(products.id, ids), eq(products.status, "published")));
+  const order = new Map(ids.map((id, i) => [id, i]));
+  rows.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+  return toCards(rows);
+}
+
+// شناسه‌ی محصول منتشرشده از روی slug (یا null)
+export async function publishedProductId(slug: string): Promise<string | null> {
+  if (!(await catalogReady())) return null;
+  const [r] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.slug, slug), eq(products.status, "published")));
+  return r?.id ?? null;
+}
+
+// شناسه‌ی دسته‌ی قابل‌نمایش از روی slug (یا null)
+export async function visibleCategoryId(slug: string): Promise<string | null> {
+  return (await getCategoryPage(slug))?.ids[0] ?? null;
+}
+
+// دسته‌های اصلی (ریشه) با شناسه؛ برای انتخاب «دسته‌های مورد علاقه»
+export async function topCategoryOptions(): Promise<{ id: string; nameFa: string }[]> {
+  const idx = await loadCategories();
+  return (idx.children.get(null) ?? []).map((r) => ({ id: r.id, nameFa: r.nameFa }));
+}
+
 type RawSpec = { labelFa?: unknown; valueFa?: unknown; unit?: unknown };
 function publicSpecs(v: unknown): PublicSpec[] {
   if (!Array.isArray(v)) return [];

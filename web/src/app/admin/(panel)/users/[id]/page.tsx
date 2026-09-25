@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { and, desc, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { activityLog, roles, sessions, userRoles, users } from "@/db/schema";
@@ -33,6 +33,8 @@ export default async function UserPage({ params }: PageProps<"/admin/users/[id]"
   const mine = await db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, id));
   const roleIds = mine.map((r) => r.roleId);
   const isStaff = allRoles.some((r) => r.isStaff && roleIds.includes(r.id));
+  // مشتری در بخش «مشتریان» دیده و مدیریت می‌شود
+  if (!isStaff && allRoles.some((r) => r.key === "customer" && roleIds.includes(r.id))) redirect(`/admin/customers/${id}`);
   const activeSessions = await db
     .select()
     .from(sessions)

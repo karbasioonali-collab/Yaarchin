@@ -7,7 +7,20 @@ import { Icon } from "./Icon";
 import styles from "./Header.module.css";
 import s from "./site.module.css";
 
-export function Header({ data, categories, favoritesEnabled }: { data: HeaderData; categories: PublicCategory[]; favoritesEnabled: boolean }) {
+// کاربر واردشده: مشتری ← «حساب من»؛ کارمند ← لینک پنل؛ null ← «ورود»
+export type Viewer = { kind: "customer"; name: string } | { kind: "staff" } | null;
+
+export function Header({
+  data,
+  categories,
+  favoritesEnabled,
+  viewer,
+}: {
+  data: HeaderData;
+  categories: PublicCategory[];
+  favoritesEnabled: boolean;
+  viewer: Viewer;
+}) {
   const { topBar, nav, categoriesMenu, account, cta } = data;
   const showCategories = categoriesMenu.visible && categories.length > 0;
   return (
@@ -42,16 +55,27 @@ export function Header({ data, categories, favoritesEnabled }: { data: HeaderDat
           </nav>
           <div className={styles.actions}>
             {account.visible && favoritesEnabled && (
-              <Link href="/login" className={s.iconBtn} aria-label="علاقه‌مندی‌ها" title="علاقه‌مندی‌ها">
+              <Link href="/favorites" className={s.iconBtn} aria-label="علاقه‌مندی‌ها" title="علاقه‌مندی‌ها">
                 <Icon name="heart" />
               </Link>
             )}
-            {account.visible && (
-              <Link href="/login" className={`${styles.account}`} aria-label="ورود یا ثبت‌نام">
-                <Icon name="user" />
-                <span className={styles.accountLabel}>ورود</span>
-              </Link>
-            )}
+            {account.visible &&
+              (viewer?.kind === "customer" ? (
+                <Link href="/account" className={styles.account} aria-label="حساب من">
+                  <Icon name="user" />
+                  <span className={styles.accountLabel}>{viewer.name.split(" ")[0]}</span>
+                </Link>
+              ) : viewer?.kind === "staff" ? (
+                <Link href="/admin" className={styles.account} aria-label="پنل مدیریت">
+                  <Icon name="user" />
+                  <span className={styles.accountLabel}>پنل</span>
+                </Link>
+              ) : (
+                <Link href="/login" className={styles.account} aria-label="ورود یا ثبت‌نام">
+                  <Icon name="user" />
+                  <span className={styles.accountLabel}>ورود</span>
+                </Link>
+              ))}
             {cta.visible && cta.label && cta.href && (
               <Link href={cta.href} className={`${s.btn} ${styles.cta}`}>
                 {cta.label}

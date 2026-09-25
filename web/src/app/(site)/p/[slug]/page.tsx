@@ -7,7 +7,9 @@ import { ImportStars } from "@/components/site/ImportStars";
 import { ChatBox, ChatButton, FavoriteButton, MobileProductBar } from "@/components/site/ProductActions";
 import { ProductGrid } from "@/components/site/ProductCard";
 import s from "@/components/site/site.module.css";
-import { getCategoryPage, getProduct, listProducts, type PublicProduct } from "@/lib/catalog/public";
+import { getCategoryPage, getProduct, listProducts, publishedProductId, type PublicProduct } from "@/lib/catalog/public";
+import { getCustomer } from "@/lib/customer/auth";
+import { isFavorite } from "@/lib/customer/favorites";
 import { fmtDate, fmtMoney, fmtNum, unitFa } from "@/lib/format";
 import { isEnabled } from "@/lib/settings";
 import styles from "./product.module.css";
@@ -94,7 +96,10 @@ function LandedCard({ p }: { p: PublicProduct }) {
 export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
   const p = await getProduct((await params).slug);
   if (!p) notFound();
-  const [chatOn, favOn] = await Promise.all([isEnabled("chat"), isEnabled("favorites")]);
+  const [chatOn, favOn, customer] = await Promise.all([isEnabled("chat"), isEnabled("favorites"), getCustomer()]);
+  // وضعیت قلب برای مشتری واردشده (برای بقیه خالی)
+  const productId = favOn && customer ? await publishedProductId(p.slug) : null;
+  const fav = customer && productId ? await isFavorite(customer.user.id, productId) : false;
   const last = p.breadcrumb.at(-1);
   const catPage = last ? await getCategoryPage(last.slug) : null;
   const related = catPage ? await listProducts({ categoryIds: catPage.ids, limit: 4, excludeSlug: p.slug }) : [];
@@ -161,7 +166,7 @@ export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
 
           <div className={styles.actions}>
             {chatOn && <ChatButton />}
-            {favOn && <FavoriteButton slug={p.slug} />}
+            {favOn && <FavoriteButton slug={p.slug} initial={fav} />}
           </div>
           <p className={styles.trust}>
             <Icon name="shield" size={16} />
@@ -218,6 +223,7 @@ export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
       <MobileProductBar
         slug={p.slug}
         favorite={favOn}
+        isFavorite={fav}
         chat={chatOn}
         price={p.price ? `${fmtMoney(p.price.min)} تا ${fmtMoney(p.price.max)} $` : null}
       />

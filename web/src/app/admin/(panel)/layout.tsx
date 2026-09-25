@@ -10,6 +10,7 @@ import styles from "./panel.module.css";
 const NAV: (NavItem & { permission: string })[] = [
   { href: "/admin", label: "داشبورد", permission: "dashboard.view" },
   { href: "/admin/users", label: "کاربران", permission: "users.view" },
+  { href: "/admin/customers", label: "مشتریان", permission: "customers.view" },
   { href: "/admin/roles", label: "نقش‌ها و دسترسی", permission: "roles.manage" },
   { href: "/admin/products", label: "محصولات", permission: "products.rate" },
   { href: "/admin/site", label: "محتوای سایت", permission: "site.manage" },

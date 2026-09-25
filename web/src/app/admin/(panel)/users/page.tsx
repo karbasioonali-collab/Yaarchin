@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, count, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, notInArray, or, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
 import { roles, userRoles, users } from "@/db/schema";
 import { can, requirePermission } from "@/lib/auth/can";
@@ -19,8 +19,14 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
   const roleKey = typeof sp.role === "string" ? sp.role : "";
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const allRoles = await db.select().from(roles).orderBy(roles.createdAt);
-  const conds: SQL[] = [];
+  // مشتری‌ها در بخش «مشتریان» هستند، نه اینجا
+  const allRoles = (await db.select().from(roles).orderBy(roles.createdAt)).filter((r) => r.key !== "customer");
+  const customerIds = db
+    .select({ id: userRoles.userId })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(eq(roles.key, "customer"));
+  const conds: SQL[] = [notInArray(users.id, customerIds)];
   if (q) {
     const like = `%${toLatinDigits(q)}%`;
     conds.push(or(ilike(users.fullName, `%${q}%`), ilike(users.mobile, like), ilike(users.email, like))!);
@@ -32,7 +38,7 @@ export default async function UsersPage({ searchParams }: PageProps<"/admin/user
       conds.push(inArray(users.id, sub));
     }
   }
-  const where = conds.length ? and(...conds) : undefined;
+  const where = and(...conds);
 
   const [{ total }] = await db.select({ total: count() }).from(users).where(where);
   const rows = await db

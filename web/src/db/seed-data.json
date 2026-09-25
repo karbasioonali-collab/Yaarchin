@@ -83,6 +83,16 @@
       "key": "products.rate",
       "groupKey": "products",
       "nameFa": "ثبت و ویرایش امتیاز «جذاب برای واردات» محصولات"
+    },
+    {
+      "key": "customers.view",
+      "groupKey": "customers",
+      "nameFa": "دیدن مشتریان (اطلاعات، پروفایل کسب‌وکار، علاقه‌مندی‌ها و بازدیدها)"
+    },
+    {
+      "key": "customers.manage",
+      "groupKey": "customers",
+      "nameFa": "فعال یا غیرفعال کردن مشتری"
     }
   ],
   "rolePermissions": {
@@ -104,6 +114,12 @@
       "groupKey": "auth",
       "value": 72,
       "labelFa": "مدت اعتبار نشست پنل (ساعت)"
+    },
+    {
+      "key": "auth.customer_session_days",
+      "groupKey": "auth",
+      "value": 30,
+      "labelFa": "مدت اعتبار نشست مشتری در سایت (روز)"
     },
     {
       "key": "features.extension_import",

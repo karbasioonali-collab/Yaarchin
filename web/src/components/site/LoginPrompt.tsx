@@ -56,14 +56,15 @@ export function Toast({ text, onDone }: { text: string | null; onDone: () => voi
   );
 }
 
-export type ApiOutcome = "ok" | "login" | "soon" | "error";
+export type ApiOutcome = "ok" | "login" | "forbidden" | "soon" | "error";
 
 // نتیجه‌ی درخواست‌هایی که ورود لازم دارند
-export async function callProtected(url: string, body: unknown): Promise<ApiOutcome> {
+export async function callProtected(url: string, body: unknown, method: "POST" | "DELETE" = "POST"): Promise<ApiOutcome> {
   try {
-    const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    const r = await fetch(url, { method, headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
     if (r.ok) return "ok";
     if (r.status === 401) return "login";
+    if (r.status === 403) return "forbidden";
     if (r.status === 501 || r.status === 503) return "soon";
     return "error";
   } catch {
