@@ -11,7 +11,7 @@ import styles from "../../panel.module.css";
 export const metadata: Metadata = { title: "کاربر جدید" };
 
 export default async function NewUserPage() {
-  await requirePermission("users.manage");
+  const a = await requirePermission("users.manage");
   const allRoles = await db.select().from(roles).orderBy(roles.createdAt);
   return (
     <>
@@ -25,7 +25,7 @@ export default async function NewUserPage() {
       </div>
       <div className={styles.card}>
         <ActionForm action={createUserAction} submitLabel="ساخت کاربر">
-          <UserFields allRoles={allRoles} withPassword />
+          <UserFields allRoles={allRoles} withPassword canGrantAdmin={a.user.isAdmin} />
         </ActionForm>
       </div>
     </>

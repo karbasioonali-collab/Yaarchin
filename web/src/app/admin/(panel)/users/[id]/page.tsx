@@ -45,7 +45,10 @@ export default async function UserPage({ params }: PageProps<"/admin/users/[id]"
     .orderBy(desc(activityLog.createdAt))
     .limit(10);
 
-  const canManage = await can(a.user, "users.manage");
+  // حساب یک ادمین فقط دست ادمین است (مشخصات، رمز، وضعیت، نشست‌ها)؛ بخش ۱۷ مستندات
+  const targetIsAdmin = allRoles.some((r) => r.key === "admin" && roleIds.includes(r.id));
+  const lockedAdmin = targetIsAdmin && !a.user.isAdmin;
+  const canManage = !lockedAdmin && (await can(a.user, "users.manage"));
   const canImpersonate = !isStaff && (await can(a.user, "impersonate"));
 
   return (
@@ -62,10 +65,15 @@ export default async function UserPage({ params }: PageProps<"/admin/users/[id]"
       <div className={styles.grid}>
         <div className={styles.card} style={{ gridColumn: "1 / -1" }}>
           <h2 className={styles.cardTitle}>مشخصات و نقش‌ها</h2>
+          {lockedAdmin && (
+            <p className={styles.impersonation} style={{ marginTop: 0 }}>
+              این حساب ادمین است؛ فقط ادمین می‌تواند مشخصات، رمز، وضعیت یا نشست‌هایش را تغییر دهد.
+            </p>
+          )}
           {canManage ? (
             <ActionForm action={updateUserAction} submitLabel="ذخیره">
               <input type="hidden" name="id" value={u.id} />
-              <UserFields allRoles={allRoles} user={u} selectedRoleIds={roleIds} />
+              <UserFields allRoles={allRoles} user={u} selectedRoleIds={roleIds} canGrantAdmin={a.user.isAdmin} />
             </ActionForm>
           ) : (
             <p>

@@ -7,6 +7,7 @@ import { db } from "@/db/client";
 import { roles, userRoles, users } from "@/db/schema";
 import type { FormState } from "@/components/ui/ActionForm";
 import { logActivity } from "@/lib/activity";
+import { ADMIN_ONLY_MSG, adminRoleId, isAdminUser } from "@/lib/auth/admin-guard";
 import { requirePermission } from "@/lib/auth/can";
 import { hashPassword, passwordError } from "@/lib/auth/password";
 import { revokeAllSessions, updateSession } from "@/lib/auth/session";
@@ -55,6 +56,9 @@ export async function createUserAction(_prev: FormState, fd: FormData): Promise<
   if (dup) return { error: dup };
   const password = String(fd.get("password") ?? "");
   const roleIds = await readRoleIds(fd);
+  // فقط ادمین نقش ادمین می‌دهد (مستقل از can؛ بخش ۱۷ مستندات)
+  const adminId = await adminRoleId();
+  if (adminId && roleIds.includes(adminId) && !a.user.isAdmin) return { error: ADMIN_ONLY_MSG.grantAdmin };
   // ادمین و کارشناس فقط با رمز وارد می‌شوند؛ پس برای نقش‌های پنل رمز اجباری است.
   const staffRoles = roleIds.length
     ? await db.select({ id: roles.id }).from(roles).where(and(inArray(roles.id, roleIds), eq(roles.isStaff, true)))
@@ -81,6 +85,8 @@ export async function updateUserAction(_prev: FormState, fd: FormData): Promise<
   const id = String(fd.get("id"));
   const [before] = await db.select().from(users).where(eq(users.id, id));
   if (!before) return { error: "کاربر پیدا نشد." };
+  // حساب یک ادمین فقط دست ادمین است
+  if (!a.user.isAdmin && (await isAdminUser(id))) return { error: ADMIN_ONLY_MSG.editAdmin };
   const p = readProfile(fd);
   if ("error" in p) return p;
   const dup = await duplicateError(p, id);
@@ -91,8 +97,13 @@ export async function updateUserAction(_prev: FormState, fd: FormData): Promise<
   const roleIds = await readRoleIds(fd);
   const beforeRoles = (await db.select({ roleId: userRoles.roleId }).from(userRoles).where(eq(userRoles.userId, id))).map((r) => r.roleId);
 
-  // جلوگیری از حذف آخرین ادمین
+  // دادن یا گرفتن نقش ادمین فقط کار ادمین است
   const [adminRole] = await db.select({ id: roles.id }).from(roles).where(eq(roles.key, "admin"));
+  if (adminRole && !a.user.isAdmin && beforeRoles.includes(adminRole.id) !== roleIds.includes(adminRole.id)) {
+    return { error: ADMIN_ONLY_MSG.grantAdmin };
+  }
+
+  // جلوگیری از حذف آخرین ادمین
   if (adminRole && beforeRoles.includes(adminRole.id) && (!roleIds.includes(adminRole.id) || status === "disabled")) {
     const admins = await db
       .select({ userId: userRoles.userId })
@@ -126,6 +137,7 @@ export async function updateUserAction(_prev: FormState, fd: FormData): Promise<
 export async function setPasswordAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("users.manage");
   const id = String(fd.get("id"));
+  if (!a.user.isAdmin && (await isAdminUser(id))) return { error: ADMIN_ONLY_MSG.editAdmin };
   const password = String(fd.get("password") ?? "");
   const policy = passwordError(password);
   if (policy) return { error: policy };
@@ -138,6 +150,7 @@ export async function setPasswordAction(_prev: FormState, fd: FormData): Promise
 export async function revokeSessionsAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("users.manage");
   const id = String(fd.get("id"));
+  if (!a.user.isAdmin && (await isAdminUser(id))) return { error: ADMIN_ONLY_MSG.editAdmin };
   await revokeAllSessions(id, id === a.user.id ? a.session.id : undefined);
   await logActivity({ actorUserId: a.user.id, action: "user.revoke_sessions", entityType: "user", entityId: id });
   return { ok: "همه‌ی نشست‌ها بسته شدند." };

@@ -6,11 +6,18 @@ import styles from "../pages.module.css";
 
 export const metadata: Metadata = { title: "ورود و ثبت‌نام", robots: { index: false } };
 
+// «بازگشت» فقط به صفحه‌هایی که واقعاً وجود دارند؛ هر چیز دیگری (مسیر ناموجود مثل /favorites، آدرس بیرونی
+// یا //evil.com) ← صفحه‌ی اصلی. صفحه‌ی تازه‌ای که ساخته شد (مثلاً علاقه‌مندی در مرحله‌ی ۵) را اینجا اضافه کن.
+const BACK_ALLOWED = [/^\/$/, /^\/categories$/, /^\/about$/, /^\/contact$/, /^\/c\/[a-z0-9-]+$/, /^\/p\/[a-z0-9-]+$/];
+
+function safeBack(next: unknown): string {
+  return typeof next === "string" && BACK_ALLOWED.some((re) => re.test(next)) ? next : "/";
+}
+
 // صفحه‌ی موقت: ثبت‌نام و ورود مشتری در مرحله‌ی ۵ ساخته می‌شود.
 // next (صفحه‌ای که کاربر از آن آمده) از الان گرفته می‌شود تا بعداً بعد از ورود به همان‌جا برگردد.
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const next = (await searchParams).next;
-  const back = typeof next === "string" && next.startsWith("/") && !next.startsWith("//") ? next : "/";
+  const back = safeBack((await searchParams).next);
   return (
     <div className={s.container}>
       <div className={styles.authCard}>

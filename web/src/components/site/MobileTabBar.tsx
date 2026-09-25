@@ -13,7 +13,7 @@ export function MobileTabBar({ favoritesEnabled }: { favoritesEnabled: boolean }
     { href: "/", label: "خانه", icon: "home", active: path === "/" },
     { href: "/categories", label: "دسته‌بندی", icon: "grid", active: path === "/categories" || path.startsWith("/c/") },
     ...(favoritesEnabled
-      ? [{ href: "/login?next=/favorites", label: "علاقه‌مندی", icon: "heart" as IconName, active: path === "/favorites" }]
+      ? [{ href: "/login", label: "علاقه‌مندی", icon: "heart" as IconName, active: false }]
       : []),
     { href: "/contact", label: "تماس", icon: "chat", active: path === "/contact" },
     { href: "/login", label: "حساب", icon: "user", active: path === "/login" },

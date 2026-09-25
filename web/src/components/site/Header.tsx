@@ -42,7 +42,7 @@ export function Header({ data, categories, favoritesEnabled }: { data: HeaderDat
           </nav>
           <div className={styles.actions}>
             {account.visible && favoritesEnabled && (
-              <Link href="/login?next=/favorites" className={s.iconBtn} aria-label="علاقه‌مندی‌ها" title="علاقه‌مندی‌ها">
+              <Link href="/login" className={s.iconBtn} aria-label="علاقه‌مندی‌ها" title="علاقه‌مندی‌ها">
                 <Icon name="heart" />
               </Link>
             )}

@@ -3,18 +3,21 @@ import { PASSWORD_HINT } from "@/lib/auth/password-policy.mjs";
 import ui from "@/components/ui/ui.module.css";
 import styles from "../panel.module.css";
 
-type RoleOpt = { id: string; nameFa: string; description: string | null };
+type RoleOpt = { id: string; key: string; nameFa: string; description: string | null };
 
 export function UserFields({
   allRoles,
   user,
   selectedRoleIds = [],
   withPassword,
+  canGrantAdmin = false,
 }: {
   allRoles: RoleOpt[];
   user?: { fullName: string; mobile: string | null; email: string | null; status: string };
   selectedRoleIds?: string[];
   withPassword?: boolean;
+  // فقط ادمین نقش ادمین می‌دهد/می‌گیرد؛ برای بقیه این گزینه غیرفعال است (سرور هم رد می‌کند)
+  canGrantAdmin?: boolean;
 }) {
   return (
     <>
@@ -48,20 +51,25 @@ export function UserFields({
       <div>
         <div className={ui.label}>نقش‌ها</div>
         <div className={styles.checkGrid} style={{ marginTop: 8 }}>
-          {allRoles.map((r) => (
-            <Checkbox
-              key={r.id}
-              name="roles"
-              value={r.id}
-              defaultChecked={selectedRoleIds.includes(r.id)}
-              label={
-                <>
-                  {r.nameFa}
-                  {r.description && <span className={styles.muted}> — {r.description}</span>}
-                </>
-              }
-            />
-          ))}
+          {allRoles.map((r) => {
+            const locked = r.key === "admin" && !canGrantAdmin;
+            return (
+              <Checkbox
+                key={r.id}
+                name="roles"
+                value={r.id}
+                defaultChecked={selectedRoleIds.includes(r.id)}
+                disabled={locked}
+                label={
+                  <>
+                    {r.nameFa}
+                    {r.description && <span className={styles.muted}> — {r.description}</span>}
+                    {locked && <span className={styles.muted}> (فقط ادمین می‌تواند این نقش را بدهد یا بگیرد)</span>}
+                  </>
+                }
+              />
+            );
+          })}
         </div>
       </div>
     </>

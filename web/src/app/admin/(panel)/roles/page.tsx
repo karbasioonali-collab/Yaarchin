@@ -14,7 +14,7 @@ import styles from "../panel.module.css";
 export const metadata: Metadata = { title: "نقش‌ها و دسترسی" };
 
 export default async function RolesPage() {
-  await requirePermission("roles.manage");
+  const a = await requirePermission("roles.manage");
   const list = await db.select().from(roles).orderBy(roles.createdAt);
   const members = await db.select({ roleId: userRoles.roleId, n: count() }).from(userRoles).groupBy(userRoles.roleId);
   const perms = await db.select({ roleId: rolePermissions.roleId, n: count() }).from(rolePermissions).groupBy(rolePermissions.roleId);
@@ -68,16 +68,21 @@ export default async function RolesPage() {
         </div>
       </div>
 
-      <div className={styles.card}>
-        <h2 className={styles.cardTitle}>نقش جدید برای کارشناس‌ها</h2>
-        <ActionForm action={createRoleAction} submitLabel="ساخت نقش">
-          <div className={styles.row}>
-            <Field label="نام فارسی" name="nameFa" required placeholder="مثلاً کارشناس ارشد" />
-            <Field label="کلید انگلیسی" name="key" required ltr placeholder="senior_expert" />
-            <Field label="نام انگلیسی" name="nameEn" ltr placeholder="Senior expert" />
-          </div>
-        </ActionForm>
-      </div>
+      {!a.user.isAdmin && (
+        <div className={styles.impersonation}>فقط ادمین می‌تواند نقش بسازد یا دسترسی نقش‌ها را تغییر دهد؛ شما فقط می‌بینید.</div>
+      )}
+      {a.user.isAdmin && (
+        <div className={styles.card}>
+          <h2 className={styles.cardTitle}>نقش جدید برای کارشناس‌ها</h2>
+          <ActionForm action={createRoleAction} submitLabel="ساخت نقش">
+            <div className={styles.row}>
+              <Field label="نام فارسی" name="nameFa" required placeholder="مثلاً کارشناس ارشد" />
+              <Field label="کلید انگلیسی" name="key" required ltr placeholder="senior_expert" />
+              <Field label="نام انگلیسی" name="nameEn" ltr placeholder="Senior expert" />
+            </div>
+          </ActionForm>
+        </div>
+      )}
     </>
   );
 }

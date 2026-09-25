@@ -7,10 +7,13 @@ import { db } from "@/db/client";
 import { permissions, rolePermissions, roles, userRoles } from "@/db/schema";
 import type { FormState } from "@/components/ui/ActionForm";
 import { logActivity } from "@/lib/activity";
+import { ADMIN_ONLY_MSG } from "@/lib/auth/admin-guard";
 import { requirePermission } from "@/lib/auth/can";
 
 export async function createRoleAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("roles.manage");
+  // ساخت، تغییر و حذف نقش‌ها فقط کار ادمین است (بخش ۱۷ مستندات)؛ roles.manage فقط دیدن را باز می‌کند
+  if (!a.user.isAdmin) return { error: ADMIN_ONLY_MSG.roles };
   const key = String(fd.get("key") ?? "").trim().toLowerCase();
   const nameFa = String(fd.get("nameFa") ?? "").trim();
   const nameEn = String(fd.get("nameEn") ?? "").trim() || key;
@@ -28,6 +31,8 @@ export async function createRoleAction(_prev: FormState, fd: FormData): Promise<
 
 export async function updateRoleAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("roles.manage");
+  // ساخت، تغییر و حذف نقش‌ها فقط کار ادمین است (بخش ۱۷ مستندات)؛ roles.manage فقط دیدن را باز می‌کند
+  if (!a.user.isAdmin) return { error: ADMIN_ONLY_MSG.roles };
   const id = String(fd.get("id"));
   const [role] = await db.select().from(roles).where(eq(roles.id, id));
   if (!role) return { error: "نقش پیدا نشد." };
@@ -65,6 +70,8 @@ export async function updateRoleAction(_prev: FormState, fd: FormData): Promise<
 
 export async function deleteRoleAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("roles.manage");
+  // ساخت، تغییر و حذف نقش‌ها فقط کار ادمین است (بخش ۱۷ مستندات)؛ roles.manage فقط دیدن را باز می‌کند
+  if (!a.user.isAdmin) return { error: ADMIN_ONLY_MSG.roles };
   const id = String(fd.get("id"));
   const [role] = await db.select().from(roles).where(eq(roles.id, id));
   if (!role) return { error: "نقش پیدا نشد." };

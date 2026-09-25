@@ -11,11 +11,17 @@ export function SettingRow({
   label,
   description,
   value,
+  notBuilt = false,
+  adminOnly = false,
 }: {
   settingKey: string;
   label: string;
   description: string | null;
   value: unknown;
+  // هنوز هیچ کدی این تنظیم را نمی‌خواند (src/lib/settings-meta.ts)
+  notBuilt?: boolean;
+  // فقط ادمین می‌تواند عوضش کند؛ برای بقیه غیرفعال (سرور هم رد می‌کند)
+  adminOnly?: boolean;
 }) {
   const [state, action, pending] = useActionState(saveSettingAction, null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -27,7 +33,12 @@ export function SettingRow({
     <form ref={formRef} onSubmit={submitWithoutReset(action)} className={styles.switchRow}>
       <input type="hidden" name="key" value={settingKey} />
       <div style={{ minWidth: 0 }}>
-        <div>{label}</div>
+        <div>
+          {label}
+          {notBuilt && <span className={`${styles.badge} ${styles.badgeWarn}`} style={{ marginInlineStart: 8 }}>هنوز ساخته نشده</span>}
+          {adminOnly && <span className={styles.badge} style={{ marginInlineStart: 8 }}>فقط ادمین</span>}
+        </div>
+        {notBuilt && <div className={styles.switchDesc}>{isBool ? "روشن یا خاموش کردنش" : "تغییرش"} فعلاً اثری ندارد؛ با ساخته شدن این بخش فعال می‌شود.</div>}
         {description && <div className={styles.switchDesc}>{description}</div>}
         <div className={`${styles.switchDesc} ${styles.mono}`} dir="ltr" style={{ textAlign: "right" }}>
           {settingKey}
@@ -44,7 +55,7 @@ export function SettingRow({
           aria-label={label}
           className={ui.toggle}
           defaultChecked={value}
-          disabled={pending}
+          disabled={pending || adminOnly}
           onChange={() => formRef.current?.requestSubmit()}
         />
       ) : isObj ? (

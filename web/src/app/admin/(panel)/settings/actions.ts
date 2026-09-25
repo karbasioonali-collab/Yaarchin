@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { FormState } from "@/components/ui/ActionForm";
 import { logActivity } from "@/lib/activity";
+import { ADMIN_ONLY_MSG, ADMIN_ONLY_SETTINGS } from "@/lib/auth/admin-guard";
 import { requirePermission } from "@/lib/auth/can";
 import { getAllSettings, setSetting } from "@/lib/settings";
 import { toLatinDigits } from "@/lib/validation";
@@ -11,6 +12,7 @@ import { toLatinDigits } from "@/lib/validation";
 export async function saveSettingAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("settings.manage");
   const key = String(fd.get("key") ?? "");
+  if (ADMIN_ONLY_SETTINGS.has(key) && !a.user.isAdmin) return { error: ADMIN_ONLY_MSG.setting };
   const current = (await getAllSettings()).find((s) => s.key === key);
   if (!current) return { error: "تنظیم پیدا نشد." };
 
