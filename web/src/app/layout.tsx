@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
@@ -11,8 +11,15 @@ const vazirmatn = localFont({
 });
 
 export const metadata: Metadata = {
-  title: { default: "یارچین", template: "%s | یارچین" },
-  description: "پل واردات از چین به ایران",
+  title: { default: "یارچین — پل واردات از چین به ایران", template: "%s | یارچین" },
+  description: "قیمت و مشخصات هر محصول از چند کارخانه‌ی چینی، کنار هم؛ با همراهی کارشناس تا رسیدن کالا به ایران.",
+  applicationName: "یارچین",
+};
+
+// آماده‌سازی PWA: رنگ نوار مرورگر و استفاده از کل صفحه در گوشی‌های دارای ناچ (safe-area در CSS رعایت شده)
+export const viewport: Viewport = {
+  themeColor: "#2F7D5C",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

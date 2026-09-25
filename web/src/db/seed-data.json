@@ -68,6 +68,16 @@
       "key": "impersonate",
       "groupKey": "users",
       "nameFa": "دیدن سایت به‌جای مشتری"
+    },
+    {
+      "key": "site.manage",
+      "groupKey": "site",
+      "nameFa": "ویرایش محتوای سایت (هدر، فوتر، اسلایدر، صفحه‌ها)"
+    },
+    {
+      "key": "contact.view",
+      "groupKey": "contact",
+      "nameFa": "دیدن و پیگیری پیام‌های تماس با ما"
     }
   ],
   "rolePermissions": {

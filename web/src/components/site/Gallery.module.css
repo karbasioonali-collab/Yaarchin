@@ -1,0 +1,58 @@
+.gallery { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.main { position: relative; aspect-ratio: 1; border-radius: var(--radius-lg); overflow: hidden; background: var(--surface); box-shadow: var(--shadow); }
+.mainButton { display: block; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; touch-action: pan-y; }
+.mainButton img { width: 100%; height: 100%; object-fit: contain; display: block; user-select: none; -webkit-user-drag: none; }
+.video { width: 100%; height: 100%; object-fit: contain; background: var(--bg); display: block; }
+.placeholder { width: 100%; height: 100%; display: grid; place-items: center; color: var(--muted); background: var(--bg); }
+.zoomHint {
+  position: absolute; top: 10px; inset-inline-end: 10px; width: 40px; height: 40px; border-radius: 12px; border: 0;
+  display: grid; place-items: center; background: rgba(255, 255, 255, .92); color: var(--green-dark); box-shadow: var(--shadow); cursor: pointer;
+}
+.zoomHint:hover { color: var(--orange-dark); }
+.counter {
+  position: absolute; bottom: 10px; inset-inline-start: 10px; padding: 2px 10px; border-radius: 999px;
+  background: rgba(34, 34, 34, .55); color: #FFFFFF; font-size: 12px; pointer-events: none;
+}
+.thumbs { display: flex; gap: 8px; overflow-x: auto; padding: 2px; scrollbar-width: thin; }
+.thumb {
+  position: relative; flex: 0 0 68px; height: 68px; padding: 0; border-radius: 12px; overflow: hidden; cursor: pointer;
+  background: var(--surface); border: 2px solid transparent; box-shadow: 0 2px 8px rgba(34, 34, 34, .06);
+}
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumbActive { border-color: var(--orange); }
+.play {
+  position: absolute; inset: 0; margin: auto; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; background: rgba(34, 34, 34, .6); color: #FFFFFF;
+}
+@media (min-width: 768px) { .thumb { flex-basis: 80px; height: 80px; } }
+
+/* تمام‌صفحه */
+.lightbox {
+  width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
+  background: rgba(34, 34, 34, .96); color: #FFFFFF; overflow: hidden;
+}
+.lightbox::backdrop { background: rgba(34, 34, 34, .96); }
+.lbTop {
+  position: absolute; z-index: 2; top: 0; inset-inline: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top)) 12px 10px;
+}
+.lbCount { font-size: 14px; opacity: .85; min-width: 60px; }
+.lbZoom { display: inline-flex; align-items: center; gap: 4px; background: rgba(255, 255, 255, .1); border-radius: 12px; padding: 2px; }
+.lbZoom button, .lbClose {
+  width: 44px; height: 44px; border: 0; border-radius: 10px; background: none; color: #FFFFFF; cursor: pointer; display: grid; place-items: center;
+}
+.lbZoom button:disabled { opacity: .35; cursor: default; }
+.lbZoom button:not(:disabled):hover, .lbClose:hover { background: rgba(255, 255, 255, .12); }
+.lbLevel { font-size: 13px; min-width: 48px; text-align: center; }
+.stage { position: absolute; inset: 64px 0 0; display: grid; place-items: center; overflow: hidden; touch-action: none; user-select: none; }
+.lbImage { max-width: 100%; max-height: 100%; object-fit: contain; transition: transform .08s linear; will-change: transform; -webkit-user-drag: none; }
+.lbVideo { max-width: 100%; max-height: 100%; }
+.lbNav {
+  position: absolute; z-index: 2; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 0;
+  background: rgba(34, 34, 34, .6); color: #FFFFFF; cursor: pointer; display: grid; place-items: center;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .25);
+}
+.lbNav:hover { background: rgba(34, 34, 34, .8); }
+.lbPrev { inset-inline-start: 12px; }
+.lbNext { inset-inline-end: 12px; }
+@media (max-width: 599px) { .lbNav { top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); transform: none; } }

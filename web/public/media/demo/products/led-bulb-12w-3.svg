@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800"><defs>
+<radialGradient id="bgled-bu2" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F7F7F5"/></radialGradient>
+<linearGradient id="bodyled-bu2" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="1"/><stop offset=".55" stop-color="#FFFFFF" stop-opacity=".88"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="1"/></linearGradient>
+<linearGradient id="shineled-bu2" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/><stop offset=".3" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+<linearGradient id="glassled-bu2" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".75"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".35"/><stop offset="1" stop-color="#FFFFFF" stop-opacity=".7"/></linearGradient>
+<radialGradient id="glowled-bu2" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FF7A00" stop-opacity=".45"/><stop offset="1" stop-color="#FF7A00" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="800" height="800" fill="url(#bgled-bu2)"/><rect width="800" height="800" fill="#FF7A00" fill-opacity=".06"/>
+<g transform="translate(400 400) scale(1.28) translate(-400 -420)"><ellipse cx="400" cy="690" rx="130" ry="26" fill="#222222" fill-opacity=".10"/>
+<circle cx="400" cy="320" r="230" fill="url(#glowled-bu2)"/>
+<path d="M400 120 C530 120 600 210 600 310 C600 400 530 440 500 500 L300 500 C270 440 200 400 200 310 C200 210 270 120 400 120Z" fill="#FFFFFF" stroke="#222222" stroke-opacity=".12" stroke-width="4"/>
+<path d="M330 420 L360 300 L400 360 L440 300 L470 420" fill="none" stroke="#FF7A00" stroke-width="8" stroke-linejoin="round"/>
+<path d="M270 250 Q290 180 360 160" fill="none" stroke="#222222" stroke-opacity=".08" stroke-width="16" stroke-linecap="round"/>
+<rect x="300" y="500" width="200" height="40" rx="10" fill="#1B4D3E"/>
+<rect x="310" y="540" width="180" height="96" rx="8" fill="#222222" fill-opacity=".35"/>
+<path d="M310 560 h180 M310 588 h180 M310 616 h180" stroke="#FFFFFF" stroke-opacity=".6" stroke-width="8"/>
+<path d="M370 636 h60 l-12 30 h-36z" fill="#222222" fill-opacity=".7"/></g></svg>

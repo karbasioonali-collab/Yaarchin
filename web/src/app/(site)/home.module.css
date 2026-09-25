@@ -1,0 +1,13 @@
+.steps {
+  display: grid; gap: 10px; grid-template-columns: 1fr;
+  background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 16px;
+}
+@media (min-width: 768px) { .steps { grid-template-columns: repeat(3, 1fr); padding: 20px 24px; gap: 20px; } }
+.step { display: flex; align-items: flex-start; gap: 12px; }
+.stepIcon {
+  flex-shrink: 0; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center;
+  background: rgba(47, 125, 92, .1); color: var(--green);
+}
+.stepIconAlt { background: rgba(255, 122, 0, .1); color: var(--orange-dark); }
+.stepTitle { display: block; font-size: 15px; color: var(--green-dark); }
+.stepText { display: block; font-size: 13px; color: var(--muted); }

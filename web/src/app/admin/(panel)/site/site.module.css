@@ -1,0 +1,25 @@
+.blocks { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.blockCard { display: block; background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; color: var(--text); border-top: 3px solid var(--green); }
+.blockCard:nth-child(even) { border-top-color: var(--orange); }
+.blockCard:hover { color: var(--text); box-shadow: var(--shadow-lg); }
+.blockTitle { font-weight: 800; color: var(--green-dark); }
+.blockDesc { font-size: 13px; color: var(--muted); }
+.blockMeta { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+.part { padding: 16px; background: var(--bg); border-radius: var(--radius); min-width: 0; }
+.partHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+.partTitle { margin: 0; font-size: 15px; font-weight: 800; color: var(--green-dark); }
+.partBody { display: grid; gap: 12px; }
+.show { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.grid2 { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+.linkRows { display: grid; gap: 6px; }
+.linkHead, .linkRow { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+.linkHead { font-size: 12px; color: var(--muted); }
+
+.slide { display: grid; gap: 12px; grid-template-columns: 140px 1fr; align-items: start; }
+.slidePreview { width: 140px; aspect-ratio: 16 / 7; border-radius: 10px; object-fit: cover; background: var(--surface); box-shadow: var(--shadow); }
+.slideEmpty { width: 140px; aspect-ratio: 16 / 7; border-radius: 10px; border: 1.5px dashed rgba(34, 34, 34, .2); display: grid; place-items: center; font-size: 12px; color: var(--muted); }
+@media (max-width: 600px) { .slide { grid-template-columns: 1fr; } }
+
+.formActions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }

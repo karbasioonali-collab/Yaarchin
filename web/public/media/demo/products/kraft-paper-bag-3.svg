@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800"><defs>
+<radialGradient id="bgkraft-2" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F7F7F5"/></radialGradient>
+<linearGradient id="bodykraft-2" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="1"/><stop offset=".55" stop-color="#FFFFFF" stop-opacity=".88"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="1"/></linearGradient>
+<linearGradient id="shinekraft-2" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/><stop offset=".3" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+<linearGradient id="glasskraft-2" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".75"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".35"/><stop offset="1" stop-color="#FFFFFF" stop-opacity=".7"/></linearGradient>
+<radialGradient id="glowkraft-2" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FF7A00" stop-opacity=".45"/><stop offset="1" stop-color="#FF7A00" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="800" height="800" fill="url(#bgkraft-2)"/><rect width="800" height="800" fill="#FF7A00" fill-opacity=".06"/>
+<g transform="translate(400 400) scale(1.28) translate(-400 -420)"><ellipse cx="400" cy="690" rx="230" ry="26" fill="#222222" fill-opacity=".10"/>
+<path d="M320 250 Q320 140 400 140 Q480 140 480 250" fill="none" stroke="#E86A00" stroke-opacity=".65" stroke-width="16" stroke-linecap="round"/>
+<path d="M230 250 L570 250 L610 670 L190 670Z" fill="#FF7A00" fill-opacity=".38"/>
+<path d="M230 250 L570 250 L610 670 L190 670Z" fill="#FFFFFF" fill-opacity=".25"/>
+<path d="M230 250 L260 670 L190 670Z" fill="#E86A00" fill-opacity=".18"/>
+<path d="M230 250 L570 250 L566 290 L234 290Z" fill="#E86A00" fill-opacity=".2"/>
+<circle cx="400" cy="450" r="70" fill="none" stroke="#1B4D3E" stroke-width="10"/>
+<path d="M360 460 Q400 410 440 460" fill="none" stroke="#1B4D3E" stroke-width="10" stroke-linecap="round"/>
+<path d="M360 600 h80" stroke="#1B4D3E" stroke-width="8" stroke-linecap="round"/></g></svg>

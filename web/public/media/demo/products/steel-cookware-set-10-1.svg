@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800"><defs>
+<radialGradient id="bgsteel-0" cx="50%" cy="38%" r="70%"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#F7F7F5"/></radialGradient>
+<linearGradient id="bodysteel-0" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="1"/><stop offset=".55" stop-color="#FFFFFF" stop-opacity=".88"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="1"/></linearGradient>
+<linearGradient id="shinesteel-0" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/><stop offset=".3" stop-color="#FFFFFF" stop-opacity=".55"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity="0"/></linearGradient>
+<linearGradient id="glasssteel-0" x1="0" x2="1"><stop offset="0" stop-color="#FFFFFF" stop-opacity=".75"/><stop offset=".5" stop-color="#FFFFFF" stop-opacity=".35"/><stop offset="1" stop-color="#FFFFFF" stop-opacity=".7"/></linearGradient>
+<radialGradient id="glowsteel-0" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#FF7A00" stop-opacity=".45"/><stop offset="1" stop-color="#FF7A00" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="800" height="800" fill="url(#bgsteel-0)"/>
+<g ><ellipse cx="400" cy="690" rx="260" ry="26" fill="#222222" fill-opacity=".10"/>
+<rect x="470" y="380" width="200" height="250" rx="26" fill="#222222" fill-opacity=".15"/>
+<rect x="190" y="330" width="420" height="340" rx="40" fill="url(#bodysteel-0)"/>
+<rect x="210" y="340" width="70" height="320" rx="30" fill="url(#shinesteel-0)"/>
+<rect x="170" y="300" width="460" height="48" rx="20" fill="#222222" fill-opacity=".2"/>
+<path d="M200 300 Q400 200 600 300Z" fill="url(#glasssteel-0)" stroke="#222222" stroke-opacity=".2" stroke-width="4"/>
+<rect x="370" y="210" width="60" height="34" rx="14" fill="#2F7D5C"/>
+<rect x="120" y="380" width="80" height="34" rx="17" fill="#222222" fill-opacity=".8"/><rect x="600" y="380" width="80" height="34" rx="17" fill="#222222" fill-opacity=".8"/>
+<path d="M240 560 Q400 590 560 560" stroke="#FFFFFF" stroke-opacity=".35" stroke-width="6" fill="none"/></g></svg>
