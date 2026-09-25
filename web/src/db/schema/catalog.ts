@@ -1,9 +1,11 @@
 // دسته‌بندی، شرکت (کارخانه)، محصول ترکیبی، لیستینگ هر شرکت، عکس/ویدیو و قیمت‌های مشاهده‌شده.
 // اسم و آدرس شرکت‌ها فقط در companies است و هیچ‌وقت در API یا صفحه‌ی عمومی خوانده نمی‌شود (src/lib/catalog/public.ts).
+import { sql } from "drizzle-orm";
 import {
   type AnyPgColumn,
   bigserial,
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -125,6 +127,9 @@ export const products = pgTable(
     // HS code پیشنهادی؛ تأیید با انسان (مرحله‌ی ۶)
     hsCode: text("hs_code"),
     status: text("status", { enum: ["draft", "published", "archived"] }).notNull().default("draft"),
+    // امتیاز «جذاب برای واردات» (migration ۰۰۰۲). فقط ۱، ۲، ۳، ۴، ۴٫۵ یا ۵؛ خالی = بدون امتیاز.
+    // مقدار مجاز را خود دیتابیس هم کنترل می‌کند (products_import_score_check). فهرست در کد: src/lib/catalog/import-score.ts
+    importScore: numeric("import_score", { precision: 2, scale: 1 }),
     publishedAt: timestamp("published_at", { withTimezone: true }),
     meta: jsonb("meta").notNull().default({}),
     source: source(),
@@ -135,6 +140,7 @@ export const products = pgTable(
   (t) => [
     index("products_category_idx").on(t.categoryId, t.status),
     index("products_status_idx").on(t.status, t.publishedAt),
+    check("products_import_score_check", sql`${t.importScore} in (1, 2, 3, 4, 4.5, 5)`),
   ],
 );
 

@@ -21,6 +21,7 @@
   font-weight: 700; font-size: 14px; line-height: 1.7; min-height: calc(1.7em * 2);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
+.stars { margin-top: 2px; }
 .price { margin-top: auto; padding-top: 6px; display: flex; flex-direction: column; }
 .priceLabel { font-size: 11px; color: var(--muted); }
 .priceValue { font-size: 18px; font-weight: 800; color: var(--orange-dark); line-height: 1.5; }

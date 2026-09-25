@@ -11,6 +11,7 @@ const NAV: (NavItem & { permission: string })[] = [
   { href: "/admin", label: "داشبورد", permission: "dashboard.view" },
   { href: "/admin/users", label: "کاربران", permission: "users.view" },
   { href: "/admin/roles", label: "نقش‌ها و دسترسی", permission: "roles.manage" },
+  { href: "/admin/products", label: "محصولات", permission: "products.rate" },
   { href: "/admin/site", label: "محتوای سایت", permission: "site.manage" },
   { href: "/admin/messages", label: "پیام‌های تماس", permission: "contact.view" },
   { href: "/admin/activity", label: "لاگ فعالیت", permission: "activity.view" },
@@ -32,7 +33,7 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
         <Link href="/" className={styles.navSoon} target="_blank">
           دیدن سایت ↗
         </Link>
-        <div className={styles.navSoon}>محصولات، شرکت‌ها، دسته‌بندی، چت‌ها، نرخ‌ها — مرحله‌های بعد</div>
+        <div className={styles.navSoon}>مدیریت کامل محصول، شرکت‌ها، دسته‌بندی، چت‌ها، نرخ‌ها — مرحله‌های بعد</div>
         <div className={styles.userBox}>
           <div>
             <div className={styles.userName}>{a.user.fullName}</div>

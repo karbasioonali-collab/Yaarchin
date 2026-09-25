@@ -9,7 +9,8 @@ import { connection } from "next/server";
 import { cache } from "react";
 import { db } from "@/db/client";
 import { categories, productMedia, products } from "@/db/schema";
-import { catalogReady } from "@/lib/db-ready";
+import { catalogReady, importScoreReady } from "@/lib/db-ready";
+import { type ImportScore, toImportScore } from "./import-score";
 import { mediaUrl } from "@/lib/storage";
 import { type LandedCost, landedCostFor } from "@/lib/pricing/landed";
 
@@ -38,6 +39,8 @@ export type ProductCard = {
   slug: string;
   titleFa: string;
   summaryFa: string | null;
+  // «جذاب برای واردات»؛ null = بدون امتیاز (ستاره نمایش داده نمی‌شود)
+  importScore: ImportScore | null;
   coverUrl: string | null;
   categoryName: string | null;
   suppliers: number;
@@ -213,16 +216,22 @@ async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // ---------- محصول ----------
-const cardColumns = {
-  id: products.id,
-  slug: products.slug,
-  titleFa: products.titleFa,
-  summaryFa: products.summaryFa,
-  categoryId: products.categoryId,
-  priceUnit: products.priceUnit,
-};
+// ستون import_score فقط وقتی select می‌شود که migration ۰۰۰۲ اجرا شده باشد؛ قبل از آن null.
+async function cardColumns() {
+  return {
+    id: products.id,
+    slug: products.slug,
+    titleFa: products.titleFa,
+    summaryFa: products.summaryFa,
+    categoryId: products.categoryId,
+    priceUnit: products.priceUnit,
+    importScore: (await importScoreReady()) ? products.importScore : sql<string | null>`null`,
+  };
+}
 
-async function toCards(rows: { id: string; slug: string; titleFa: string; summaryFa: string | null; categoryId: string | null; priceUnit: string }[]): Promise<ProductCard[]> {
+type CardRow = { id: string; slug: string; titleFa: string; summaryFa: string | null; categoryId: string | null; priceUnit: string; importScore: string | null };
+
+async function toCards(rows: CardRow[]): Promise<ProductCard[]> {
   if (!rows.length) return [];
   const idx = await loadCategories();
   const ids = rows.map((r) => r.id);
@@ -241,6 +250,7 @@ async function toCards(rows: { id: string; slug: string; titleFa: string; summar
       slug: r.slug,
       titleFa: r.titleFa,
       summaryFa: r.summaryFa,
+      importScore: toImportScore(r.importScore),
       coverUrl: mediaUrl(coverOf.get(r.id)),
       categoryName: (r.categoryId && idx.byId.get(r.categoryId)?.nameFa) || null,
       suppliers: s?.suppliers ?? 0,
@@ -259,7 +269,7 @@ export async function listProducts(opts: { categoryIds?: string[]; limit?: numbe
   }
   if (opts.excludeSlug) where.push(sql`${products.slug} <> ${opts.excludeSlug}`);
   const rows = await db
-    .select(cardColumns)
+    .select(await cardColumns())
     .from(products)
     .where(and(...where))
     .orderBy(desc(products.publishedAt), desc(products.createdAt))
@@ -290,7 +300,7 @@ export async function getProduct(slug: string): Promise<PublicProduct | null> {
   if (!(await catalogReady())) return null;
   const [p] = await db
     .select({
-      ...cardColumns,
+      ...(await cardColumns()),
       titleEn: products.titleEn,
       descriptionFa: products.descriptionFa,
       specs: products.specs,

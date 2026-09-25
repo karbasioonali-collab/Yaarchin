@@ -49,6 +49,12 @@ try {
     );
     if (clash.rows.length) throw new Error(`این slugها قبلاً برای داده‌ی واقعی استفاده شده‌اند: ${clash.rows.map((r) => r.slug).join(", ")}`);
 
+    // ستون امتیاز از migration ۰۰۰۲ است؛ بدون آن اجرای seed-demo معنا ندارد (اول db:migrate)
+    const col = await client.query(
+      `select 1 from information_schema.columns where table_schema = 'public' and table_name = 'products' and column_name = 'import_score'`,
+    );
+    if (!col.rowCount) throw new Error("ستون products.import_score نیست؛ اول npm run db:migrate را اجرا کنید.");
+
     const catId = new Map();
     for (const cat of categories) {
       const { rows } = await client.query(
@@ -81,9 +87,9 @@ try {
       order++;
       const { rows } = await client.query(
         `insert into products (slug, kind, category_id, title_fa, title_en, summary_fa, description_fa, specs, price_unit, hs_code,
-                               status, published_at, source)
-         values ($1,'combined',$2,$3,$4,$5,$6,$7,$8,$9,'published',$10,'demo') returning id`,
-        [p.slug, catId.get(p.category), p.titleFa, p.titleEn, p.summaryFa, p.descriptionFa, JSON.stringify(p.specs), p.priceUnit ?? "piece", p.hsCode, daysAgo(order)],
+                               import_score, status, published_at, source)
+         values ($1,'combined',$2,$3,$4,$5,$6,$7,$8,$9,$10,'published',$11,'demo') returning id`,
+        [p.slug, catId.get(p.category), p.titleFa, p.titleEn, p.summaryFa, p.descriptionFa, JSON.stringify(p.specs), p.priceUnit ?? "piece", p.hsCode, p.importScore ?? null, daysAgo(order)],
       );
       const productId = rows[0].id;
 

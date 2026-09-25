@@ -35,10 +35,12 @@ const img = (slug, n, alt) => ({ kind: "image", key: `demo/products/${slug}-${n}
 const video = (slug, alt) => ({ kind: "video", key: `demo/products/${slug}.webm`, poster: `demo/products/${slug}-1.svg`, alt });
 const spec = (labelFa, valueFa, unit) => ({ labelFa, valueFa, ...(unit ? { unit } : {}) });
 
+// importScore: امتیاز «جذاب برای واردات» (۱، ۲، ۳، ۴، ۴٫۵، ۵ یا null = بدون امتیاز؛ دو محصول عمداً بدون امتیاز)
 // prices: [minQty, maxQty|null, priceMin, priceMax|null]؛ old: یک نوبت قیمت قدیمی‌تر (برای نشان دادن اینکه فقط آخرین نوبت حساب می‌شود)
 export const products = [
   {
     slug: "portable-blender",
+    importScore: 4.5,
     category: "blenders",
     titleFa: "مخلوط‌کن قابل‌حمل شارژی ۳۸۰ میلی‌لیتر",
     titleEn: "Portable Rechargeable Blender 380ml",
@@ -65,6 +67,7 @@ export const products = [
   },
   {
     slug: "juicer-300w",
+    importScore: 3,
     category: "blenders",
     titleFa: "آبمیوه‌گیری تک‌کاره ۳۰۰ وات",
     titleEn: "Electric Juicer 300W",
@@ -81,6 +84,7 @@ export const products = [
   },
   {
     slug: "cast-iron-pan-28",
+    importScore: 4,
     category: "cookware",
     titleFa: "ماهیتابه‌ی چدنی ۲۸ سانتی‌متر",
     titleEn: "Pre-seasoned Cast Iron Skillet 28cm",
@@ -97,6 +101,7 @@ export const products = [
   },
   {
     slug: "steel-cookware-set-10",
+    importScore: 2,
     category: "cookware",
     titleFa: "سرویس قابلمه‌ی استیل ۱۰ پارچه",
     titleEn: "Stainless Steel Cookware Set 10 pcs",
@@ -114,6 +119,7 @@ export const products = [
   },
   {
     slug: "powerbank-10000-pd",
+    importScore: 5,
     category: "power-banks",
     titleFa: "پاوربانک ۱۰۰۰۰ میلی‌آمپر فست‌شارژ PD 20W",
     titleEn: "Power Bank 10000mAh PD 20W Fast Charging",
@@ -131,6 +137,7 @@ export const products = [
   },
   {
     slug: "magnetic-powerbank-5000",
+    importScore: 4.5,
     category: "power-banks",
     titleFa: "پاوربانک مگنتی بی‌سیم ۵۰۰۰ میلی‌آمپر",
     titleEn: "Magnetic Wireless Power Bank 5000mAh",
@@ -147,6 +154,7 @@ export const products = [
   },
   {
     slug: "tws-earbuds-bt53",
+    importScore: 4,
     category: "earbuds",
     titleFa: "هندزفری بی‌سیم TWS بلوتوث ۵٫۳",
     titleEn: "TWS Wireless Earbuds Bluetooth 5.3",
@@ -164,6 +172,7 @@ export const products = [
   },
   {
     slug: "led-bulb-12w",
+    importScore: 1,
     category: "led-lighting",
     titleFa: "لامپ LED حبابی ۱۲ وات E27",
     titleEn: "LED Bulb 12W E27",
@@ -180,6 +189,7 @@ export const products = [
   },
   {
     slug: "smart-led-strip-5m",
+    importScore: null,
     category: "led-lighting",
     titleFa: "ریسه‌ی LED هوشمند RGB پنج متری",
     titleEn: "Smart RGB LED Strip 5m",
@@ -196,6 +206,7 @@ export const products = [
   },
   {
     slug: "kraft-paper-bag",
+    importScore: null,
     category: "paper-bags",
     titleFa: "کیسه‌ی کاغذی کرافت دسته‌دار با چاپ اختصاصی",
     titleEn: "Custom Printed Kraft Paper Bag with Handle",

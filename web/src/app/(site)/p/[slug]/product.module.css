@@ -7,6 +7,7 @@
 .info { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; min-width: 0; }
 .title { margin: 0; font-size: 22px; font-weight: 800; color: var(--green-dark); line-height: 1.6; }
 @media (min-width: 768px) { .title { font-size: 28px; } }
+.importScore { display: flex; align-items: center; gap: 8px; margin-top: -4px; font-size: 14px; font-weight: 700; color: var(--orange-dark); }
 .titleEn { margin: -6px 0 0; font-size: 13px; color: var(--muted); text-align: start; }
 .summary { margin: 0; color: rgba(34, 34, 34, .8); }
 .facts { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }

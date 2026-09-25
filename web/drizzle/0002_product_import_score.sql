@@ -1,0 +1,2 @@
+ALTER TABLE "products" ADD COLUMN "import_score" numeric(2, 1);--> statement-breakpoint
+ALTER TABLE "products" ADD CONSTRAINT "products_import_score_check" CHECK ("products"."import_score" in (1, 2, 3, 4, 4.5, 5));
