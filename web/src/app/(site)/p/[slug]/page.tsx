@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Gallery } from "@/components/site/Gallery";
 import { Icon } from "@/components/site/Icon";
+import { ImportStars } from "@/components/site/ImportStars";
 import { ChatBox, ChatButton, FavoriteButton, MobileProductBar } from "@/components/site/ProductActions";
 import { ProductGrid } from "@/components/site/ProductCard";
 import s from "@/components/site/site.module.css";
@@ -118,6 +119,12 @@ export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
         <div className={styles.info}>
           {p.categoryName && <span className={s.chip}>{p.categoryName}</span>}
           <h1 className={styles.title}>{p.titleFa}</h1>
+          {p.importScore !== null && (
+            <div className={styles.importScore}>
+              <span>جذاب برای واردات</span>
+              <ImportStars score={p.importScore} size={20} />
+            </div>
+          )}
           {p.titleEn && (
             <p className={`${styles.titleEn} ${s.ltr}`} lang="en" dir="ltr">
               {p.titleEn}

@@ -78,6 +78,11 @@
       "key": "contact.view",
       "groupKey": "contact",
       "nameFa": "دیدن و پیگیری پیام‌های تماس با ما"
+    },
+    {
+      "key": "products.rate",
+      "groupKey": "products",
+      "nameFa": "ثبت و ویرایش امتیاز «جذاب برای واردات» محصولات"
     }
   ],
   "rolePermissions": {

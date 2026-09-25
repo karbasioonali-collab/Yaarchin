@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ProductCard as Card } from "@/lib/catalog/public";
 import { fmtMoney, fmtNum, unitFa } from "@/lib/format";
 import { Icon } from "./Icon";
+import { ImportStars } from "./ImportStars";
 import styles from "./ProductCard.module.css";
 
 export function ProductCard({ p, priority = false }: { p: Card; priority?: boolean }) {
@@ -24,6 +25,7 @@ export function ProductCard({ p, priority = false }: { p: Card; priority?: boole
       <span className={styles.body}>
         {p.categoryName && <span className={styles.cat}>{p.categoryName}</span>}
         <span className={styles.title}>{p.titleFa}</span>
+        <ImportStars score={p.importScore} size={14} className={styles.stars} />
         {p.price ? (
           <span className={styles.price}>
             <span className={styles.priceLabel}>میانگین قیمت هر {unitFa(p.price.unit)}</span>

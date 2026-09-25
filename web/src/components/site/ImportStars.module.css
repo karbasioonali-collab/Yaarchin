@@ -1,0 +1,6 @@
+/* رنگ ستاره‌ها: نارنجی برند #FF7A00؛ ستاره‌ی خالی همان رنگ کم‌رنگ (رنگ بیرون از پالت ندارد) */
+.stars { display: inline-flex; align-items: center; gap: 2px; line-height: 0; vertical-align: middle; }
+.star { position: relative; display: inline-block; flex-shrink: 0; }
+.star svg { position: absolute; inset: 0; display: block; }
+.empty { fill: rgba(255, 122, 0, .22); }
+.full { fill: var(--orange); }
