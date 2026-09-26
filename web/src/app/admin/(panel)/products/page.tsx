@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, count, desc, eq, ilike, inArray } from "drizzle-orm";
+import { and, count, desc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { ImportStars } from "@/components/site/ImportStars";
 import { ActionForm } from "@/components/ui/ActionForm";
 import ui from "@/components/ui/ui.module.css";
 import { db } from "@/db/client";
-import { activityLog, categories, products, users } from "@/db/schema";
-import { requirePermission } from "@/lib/auth/can";
+import { activityLog, categories, productListings, products, users } from "@/db/schema";
+import { can, requireAnyPermission } from "@/lib/auth/can";
+import { PRODUCT_STATUS_FA } from "@/lib/catalog/admin-labels";
 import { fmtImportScore, IMPORT_SCORES, toImportScore } from "@/lib/catalog/import-score";
 import { catalogReady, importScoreReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
@@ -16,18 +17,23 @@ import { setImportScoreAction } from "./actions";
 export const metadata: Metadata = { title: "محصولات" };
 
 const PAGE = 30;
-const STATUS_FA: Record<string, string> = { draft: "پیش‌نویس", published: "منتشرشده", archived: "بایگانی" };
+const STATUS_FA = PRODUCT_STATUS_FA;
 
-// فعلاً فقط ثبت امتیاز «جذاب برای واردات». مدیریت کامل محصول در مرحله‌ی ۳.
+// فهرست محصولات. products.manage: ساخت و ویرایش محصول (صفحه‌ی هر محصول)؛ products.rate: ثبت امتیاز «جذاب برای واردات».
 export default async function ProductsAdminPage({ searchParams }: PageProps<"/admin/products">) {
-  await requirePermission("products.rate");
+  const a = await requireAnyPermission(["products.rate", "products.manage"]);
   if (!(await catalogReady()) || !(await importScoreReady())) {
     return <div className={styles.impersonation}>جدول یا ستون لازم هنوز ساخته نشده است. در کنسول لیارا npm run db:migrate را اجرا کنید.</div>;
   }
+  const [canRate, canManage] = await Promise.all([can(a.user, "products.rate"), can(a.user, "products.manage")]);
   const sp = await searchParams;
   const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 100) : "";
+  const status = sp.status === "draft" || sp.status === "published" || sp.status === "archived" ? sp.status : "";
   const page = Math.max(1, Number(sp.page) || 1);
-  const where = q ? ilike(products.titleFa, `%${q}%`) : undefined;
+  const conds: SQL[] = [];
+  if (q) conds.push(or(ilike(products.titleFa, `%${q}%`), ilike(products.titleEn, `%${q}%`), ilike(products.slug, `%${q}%`))!);
+  if (status) conds.push(eq(products.status, status));
+  const where = conds.length ? and(...conds) : undefined;
 
   const [{ total }] = await db.select({ total: count() }).from(products).where(where);
   const rows = await db
@@ -63,9 +69,17 @@ export default async function ProductsAdminPage({ searchParams }: PageProps<"/ad
         .orderBy(activityLog.entityId, desc(activityLog.createdAt))
     : [];
   const lastOf = new Map(lastChanges.map((c) => [c.entityId, c]));
+  const listingCounts = ids.length
+    ? await db
+        .select({ id: productListings.productId, n: count() })
+        .from(productListings)
+        .where(and(inArray(productListings.productId, ids), eq(productListings.status, "active")))
+        .groupBy(productListings.productId)
+    : [];
+  const suppliersOf = new Map(listingCounts.map((c) => [c.id, c.n]));
   const scoreOf = (v: unknown) => toImportScore((v as { importScore?: unknown } | null)?.importScore ?? null);
   const pages = Math.max(1, Math.ceil(total / PAGE));
-  const qs = (p: number) => `?${new URLSearchParams({ ...(q && { q }), page: String(p) })}`;
+  const qs = (p: number) => `?${new URLSearchParams({ ...(q && { q }), ...(status && { status }), page: String(p) })}`;
 
   return (
     <>
@@ -73,14 +87,28 @@ export default async function ProductsAdminPage({ searchParams }: PageProps<"/ad
         <div>
           <h1 className={styles.pageTitle}>محصولات</h1>
           <p className={styles.pageSub}>
-            امتیاز «جذاب برای واردات». فقط از بین {IMPORT_SCORES.map((x) => fmtImportScore(x)).join("، ")}؛ «بدون امتیاز» یعنی ستاره نمایش داده نمی‌شود. هر تغییر در لاگ فعالیت ثبت
-            می‌شود.
+            {fmtNum(total)} محصول.
+            {canRate && ` امتیاز «جذاب برای واردات» فقط از بین ${IMPORT_SCORES.map((x) => fmtImportScore(x)).join("، ")}؛ «بدون امتیاز» یعنی ستاره نمایش داده نمی‌شود.`} همه‌ی
+            تغییرات در لاگ فعالیت ثبت می‌شود.
           </p>
         </div>
+        {canManage && (
+          <Link href="/admin/products/new" className={styles.btn}>
+            محصول جدید
+          </Link>
+        )}
       </div>
 
       <form className={styles.toolbar}>
-        <input name="q" defaultValue={q} placeholder="جستجو در نام محصول" />
+        <input name="q" defaultValue={q} placeholder="جستجو: نام فارسی یا انگلیسی، slug" />
+        <select name="status" defaultValue={status}>
+          <option value="">همه‌ی وضعیت‌ها</option>
+          {Object.entries(STATUS_FA).map(([k, v]) => (
+            <option key={k} value={k}>
+              {v}
+            </option>
+          ))}
+        </select>
         <button type="submit" className={styles.btnGhost}>
           جستجو
         </button>
@@ -94,8 +122,9 @@ export default async function ProductsAdminPage({ searchParams }: PageProps<"/ad
                 <th>محصول</th>
                 <th>دسته</th>
                 <th>وضعیت</th>
-                <th>امتیاز فعلی</th>
-                <th>ثبت امتیاز</th>
+                <th>کارخانه‌ی فعال</th>
+                {canRate && <th>امتیاز فعلی</th>}
+                {canRate && <th>ثبت امتیاز</th>}
               </tr>
             </thead>
             <tbody>
@@ -105,7 +134,9 @@ export default async function ProductsAdminPage({ searchParams }: PageProps<"/ad
                 return (
                   <tr key={r.id}>
                     <td>
-                      {r.status === "published" ? (
+                      {canManage ? (
+                        <Link href={`/admin/products/${r.id}`}>{r.titleFa}</Link>
+                      ) : r.status === "published" ? (
                         <Link href={`/p/${r.slug}`} target="_blank">
                           {r.titleFa}
                         </Link>
@@ -122,29 +153,34 @@ export default async function ProductsAdminPage({ searchParams }: PageProps<"/ad
                     <td>
                       <span className={`${styles.badge} ${r.status !== "published" ? styles.badgeWarn : ""}`}>{STATUS_FA[r.status] ?? r.status}</span>
                     </td>
-                    <td style={{ whiteSpace: "nowrap" }}>
-                      {score === null ? <span className={styles.muted}>بدون امتیاز</span> : <ImportStars score={score} size={16} />}
-                      {score !== null && <span className={styles.muted}> {fmtImportScore(score)}</span>}
-                    </td>
-                    <td>
-                      <ActionForm action={setImportScoreAction} submitLabel="ذخیره" submitVariant="secondary" className={styles.scoreForm}>
-                        <input type="hidden" name="id" value={r.id} />
-                        <select name="score" defaultValue={score === null ? "" : String(score)} className={ui.select} aria-label={`امتیاز ${r.titleFa}`}>
-                          <option value="">بدون امتیاز</option>
-                          {IMPORT_SCORES.map((x) => (
-                            <option key={x} value={String(x)}>
-                              {fmtImportScore(x)}
-                            </option>
-                          ))}
-                        </select>
-                      </ActionForm>
-                    </td>
+                    <td>{fmtNum(suppliersOf.get(r.id) ?? 0)}</td>
+                    {canRate && (
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        {score === null ? <span className={styles.muted}>بدون امتیاز</span> : <ImportStars score={score} size={16} />}
+                        {score !== null && <span className={styles.muted}> {fmtImportScore(score)}</span>}
+                      </td>
+                    )}
+                    {canRate && (
+                      <td>
+                        <ActionForm action={setImportScoreAction} submitLabel="ذخیره" submitVariant="secondary" className={styles.scoreForm}>
+                          <input type="hidden" name="id" value={r.id} />
+                          <select name="score" defaultValue={score === null ? "" : String(score)} className={ui.select} aria-label={`امتیاز ${r.titleFa}`}>
+                            <option value="">بدون امتیاز</option>
+                            {IMPORT_SCORES.map((x) => (
+                              <option key={x} value={String(x)}>
+                                {fmtImportScore(x)}
+                              </option>
+                            ))}
+                          </select>
+                        </ActionForm>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
               {rows.length === 0 && (
                 <tr>
-                  <td colSpan={5} className={styles.muted}>
+                  <td colSpan={canRate ? 6 : 4} className={styles.muted}>
                     محصولی پیدا نشد.
                   </td>
                 </tr>

@@ -93,6 +93,31 @@
       "key": "customers.manage",
       "groupKey": "customers",
       "nameFa": "فعال یا غیرفعال کردن مشتری"
+    },
+    {
+      "key": "categories.manage",
+      "groupKey": "categories",
+      "nameFa": "مدیریت دسته‌بندی‌ها (ساخت، ویرایش، جابه‌جایی، حذف)"
+    },
+    {
+      "key": "companies.view",
+      "groupKey": "companies",
+      "nameFa": "دیدن کارخانه‌ها (اطلاعات محرمانه، تماس‌ها، سابقه‌ی مکاتبه)"
+    },
+    {
+      "key": "companies.manage",
+      "groupKey": "companies",
+      "nameFa": "ثبت و ویرایش کارخانه‌ها و تماس‌هایشان"
+    },
+    {
+      "key": "correspondence.create",
+      "groupKey": "correspondence",
+      "nameFa": "ثبت مکاتبه با کارخانه"
+    },
+    {
+      "key": "products.manage",
+      "groupKey": "products",
+      "nameFa": "مدیریت محصولات، عکس‌ها، لیستینگ‌ها، قیمت‌ها و زمان آماده‌سازی"
     }
   ],
   "rolePermissions": {

@@ -1,18 +1,21 @@
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
-import { can } from "@/lib/auth/can";
+import { canAny } from "@/lib/auth/can";
 import { requireStaff } from "@/lib/auth/current";
 import { logoutAction } from "../(auth)/actions";
 import { stopImpersonationAction } from "./users/actions";
 import { NavLinks, type NavItem } from "./NavLinks";
 import styles from "./panel.module.css";
 
-const NAV: (NavItem & { permission: string })[] = [
+// permission: یکی از این‌ها کافی است
+const NAV: (NavItem & { permission: string | string[] })[] = [
   { href: "/admin", label: "داشبورد", permission: "dashboard.view" },
   { href: "/admin/users", label: "کاربران", permission: "users.view" },
   { href: "/admin/customers", label: "مشتریان", permission: "customers.view" },
   { href: "/admin/roles", label: "نقش‌ها و دسترسی", permission: "roles.manage" },
-  { href: "/admin/products", label: "محصولات", permission: "products.rate" },
+  { href: "/admin/products", label: "محصولات", permission: ["products.manage", "products.rate"] },
+  { href: "/admin/categories", label: "دسته‌بندی‌ها", permission: "categories.manage" },
+  { href: "/admin/companies", label: "کارخانه‌ها", permission: "companies.view" },
   { href: "/admin/site", label: "محتوای سایت", permission: "site.manage" },
   { href: "/admin/messages", label: "پیام‌های تماس", permission: "contact.view" },
   { href: "/admin/activity", label: "لاگ فعالیت", permission: "activity.view" },
@@ -22,7 +25,7 @@ const NAV: (NavItem & { permission: string })[] = [
 export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
   const a = await requireStaff();
   const items: NavItem[] = [];
-  for (const n of NAV) if (await can(a.user, n.permission)) items.push({ href: n.href, label: n.label });
+  for (const n of NAV) if (await canAny(a.user, [n.permission].flat())) items.push({ href: n.href, label: n.label });
 
   return (
     <div className={styles.shell}>
@@ -34,7 +37,7 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
         <Link href="/" className={styles.navSoon} target="_blank">
           دیدن سایت ↗
         </Link>
-        <div className={styles.navSoon}>مدیریت کامل محصول، شرکت‌ها، دسته‌بندی، چت‌ها، نرخ‌ها — مرحله‌های بعد</div>
+        <div className={styles.navSoon}>آپلود عکس، چت‌ها و نرخ‌ها — مرحله‌های بعد</div>
         <div className={styles.userBox}>
           <div>
             <div className={styles.userName}>{a.user.fullName}</div>

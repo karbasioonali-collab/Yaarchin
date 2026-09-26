@@ -61,6 +61,8 @@ export const companies = pgTable(
     city: text("city"),
     address: text("address"),
     website: text("website"),
+    // یادداشت داخلی کارشناس‌ها (migration ۰۰۰۴). مثل همه‌ی اطلاعات کارخانه، فقط در پنل.
+    notes: text("notes"),
     // فاز ۲: کاربرِ خود شرکت
     userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     status: text("status", { enum: ["active", "blocked", "merged"] }).notNull().default("active"),
@@ -124,8 +126,15 @@ export const products = pgTable(
     specs: jsonb("specs").notNull().default([]),
     // واحد قیمت (piece، set، kg، …) برای «قیمت هر …»
     priceUnit: text("price_unit").notNull().default("piece"),
-    // HS code پیشنهادی؛ تأیید با انسان (مرحله‌ی ۶)
+    // HS code پیشنهادی؛ تأیید با انسان (مرحله‌ی ۶). فعلاً متن؛ در مرحله‌ی نرخ‌ها به جدول HS وصل می‌شود.
     hsCode: text("hs_code"),
+    // وزن و بسته‌بندی برای ماشین‌حساب هزینه‌ی حمل (migration ۰۰۰۴). همه اختیاری؛ اگر پر باشند > ۰.
+    unitWeightKg: numeric("unit_weight_kg", { precision: 10, scale: 3 }),
+    cartonLengthCm: numeric("carton_length_cm", { precision: 8, scale: 1 }),
+    cartonWidthCm: numeric("carton_width_cm", { precision: 8, scale: 1 }),
+    cartonHeightCm: numeric("carton_height_cm", { precision: 8, scale: 1 }),
+    cartonWeightKg: numeric("carton_weight_kg", { precision: 10, scale: 3 }),
+    unitsPerCarton: integer("units_per_carton"),
     status: text("status", { enum: ["draft", "published", "archived"] }).notNull().default("draft"),
     // امتیاز «جذاب برای واردات» (migration ۰۰۰۲). فقط ۱، ۲، ۳، ۴، ۴٫۵ یا ۵؛ خالی = بدون امتیاز.
     // مقدار مجاز را خود دیتابیس هم کنترل می‌کند (products_import_score_check). فهرست در کد: src/lib/catalog/import-score.ts
@@ -141,6 +150,12 @@ export const products = pgTable(
     index("products_category_idx").on(t.categoryId, t.status),
     index("products_status_idx").on(t.status, t.publishedAt),
     check("products_import_score_check", sql`${t.importScore} in (1, 2, 3, 4, 4.5, 5)`),
+    check(
+      "products_packing_check",
+      sql`(${t.unitWeightKg} is null or ${t.unitWeightKg} > 0) and (${t.cartonLengthCm} is null or ${t.cartonLengthCm} > 0)
+        and (${t.cartonWidthCm} is null or ${t.cartonWidthCm} > 0) and (${t.cartonHeightCm} is null or ${t.cartonHeightCm} > 0)
+        and (${t.cartonWeightKg} is null or ${t.cartonWeightKg} > 0) and (${t.unitsPerCarton} is null or ${t.unitsPerCarton} > 0)`,
+    ),
   ],
 );
 
@@ -222,5 +237,96 @@ export const priceObservations = pgTable(
     createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
     createdAt: createdAt(),
   },
-  (t) => [index("price_observations_listing_idx").on(t.listingId, t.observedAt)],
+  (t) => [
+    index("price_observations_listing_idx").on(t.listingId, t.observedAt),
+    // ارز اصلی: فقط دلار یا یوان (migration ۰۰۰۴). تبدیل به تومان هرگز ذخیره نمی‌شود؛ هر بار با آخرین نرخ حساب می‌شود.
+    check("price_observations_currency_check", sql`${t.currency} in ('USD', 'CNY')`),
+  ],
+);
+
+// زمان آماده‌سازی هر لیستینگ با پله‌ی تعداد (migration ۰۰۰۴). مثل قیمت فقط افزودنی: نوبت تازه = ردیف‌های تازه.
+// مثال یک نوبت: (1..500 → 15 روز) و (501..∞ → 30 روز). ستون قدیمی product_listings.lead_time_days
+// فقط وقتی استفاده می‌شود که هنوز هیچ پله‌ای برای آن لیستینگ ثبت نشده (داده‌ی demo و قبلی).
+export const leadTimeObservations = pgTable(
+  "lead_time_observations",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    listingId: uuid("listing_id")
+      .notNull()
+      .references(() => productListings.id, { onDelete: "restrict" }),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+    minQty: integer("min_qty"),
+    maxQty: integer("max_qty"),
+    days: integer("days").notNull(),
+    source: source(),
+    note: text("note"),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("lead_time_observations_listing_idx").on(t.listingId, t.observedAt),
+    check("lead_time_observations_days_check", sql`${t.days} > 0 and ${t.days} <= 730`),
+  ],
+);
+
+// ---------- تماس‌ها و سابقه‌ی مکاتبه با کارخانه (migration ۰۰۰۴) — محرمانه، فقط پنل ----------
+export const companyContacts = pgTable(
+  "company_contacts",
+  {
+    id: id(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    role: text("role"), // مثلاً Sales Manager
+    phone: text("phone"),
+    email: text("email"),
+    wechat: text("wechat"),
+    whatsapp: text("whatsapp"),
+    note: text("note"),
+    source: source(),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (t) => [index("company_contacts_company_idx").on(t.companyId)],
+);
+
+// سابقه‌ی مکاتبه: فقط افزودنی (ویرایش و حذف ندارد؛ اصلاح = یادداشت تازه).
+// اکستنشن بعداً همین‌جا با source = 'extension' و external_ref (شناسه‌ی پیام/گفتگو در علی‌بابا) ثبت می‌کند؛
+// ایندکس یکتای (company_id، source، external_ref) جلوی ثبت دوباره‌ی یک پیام را می‌گیرد.
+export const CORRESPONDENCE_KINDS = ["note", "chat_summary", "chat_message", "email", "call"] as const;
+export const CORRESPONDENCE_CHANNELS = ["alibaba_chat", "email", "wechat", "whatsapp", "phone", "other"] as const;
+export const CORRESPONDENCE_DIRECTIONS = ["inbound", "outbound", "internal"] as const;
+
+export const companyCorrespondence = pgTable(
+  "company_correspondence",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    companyId: uuid("company_id")
+      .notNull()
+      .references(() => companies.id, { onDelete: "restrict" }),
+    contactId: uuid("contact_id").references(() => companyContacts.id, { onDelete: "set null" }),
+    productId: uuid("product_id").references(() => products.id, { onDelete: "set null" }),
+    listingId: uuid("listing_id").references(() => productListings.id, { onDelete: "set null" }),
+    kind: text("kind", { enum: CORRESPONDENCE_KINDS }).notNull().default("note"),
+    channel: text("channel", { enum: CORRESPONDENCE_CHANNELS }).notNull().default("other"),
+    // inbound: از کارخانه، outbound: به کارخانه، internal: یادداشت داخلی
+    direction: text("direction", { enum: CORRESPONDENCE_DIRECTIONS }).notNull().default("internal"),
+    body: text("body").notNull(),
+    // زمان خود مکاتبه (ممکن است قبل از زمان ثبت باشد)
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull().defaultNow(),
+    source: source(),
+    externalRef: text("external_ref"),
+    meta: jsonb("meta").notNull().default({}),
+    createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("company_correspondence_company_idx").on(t.companyId, t.occurredAt),
+    index("company_correspondence_product_idx").on(t.productId),
+    uniqueIndex("company_correspondence_ref_uq").on(t.companyId, t.source, t.externalRef).where(sql`${t.externalRef} is not null`),
+    check("company_correspondence_kind_check", sql`${t.kind} in ('note', 'chat_summary', 'chat_message', 'email', 'call')`),
+    check("company_correspondence_channel_check", sql`${t.channel} in ('alibaba_chat', 'email', 'wechat', 'whatsapp', 'phone', 'other')`),
+    check("company_correspondence_direction_check", sql`${t.direction} in ('inbound', 'outbound', 'internal')`),
+  ],
 );
