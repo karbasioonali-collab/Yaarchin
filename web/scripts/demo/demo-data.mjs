@@ -17,7 +17,28 @@ export const categories = [
 ];
 
 export const companies = [
-  { key: "c1", nameEn: "Demo Ningbo Homeware Appliance Co., Ltd.", type: "manufacturer", province: "Zhejiang", city: "Ningbo", ext: "demo-nb-001", cats: ["kitchen-appliances"] },
+  {
+    key: "c1",
+    nameEn: "Demo Ningbo Homeware Appliance Co., Ltd.",
+    type: "manufacturer",
+    province: "Zhejiang",
+    city: "Ningbo",
+    ext: "demo-nb-001",
+    cats: ["kitchen-appliances"],
+    // تماس و سابقه‌ی مکاتبه‌ی نمونه (migration ۰۰۰۴)
+    contacts: [{ name: "Demo Lily Chen", role: "Sales Manager", email: "lily@example.com", wechat: "demo-lily" }],
+    correspondence: [
+      {
+        kind: "chat_summary",
+        channel: "alibaba_chat",
+        direction: "inbound",
+        daysAgo: 5,
+        product: "portable-blender",
+        body: "خلاصه‌ی نمونه: قیمت ۵۰۰ عدد ۶٫۸ تا ۷٫۲ دلار؛ چاپ لوگو از ۱۰۰۰ عدد رایگان؛ نمونه با هزینه‌ی ارسال خریدار.",
+      },
+      { kind: "note", channel: "other", direction: "internal", daysAgo: 4, body: "یادداشت نمونه: کیفیت عکس‌های کارخانه خوب است ولی لوگو دارد؛ عکس اختصاصی بخواهیم." },
+    ],
+  },
   { key: "c2", nameEn: "Demo Zhongshan Kitchen Electric Co., Ltd.", type: "manufacturer", province: "Guangdong", city: "Zhongshan", ext: "demo-zs-002", cats: ["kitchen-appliances"] },
   { key: "c3", nameEn: "Demo Yiwu Smart Living Trading Co., Ltd.", type: "trading", province: "Zhejiang", city: "Yiwu", ext: "demo-yw-003", cats: ["kitchen-appliances", "cookware"] },
   { key: "c4", nameEn: "Demo Yongkang Cookware Industry Co., Ltd.", type: "manufacturer", province: "Zhejiang", city: "Yongkang", ext: "demo-yk-004", cats: ["cookware"] },
@@ -41,6 +62,8 @@ export const products = [
   {
     slug: "portable-blender",
     importScore: 4.5,
+    // وزن و کارتن (migration ۰۰۰۴؛ برای ماشین‌حساب مرحله‌ی نرخ‌ها)
+    packing: { unitWeightKg: 0.5, unitsPerCarton: 24, cartonWeightKg: 13.5, cartonLengthCm: 52, cartonWidthCm: 36, cartonHeightCm: 30 },
     category: "blenders",
     titleFa: "مخلوط‌کن قابل‌حمل شارژی ۳۸۰ میلی‌لیتر",
     titleEn: "Portable Rechargeable Blender 380ml",
@@ -59,7 +82,8 @@ export const products = [
     ],
     media: [img("portable-blender", 1, "مخلوط‌کن قابل‌حمل سبز"), video("portable-blender", "ویدیوی مخلوط‌کن"), img("portable-blender", 2, "مخلوط‌کن قابل‌حمل نارنجی"), img("portable-blender", 3, "نمای نزدیک مخلوط‌کن")],
     listings: [
-      { company: "c1", moq: 500, lead: 20, prices: [[500, 999, 6.8, 7.2], [1000, null, 6.1, null]], old: [[500, null, 7.5, null]] },
+      // leadTiers: زمان آماده‌سازی پله‌ای [minQty, maxQty|null, days] (migration ۰۰۰۴؛ جای lead را در سایت می‌گیرد)
+      { company: "c1", moq: 500, lead: 20, leadTiers: [[1, 999, 20], [1000, null, 30]], prices: [[500, 999, 6.8, 7.2], [1000, null, 6.1, null]], old: [[500, null, 7.5, null]] },
       { company: "c2", moq: 1000, lead: 25, prices: [[1000, 4999, 5.9, 6.3]] },
       { company: "c3", moq: 100, lead: 10, prices: [[100, 499, 8.2, 8.9], [500, null, 7.6, null]] },
       { company: "c1", moq: 2000, lead: 30, prices: [[2000, null, 5.6, 5.8]], dup: true },

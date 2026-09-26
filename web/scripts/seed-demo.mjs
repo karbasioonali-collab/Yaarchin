@@ -14,9 +14,20 @@ if (!url) {
 const removeOnly = process.argv.includes("--remove");
 
 async function removeDemo(c) {
-  await c.query(`delete from price_observations where source = 'demo'`);
-  await c.query(`delete from product_media where source = 'demo'`);
-  await c.query(`delete from product_listings where source = 'demo'`);
+  // هر چیزی که به محصول یا کارخانه‌ی demo وصل است هم پاک می‌شود، حتی اگر دستی در پنل اضافه شده باشد
+  // (مثلاً قیمتی که کارشناس برای لیستینگ یک کارخانه‌ی demo ثبت کرده). وگرنه قیدهای RESTRICT جلوی پاک شدن را می‌گیرند.
+  const has0004 = (await c.query(`select to_regclass('public.lead_time_observations') is not null as ok`)).rows[0].ok;
+  const demoListings = `select pl.id from product_listings pl
+      where pl.source = 'demo'
+         or pl.product_id in (select id from products where source = 'demo')
+         or pl.company_id in (select id from companies where source = 'demo')`;
+  if (has0004) {
+    await c.query(`delete from company_correspondence where source = 'demo' or company_id in (select id from companies where source = 'demo')`);
+    await c.query(`delete from lead_time_observations where source = 'demo' or listing_id in (${demoListings})`);
+  }
+  await c.query(`delete from price_observations where source = 'demo' or listing_id in (${demoListings})`);
+  await c.query(`delete from product_media where source = 'demo' or product_id in (select id from products where source = 'demo')`);
+  await c.query(`delete from product_listings where id in (${demoListings})`);
   await c.query(`delete from products where source = 'demo'`);
   await c.query(`delete from companies where source = 'demo'`);
   // دسته‌ها از برگ به ریشه (والد با RESTRICT محافظت می‌شود)
@@ -55,6 +66,9 @@ try {
     );
     if (!col.rowCount) throw new Error("ستون products.import_score نیست؛ اول npm run db:migrate را اجرا کنید.");
 
+    // داده‌ی مخصوص migration ۰۰۰۴ (تماس، مکاتبه، پله‌ی زمان آماده‌سازی، وزن و کارتن) فقط اگر اجرا شده باشد
+    const has0004 = (await client.query(`select to_regclass('public.lead_time_observations') is not null as ok`)).rows[0].ok;
+
     const catId = new Map();
     for (const cat of categories) {
       const { rows } = await client.query(
@@ -80,6 +94,14 @@ try {
       for (const slug of co.cats) {
         await client.query(`insert into company_categories (company_id, category_id) values ($1,$2)`, [rows[0].id, catId.get(slug)]);
       }
+      if (has0004) {
+        for (const ct of co.contacts ?? []) {
+          await client.query(
+            `insert into company_contacts (company_id, name, role, email, wechat, source) values ($1,$2,$3,$4,$5,'demo')`,
+            [rows[0].id, ct.name, ct.role ?? null, ct.email ?? null, ct.wechat ?? null],
+          );
+        }
+      }
     }
 
     let order = 0;
@@ -92,6 +114,13 @@ try {
         [p.slug, catId.get(p.category), p.titleFa, p.titleEn, p.summaryFa, p.descriptionFa, JSON.stringify(p.specs), p.priceUnit ?? "piece", p.hsCode, p.importScore ?? null, daysAgo(order)],
       );
       const productId = rows[0].id;
+      if (has0004 && p.packing) {
+        const k = p.packing;
+        await client.query(
+          `update products set unit_weight_kg=$2, units_per_carton=$3, carton_weight_kg=$4, carton_length_cm=$5, carton_width_cm=$6, carton_height_cm=$7 where id=$1`,
+          [productId, k.unitWeightKg, k.unitsPerCarton, k.cartonWeightKg, k.cartonLengthCm, k.cartonWidthCm, k.cartonHeightCm],
+        );
+      }
 
       let sort = 0;
       for (const m of p.media) {
@@ -119,6 +148,28 @@ try {
             );
           }
         }
+        if (has0004) {
+          for (const [minQty, maxQty, days] of l.leadTiers ?? []) {
+            await client.query(
+              `insert into lead_time_observations (listing_id, observed_at, min_qty, max_qty, days, source) values ($1,$2,$3,$4,$5,'demo')`,
+              [lr[0].id, daysAgo(3), minQty, maxQty, days],
+            );
+          }
+        }
+      }
+    }
+  }
+
+  if (!removeOnly && (await client.query(`select to_regclass('public.company_correspondence') is not null as ok`)).rows[0].ok) {
+    for (const co of companies) {
+      for (const m of co.correspondence ?? []) {
+        await client.query(
+          `insert into company_correspondence (company_id, product_id, kind, channel, direction, body, occurred_at, source)
+           select c.id, (select id from products where slug = $2 and source = 'demo'), $3, $4, $5, $6, $7, 'demo'
+           from companies c join company_external_ids e on e.company_id = c.id and e.platform = 'alibaba' and e.external_id = $1
+           where c.source = 'demo'`,
+          [co.ext, m.product ?? null, m.kind, m.channel, m.direction, m.body, daysAgo(m.daysAgo)],
+        );
       }
     }
   }

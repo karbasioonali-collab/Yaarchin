@@ -28,7 +28,7 @@ export function fmtMoney(n: number): string {
 }
 
 // واحدهای قیمت (products.price_unit)
-const UNITS: Record<string, string> = { piece: "عدد", set: "دست", pair: "جفت", kg: "کیلوگرم", meter: "متر", box: "جعبه", pack: "بسته" };
+export const UNITS: Record<string, string> = { piece: "عدد", set: "دست", pair: "جفت", kg: "کیلوگرم", meter: "متر", box: "جعبه", pack: "بسته" };
 export function unitFa(u: string): string {
   return UNITS[u] ?? u;
 }

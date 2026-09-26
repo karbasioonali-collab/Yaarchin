@@ -9,7 +9,7 @@ import { connection } from "next/server";
 import { cache } from "react";
 import { db } from "@/db/client";
 import { categories, productMedia, products } from "@/db/schema";
-import { catalogReady, importScoreReady } from "@/lib/db-ready";
+import { catalogAdminReady, catalogReady, importScoreReady } from "@/lib/db-ready";
 import { type ImportScore, toImportScore } from "./import-score";
 import { mediaUrl } from "@/lib/storage";
 import { type LandedCost, landedCostFor } from "@/lib/pricing/landed";
@@ -164,17 +164,32 @@ async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
   if (!productIds.length) return out;
   const ids = sql`array[${sql.join(productIds.map((id) => sql`${id}::uuid`), sql`, `)}]`;
 
-  // لیستینگ‌های فعالِ کارخانه‌های غیرمسدود
+  // لیستینگ‌های فعالِ کارخانه‌های فعال (مسدود یا ادغام‌شده حساب نمی‌شوند)
+  // زمان آماده‌سازی: از آخرین نوبت پله‌های lead_time_observations (migration ۰۰۰۴؛ مثل قیمت، همه‌ی ردیف‌های تا ۲ ثانیه
+  // قبل از جدیدترین = یک نوبت). لیستینگی که هنوز پله ندارد، از ستون قدیمی lead_time_days (داده‌ی demo و قبلی).
+  // بازه = کمترین تا بیشترین روزِ همه‌ی پله‌های همه‌ی کارخانه‌ها (مثلاً ۱۵ روز برای سفارش کم تا ۳۰ روز برای سفارش زیاد).
+  const tiers = (await catalogAdminReady())
+    ? sql`
+      select po.listing_id, min(po.days) as lo, max(po.days) as hi
+      from (select listing_id, days, observed_at, max(observed_at) over (partition by listing_id) as last_at
+            from lead_time_observations) po
+      where po.observed_at > po.last_at - interval '2 seconds'
+      group by po.listing_id`
+    : sql`select null::uuid as listing_id, null::int as lo, null::int as hi where false`;
   const listingStats = await db.execute<{ product_id: string; suppliers: number; moq_min: number | null; lt_min: number | null; lt_max: number | null }>(sql`
-    select pl.product_id, count(distinct pl.company_id)::int as suppliers,
-           min(pl.moq)::int as moq_min, min(pl.lead_time_days)::int as lt_min, max(pl.lead_time_days)::int as lt_max
+    with lt as (${tiers})
+    select pl.product_id, count(distinct pl.company_id)::int as suppliers, min(pl.moq)::int as moq_min,
+           min(coalesce(lt.lo, pl.lead_time_days))::int as lt_min, max(coalesce(lt.hi, pl.lead_time_days))::int as lt_max
     from product_listings pl
-    join companies c on c.id = pl.company_id and c.status <> 'blocked'
+    join companies c on c.id = pl.company_id and c.status = 'active'
+    left join lt on lt.listing_id = pl.id
     where pl.status = 'active' and pl.product_id = any(${ids})
     group by pl.product_id`);
 
-  // برای هر لیستینگ فقط آخرین نوبتِ مشاهده‌ی قیمت حساب می‌شود: همه‌ی ردیف‌های تا یک ساعت قبل از جدیدترین
-  // (پله‌های قیمتِ یک صفحه با فاصله‌ی چند میلی‌ثانیه ثبت می‌شوند؛ «برابر بودن زمان» معیار درستی نیست).
+  // برای هر لیستینگ فقط آخرین نوبتِ مشاهده‌ی قیمت حساب می‌شود: همه‌ی ردیف‌های تا ۲ ثانیه قبل از جدیدترین.
+  // (پله‌های یک نوبت ممکن است چند میلی‌ثانیه فاصله داشته باشند، پس «برابر بودن زمان» کافی نیست؛ ولی پنجره نباید بزرگ باشد:
+  // با پنجره‌ی یک ساعته، قیمتی که کارشناس چند دقیقه بعد اصلاح می‌کرد با نوبت قبلی قاطی می‌شد. پنل همه‌ی پله‌های یک نوبت را
+  // با یک زمانِ واحد ثبت می‌کند؛ اکستنشن هم باید همین کار را بکند. docs/infoyaarchin.md بخش ۱۹.)
   // «میانگین» = میانگینِ وسطِ بازه‌ی هر کارخانه (هر کارخانه یک رأی، حتی با چند لیستینگ)؛
   // «بازه» = کمترین تا بیشترین قیمت همه‌ی کارخانه‌ها.
   const priceStats = await db.execute<{ product_id: string; n: number; lo: string; hi: string; avg: string; at: Date }>(sql`
@@ -183,11 +198,13 @@ async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
              max(po.observed_at) over (partition by po.listing_id) as last_at
       from price_observations po
       join product_listings pl on pl.id = po.listing_id and pl.status = 'active'
-      join companies c on c.id = pl.company_id and c.status <> 'blocked'
+      join companies c on c.id = pl.company_id and c.status = 'active'
+      -- فقط دلار: قیمت یوانی تا مرحله‌ی نرخ‌ها در میانگین سایت نمی‌آید (بدون نرخ یوان/دلار قابل مقایسه نیست).
+      -- «آخرین نوبت» هم فقط بین قیمت‌های دلاری هر لیستینگ حساب می‌شود.
       where po.currency = 'USD' and pl.product_id = any(${ids})
     ), per_listing as (
       select product_id, listing_id, company_id, min(price_min) as lo, max(price_max) as hi, max(observed_at) as at
-      from latest where observed_at > last_at - interval '1 hour' group by product_id, listing_id, company_id
+      from latest where observed_at > last_at - interval '2 seconds' group by product_id, listing_id, company_id
     ), per_company as (
       select product_id, company_id, min(lo) as lo, max(hi) as hi, avg((lo + hi) / 2) as mid, max(at) as at
       from per_listing group by product_id, company_id

@@ -26,3 +26,15 @@ export async function requirePermission(permission: string): Promise<AuthState> 
   if (!(await can(a.user, permission))) redirect("/admin/forbidden");
   return a;
 }
+
+// یکی از چند دسترسی کافی است (مثلاً فهرست محصولات: products.rate یا products.manage)
+export async function canAny(user: CurrentUser, permissions: string[]): Promise<boolean> {
+  for (const p of permissions) if (await can(user, p)) return true;
+  return false;
+}
+
+export async function requireAnyPermission(permissions: string[]): Promise<AuthState> {
+  const a = await requireStaff();
+  if (!(await canAny(a.user, permissions))) redirect("/admin/forbidden");
+  return a;
+}

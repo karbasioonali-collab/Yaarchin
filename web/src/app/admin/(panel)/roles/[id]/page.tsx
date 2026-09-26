@@ -22,6 +22,9 @@ const GROUP_FA: Record<string, string> = {
   contact: "پیام‌های تماس",
   products: "محصولات",
   customers: "مشتریان",
+  categories: "دسته‌بندی‌ها",
+  companies: "کارخانه‌ها",
+  correspondence: "مکاتبه با کارخانه‌ها",
 };
 
 export default async function RolePage({ params }: PageProps<"/admin/roles/[id]">) {
