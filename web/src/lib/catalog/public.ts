@@ -9,10 +9,10 @@ import { connection } from "next/server";
 import { cache } from "react";
 import { db } from "@/db/client";
 import { categories, productMedia, products } from "@/db/schema";
-import { catalogAdminReady, catalogReady, importScoreReady } from "@/lib/db-ready";
+import { catalogAdminReady, catalogReady, importScoreReady, ratesReady } from "@/lib/db-ready";
 import { type ImportScore, toImportScore } from "./import-score";
 import { mediaUrl } from "@/lib/storage";
-import { type LandedCost, landedCostFor } from "@/lib/pricing/landed";
+import { clampQty, type LandedCost, publicLandedCost } from "@/lib/pricing/landed";
 
 export type PublicCategory = {
   slug: string;
@@ -192,16 +192,22 @@ async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
   // با یک زمانِ واحد ثبت می‌کند؛ اکستنشن هم باید همین کار را بکند. docs/infoyaarchin.md بخش ۱۹.)
   // «میانگین» = میانگینِ وسطِ بازه‌ی هر کارخانه (هر کارخانه یک رأی، حتی با چند لیستینگ)؛
   // «بازه» = کمترین تا بیشترین قیمت همه‌ی کارخانه‌ها.
+  // قیمت یوانی (migration ۰۰۰۵): وقتی نرخ بازار دلار و یوان هر دو ثبت شده، یوان با نسبت «نرخ یوان ÷ نرخ دلار» به دلار
+  // تبدیل و وارد میانگین می‌شود؛ وگرنه مثل قبل کنار گذاشته می‌شود. «آخرین نوبت» هر لیستینگ بین همه‌ی ارزهای قابل‌استفاده
+  // حساب می‌شود (اگر کارشناس بعد از قیمت دلاری، قیمت یوانی تازه ثبت کند، قیمت یوانی ملاک است). docs/infoyaarchin.md بخش ۲۱.
+  const lastRate = (code: string) => sql`(select rate_toman from exchange_rates where currency_code = ${code} and kind = 'market'
+      and rate_date <= (now() at time zone 'Asia/Tehran')::date order by rate_date desc, created_at desc, id desc limit 1)`;
+  const fx = (await ratesReady()) ? sql`select ${lastRate("CNY")} / ${lastRate("USD")} as cny_usd` : sql`select null::numeric as cny_usd`;
   const priceStats = await db.execute<{ product_id: string; n: number; lo: string; hi: string; avg: string; at: Date }>(sql`
-    with latest as (
-      select po.listing_id, pl.product_id, pl.company_id, po.price_min, coalesce(po.price_max, po.price_min) as price_max, po.observed_at,
+    with fx as (${fx}), latest as (
+      select po.listing_id, pl.product_id, pl.company_id,
+             po.price_min * f.k as price_min, coalesce(po.price_max, po.price_min) * f.k as price_max, po.observed_at,
              max(po.observed_at) over (partition by po.listing_id) as last_at
       from price_observations po
       join product_listings pl on pl.id = po.listing_id and pl.status = 'active'
       join companies c on c.id = pl.company_id and c.status = 'active'
-      -- فقط دلار: قیمت یوانی تا مرحله‌ی نرخ‌ها در میانگین سایت نمی‌آید (بدون نرخ یوان/دلار قابل مقایسه نیست).
-      -- «آخرین نوبت» هم فقط بین قیمت‌های دلاری هر لیستینگ حساب می‌شود.
-      where po.currency = 'USD' and pl.product_id = any(${ids})
+      cross join lateral (select case when po.currency = 'CNY' then (select cny_usd from fx) else 1 end as k) f
+      where f.k is not null and po.currency in ('USD', 'CNY') and pl.product_id = any(${ids})
     ), per_listing as (
       select product_id, listing_id, company_id, min(price_min) as lo, max(price_max) as hi, max(observed_at) as at
       from latest where observed_at > last_at - interval '2 seconds' group by product_id, listing_id, company_id
@@ -356,7 +362,6 @@ export async function getProduct(slug: string): Promise<PublicProduct | null> {
       titleEn: products.titleEn,
       descriptionFa: products.descriptionFa,
       specs: products.specs,
-      hsCode: products.hsCode,
       updatedAt: products.updatedAt,
     })
     .from(products)
@@ -396,9 +401,21 @@ export async function getProduct(slug: string): Promise<PublicProduct | null> {
     moqMin: s?.moqMin ?? null,
     leadTimeDays: s?.ltMin != null && s?.ltMax != null ? { min: s.ltMin, max: s.ltMax } : null,
     breadcrumb: ancestors(idx, p.categoryId),
-    landedCost: await landedCostFor({ price: card.price, hsCode: p.hsCode }),
+    // پیش‌فرض تعداد در کارت «قیمت تمام‌شده» = حداقل سفارش؛ مشتری در صفحه عوضش می‌کند (/api/v1/products/[slug]/landed)
+    landedCost: await publicLandedCost(p.id, s?.moqMin ?? 1),
     updatedAt: p.updatedAt.toISOString(),
   };
+}
+
+// کارت «قیمت تمام‌شده» با تعداد دلخواه مشتری (/api/v1/products/[slug]/landed). خروجی فقط عددهای گردشده‌ی جمع است؛
+// قیمت یا اسم تک‌تک کارخانه‌ها در آن نیست (src/lib/pricing/compute.ts → toPublic).
+export async function landedForSlug(slug: string, qtyRaw: unknown): Promise<LandedCost | null> {
+  await connection();
+  if (!(await catalogReady())) return null;
+  const id = await publishedProductId(slug);
+  if (!id) return null;
+  const s = (await statsFor([id])).get(id);
+  return publicLandedCost(id, clampQty(qtyRaw, s?.moqMin ?? 1));
 }
 
 // برای فوتر و نقشه‌ی سایت

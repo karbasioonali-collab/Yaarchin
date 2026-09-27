@@ -3,8 +3,12 @@ import Link from "next/link";
 import { and, count, desc, eq, gt, isNull } from "drizzle-orm";
 import { db } from "@/db/client";
 import { activityLog, roles, sessions, userRoles, users } from "@/db/schema";
-import { can, requirePermission } from "@/lib/auth/can";
-import { fmtDateTime, fmtNum } from "@/lib/format";
+import { can, canAny, requirePermission } from "@/lib/auth/can";
+import { fmtDate, fmtDateTime, fmtNum } from "@/lib/format";
+import { currencyRows } from "@/lib/pricing/admin";
+import { RATE_PERMS } from "@/lib/pricing/labels";
+import { tehranDate } from "@/lib/pricing/snapshot";
+import { ratesReady } from "@/lib/db-ready";
 import { getAllSettings } from "@/lib/settings";
 import { NOT_BUILT_SETTINGS } from "@/lib/settings-meta";
 import styles from "./panel.module.css";
@@ -36,6 +40,9 @@ export default async function DashboardPage() {
         .limit(8)
     : [];
   const features = (await getAllSettings()).filter((s) => s.groupKey === "features");
+  // نرخ ارز امروز (برای کسی که بخش نرخ‌ها را می‌بیند؛ هشدار کلی بالای همه‌ی صفحه‌های پنل هم هست)
+  const rates = (await canAny(a.user, RATE_PERMS)) && (await ratesReady()) ? (await currencyRows()).filter((c) => c.isActive && !c.isBase) : null;
+  const today = tehranDate();
 
   return (
     <>
@@ -84,6 +91,23 @@ export default async function DashboardPage() {
             <Link href="/admin/activity">همه‌ی فعالیت‌ها</Link>
           </p>
         </div>
+        )}
+        {rates && (
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>نرخ ارز امروز</h2>
+            {rates.map((c) => (
+              <div key={c.code} className={styles.switchRow}>
+                <span>
+                  {c.nameFa}: {c.market ? <strong>{fmtNum(c.market.rate)} تومان</strong> : "—"}
+                  {c.market && <span className={styles.muted}> ({fmtDate(c.market.date)})</span>}
+                </span>
+                {c.market?.date === today ? <span className={styles.badge}>ثبت شده</span> : <span className={`${styles.badge} ${styles.badgeWarn}`}>امروز ثبت نشده</span>}
+              </div>
+            ))}
+            <p style={{ marginBottom: 0 }}>
+              <Link href="/admin/rates">نرخ‌ها و هزینه‌ها</Link>
+            </p>
+          </div>
         )}
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>بخش‌ها</h2>

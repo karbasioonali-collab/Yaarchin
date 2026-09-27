@@ -39,6 +39,23 @@
 .landedHead > span:last-child { margin-inline-start: auto; }
 .landedValue { font-size: 22px; font-weight: 800; color: var(--green-dark); margin-top: 6px; }
 .landedValue small { font-size: 13px; font-weight: 500; color: var(--muted); }
+.qtyRow { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 14px; font-weight: 600; flex-wrap: wrap; }
+.qtyInput {
+  width: 120px; padding: 8px 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); font: inherit; font-weight: 700;
+  text-align: center; background: var(--bg); color: var(--text);
+}
+.qtyInput:focus { outline: 2px solid var(--green); outline-offset: 1px; }
+.landedError { margin: 8px 0 0; font-size: 13px; color: #b3261e; }
+.landedWarn { margin: 8px 0 0; font-size: 12px; color: var(--orange-dark); }
+.methods { display: grid; gap: 10px; margin-top: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.methods[aria-busy="true"] { opacity: .55; transition: opacity .15s; }
+.method { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; background: var(--bg); min-width: 0; }
+.methodName { font-weight: 700; color: var(--green-dark); font-size: 14px; }
+.methodUnit { font-size: 20px; font-weight: 800; color: var(--orange-dark); margin-top: 4px; line-height: 1.4; }
+.methodUnit small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); line-height: 1.4; }
+.methodTotal { font-size: 13px; margin-top: 2px; }
+.methodInquiry { font-size: 15px; font-weight: 700; color: var(--green); margin-top: 6px; }
+.methodDays { font-size: 12px; color: var(--muted); margin-top: 6px; }
 .muted { color: var(--muted); font-size: 13px; margin: 8px 0 0; }
 
 .actions { display: flex; gap: 10px; width: 100%; margin-top: 4px; }

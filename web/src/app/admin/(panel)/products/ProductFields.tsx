@@ -4,6 +4,7 @@ import { SLUG_HINT } from "@/lib/catalog/admin-input";
 import { PRODUCT_STATUS_FA } from "@/lib/catalog/admin-labels";
 import { type AdminCategory, categoryLabel } from "@/lib/catalog/admin-tree";
 import { UNITS } from "@/lib/format";
+import { HsPicker } from "./HsPicker";
 
 type V = {
   titleFa?: string;
@@ -18,7 +19,8 @@ type V = {
 };
 
 // فیلدهای اصلی محصول (ساخت و ویرایش)
-export function ProductFields({ tree, value }: { tree: AdminCategory[]; value?: V }) {
+// hs: وضعیت HS code فعلی در لیست HS (ready = migration ۰۰۰۵ اجرا شده)
+export function ProductFields({ tree, value, hs }: { tree: AdminCategory[]; value?: V; hs: { ready: boolean; current: { code: string; titleFa: string | null; duty: string } | null } }) {
   return (
     <>
       <Field label="نام فارسی" name="titleFa" defaultValue={value?.titleFa ?? ""} required maxLength={200} />
@@ -57,8 +59,8 @@ export function ProductFields({ tree, value }: { tree: AdminCategory[]; value?: 
             ))}
           </select>
         </label>
-        <div style={{ flex: "1 1 160px" }}>
-          <Field label="HS code" name="hsCode" defaultValue={value?.hsCode ?? ""} ltr maxLength={20} hint="فعلاً متن؛ در مرحله‌ی نرخ‌ها به جدول HS وصل می‌شود." />
+        <div style={{ flex: "1 1 240px" }}>
+          <HsPicker defaultValue={value?.hsCode ?? ""} current={hs.current} ready={hs.ready} />
         </div>
       </div>
       <Field label="خلاصه (یک خط)" name="summaryFa" defaultValue={value?.summaryFa ?? ""} maxLength={500} />

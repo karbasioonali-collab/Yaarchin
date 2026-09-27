@@ -12,6 +12,7 @@ import { getCustomer } from "@/lib/customer/auth";
 import { isFavorite } from "@/lib/customer/favorites";
 import { fmtDate, fmtMoney, fmtNum, unitFa } from "@/lib/format";
 import { isEnabled } from "@/lib/settings";
+import { LandedCalculator } from "./LandedCalculator";
 import styles from "./product.module.css";
 
 export async function generateMetadata({ params }: PageProps<"/p/[slug]">): Promise<Metadata> {
@@ -71,22 +72,13 @@ function LandedCard({ p }: { p: PublicProduct }) {
       <div className={styles.landedHead}>
         <Icon name="truck" size={20} />
         قیمت تمام‌شده تا ایران
-        {lc.status !== "ok" && <span className={`${s.chip} ${s.chipOrange}`}>به‌زودی</span>}
+        {lc.status !== "ready" && <span className={`${s.chip} ${s.chipOrange}`}>به‌زودی</span>}
       </div>
-      {lc.status === "ok" ? (
-        <>
-          <div className={styles.landedValue}>
-            {fmtNum(lc.min)} تا {fmtNum(lc.max)} <small>ریال برای هر {unitFa(lc.unit)}</small>
-          </div>
-          <p className={styles.priceNote}>
-            با نرخ‌های {fmtDate(lc.ratesDate)}؛ معتبر تا {fmtDate(lc.validUntil)}.
-          </p>
-        </>
+      {lc.status === "ready" ? (
+        <LandedCalculator slug={p.slug} unit={p.price?.unit ?? "piece"} initial={lc} />
       ) : (
         <p className={styles.priceNote}>
-          {lc.reason === "no_price"
-            ? "بعد از استعلام قیمت کارخانه، هزینه‌ی تمام‌شده هم نمایش داده می‌شود."
-            : "به‌زودی بازه‌ی قیمت رسیده به ایران (با حمل، بیمه، حقوق گمرکی و نرخ روز ارز) همراه تاریخ و مدت اعتبار اینجا نمایش داده می‌شود."}
+          به‌زودی قیمت رسیده به ایران (با حمل، بیمه، حقوق ورودی، مالیات و نرخ روز ارز) برای هر روش حمل اینجا نمایش داده می‌شود.
         </p>
       )}
     </div>

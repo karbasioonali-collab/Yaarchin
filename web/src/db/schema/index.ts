@@ -3,3 +3,4 @@ export * from "./catalog";
 export * from "./site";
 export * from "./system";
 export * from "./customer";
+export * from "./rates";

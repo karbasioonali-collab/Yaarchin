@@ -12,7 +12,8 @@ import { httpsUrl, isBad, isBadInt, num, optStr, rows, SLUG_RE, str, type Tier, 
 import { categoryExists } from "@/lib/catalog/admin-tree";
 import { UNITS } from "@/lib/format";
 import { fmtImportScore, IMPORT_SCORES, toImportScore } from "@/lib/catalog/import-score";
-import { catalogAdminReady, importScoreReady } from "@/lib/db-ready";
+import { catalogAdminReady, importScoreReady, ratesReady } from "@/lib/db-ready";
+import { hsLookup } from "@/lib/pricing/admin";
 
 // ثبت/ویرایش امتیاز «جذاب برای واردات». فقط با دسترسی products.rate (ادمین همیشه).
 // مقدار فقط از فهرست مجاز پذیرفته می‌شود؛ دیتابیس هم با CHECK constraint همین را کنترل می‌کند.
@@ -66,7 +67,9 @@ type ProductInput = {
   status: "draft" | "published" | "archived";
 };
 
-async function readProduct(fd: FormData, selfId?: string): Promise<{ error: string } | { v: ProductInput }> {
+// prevHs: HS code فعلی محصول (در ویرایش). کد تازه یا تغییرکرده باید در لیست HS باشد (بعد از migration ۰۰۰۵) و به‌شکل
+// فقط-رقم ذخیره می‌شود؛ کد قدیمیِ بدون تغییر دست نمی‌خورد حتی اگر در لیست نباشد.
+async function readProduct(fd: FormData, selfId?: string, prevHs?: string | null): Promise<{ error: string } | { v: ProductInput }> {
   const titleFa = str(fd, "titleFa", 200);
   const slug = str(fd, "slug", 100).toLowerCase();
   const cat = str(fd, "categoryId", 40);
@@ -79,6 +82,12 @@ async function readProduct(fd: FormData, selfId?: string): Promise<{ error: stri
   if (cat && !(UUID.test(cat) && (await categoryExists(cat)))) return { error: "دسته پیدا نشد." };
   const [dup] = await db.select({ id: products.id }).from(products).where(selfId ? and(eq(products.slug, slug), ne(products.id, selfId)) : eq(products.slug, slug));
   if (dup) return { error: "این slug قبلاً برای محصول دیگری استفاده شده است." };
+  let hsCode = optStr(fd, "hsCode", 30);
+  if (hsCode && hsCode !== prevHs && (await ratesReady())) {
+    const hs = await hsLookup(hsCode);
+    if (!hs) return { error: "این HS code در لیست HS نیست. از پیشنهادهای فیلد انتخاب کنید یا اول در «نرخ‌ها و هزینه‌ها ← HS code» ثبتش کنید." };
+    hsCode = hs.code;
+  }
   return {
     v: {
       titleFa,
@@ -88,7 +97,7 @@ async function readProduct(fd: FormData, selfId?: string): Promise<{ error: stri
       summaryFa: optStr(fd, "summaryFa", 500),
       descriptionFa: optStr(fd, "descriptionFa", 10000),
       priceUnit: unit,
-      hsCode: optStr(fd, "hsCode", 20),
+      hsCode,
       status: status as ProductInput["status"],
     },
   };
@@ -130,7 +139,7 @@ export async function updateProductAction(_prev: FormState, fd: FormData): Promi
     .from(products)
     .where(eq(products.id, id));
   if (!before) return { error: "محصول پیدا نشد." };
-  const r = await readProduct(fd, id);
+  const r = await readProduct(fd, id, before.hsCode);
   if ("error" in r) return r;
 
   // مشخصات مشترک: ردیف‌های «عنوان | مقدار | واحد»
@@ -313,7 +322,7 @@ export async function addPriceBatchAction(_prev: FormState, fd: FormData): Promi
   );
   await logActivity({ actorUserId: a.user.id, action: "price.add", entityType: "product", entityId: l.productId ?? undefined, after: { listingId, currency, tiers, note } });
   revalidatePath("/", "layout");
-  return { ok: currency === "CNY" ? "ثبت شد. قیمت یوانی تا مرحله‌ی نرخ‌ها در میانگین سایت حساب نمی‌شود." : "ثبت شد." };
+  return { ok: currency === "CNY" ? "ثبت شد. قیمت یوانی با آخرین نرخ یوان و دلار به دلار تبدیل و وارد میانگین سایت می‌شود (اگر هر دو نرخ ثبت شده باشند)." : "ثبت شد." };
 }
 
 export async function addLeadTimeBatchAction(_prev: FormState, fd: FormData): Promise<FormState> {

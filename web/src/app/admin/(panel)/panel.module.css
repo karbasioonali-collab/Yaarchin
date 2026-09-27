@@ -118,3 +118,27 @@
 .iconOption:has(input:focus-visible) { outline: 2px solid var(--orange); outline-offset: 2px; }
 .iconNone { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 10px; border: 1.5px dashed rgba(34, 34, 34, .25); color: var(--muted); font-size: 11px; }
 .catThumb { display: inline-block; width: 28px; height: 28px; border-radius: 8px; vertical-align: middle; margin-inline-end: 8px; background: var(--bg); object-fit: cover; }
+
+/* بخش نرخ‌ها و هزینه‌ها */
+.rateWarn {
+  display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  background: rgba(255, 122, 0, .1); border: 1px solid rgba(255, 122, 0, .35); color: var(--text);
+  border-radius: var(--radius); padding: 10px 14px; margin-bottom: 16px; font-size: 14px;
+}
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.tab { padding: 6px 12px; border-radius: 999px; font-size: 14px; color: var(--text); text-decoration: none; }
+.tab:hover { background: rgba(47, 125, 92, .08); }
+.tabActive { background: var(--green); color: #FFFFFF; }
+.tabActive:hover { background: var(--green-dark); }
+.checkRow { display: flex; gap: 14px; flex-wrap: wrap; }
+.num { direction: ltr; unicode-bidi: embed; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.formulaCell { font-size: 13px; color: var(--muted); }
+.totalRow td { font-weight: 800; color: var(--green-dark); border-top: 2px solid var(--green); }
+.sectionRow td { background: var(--bg); font-weight: 700; font-size: 13px; }
+.errorList { max-height: 260px; overflow: auto; margin: 0; padding-inline-start: 18px; font-size: 13px; }
+.hsHits {
+  position: absolute; inset-inline: 0; top: 100%; z-index: 20; list-style: none; margin: 4px 0 0; padding: 4px; max-height: 280px; overflow: auto;
+  background: var(--surface); border-radius: var(--radius-sm); box-shadow: var(--shadow-lg);
+}
+.hsHits button { width: 100%; text-align: start; background: none; border: 0; padding: 8px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px; }
+.hsHits button:hover, .hsHits button:focus { background: rgba(47, 125, 92, .08); }

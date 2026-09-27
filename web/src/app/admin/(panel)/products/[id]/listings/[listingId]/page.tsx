@@ -104,7 +104,7 @@ export default async function ListingPage({ params }: PageProps<"/admin/products
               <span className={ui.label}>ارز</span>
               <select name="currency" defaultValue="USD" className={ui.select}>
                 <option value="USD">دلار (USD)</option>
-                <option value="CNY">یوان (CNY) — تا مرحله‌ی نرخ‌ها در میانگین سایت نمی‌آید</option>
+                <option value="CNY">یوان (CNY) — با نرخ روز به دلار تبدیل می‌شود</option>
               </select>
             </label>
             <RowsEditor
