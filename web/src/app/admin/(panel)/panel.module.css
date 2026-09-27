@@ -107,3 +107,14 @@
 .mediaActions { display: flex; flex-wrap: wrap; gap: 4px; }
 .mediaActions .btnGhost { padding: 4px 8px; font-size: 12px; }
 .batch { padding: 8px 0; border-bottom: 1px solid rgba(34, 34, 34, .08); }
+
+/* انتخاب آیکون دسته (فرم دسته‌بندی) */
+.iconPicker { border: 0; padding: 0; margin: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.iconGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; max-height: 320px; overflow-y: auto; padding: 2px; }
+.iconOption { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px; border-radius: 12px; border: 2px solid transparent; background: var(--bg); cursor: pointer; font-size: 11px; text-align: center; line-height: 1.4; }
+.iconOption input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.iconOption img { width: 64px; height: 64px; border-radius: 10px; }
+.iconOption:has(input:checked) { border-color: var(--green); background: rgba(47, 125, 92, .08); }
+.iconOption:has(input:focus-visible) { outline: 2px solid var(--orange); outline-offset: 2px; }
+.iconNone { width: 64px; height: 64px; display: grid; place-items: center; border-radius: 10px; border: 1.5px dashed rgba(34, 34, 34, .25); color: var(--muted); font-size: 11px; }
+.catThumb { display: inline-block; width: 28px; height: 28px; border-radius: 8px; vertical-align: middle; margin-inline-end: 8px; background: var(--bg); object-fit: cover; }

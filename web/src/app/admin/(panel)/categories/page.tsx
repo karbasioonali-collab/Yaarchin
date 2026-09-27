@@ -5,6 +5,7 @@ import { requirePermission } from "@/lib/auth/can";
 import { adminCategoryTree } from "@/lib/catalog/admin-tree";
 import { catalogReady } from "@/lib/db-ready";
 import { fmtNum } from "@/lib/format";
+import { mediaUrl } from "@/lib/storage";
 import styles from "../panel.module.css";
 import { createCategoryAction, moveCategoryAction } from "./actions";
 import { CategoryFields } from "./CategoryFields";
@@ -45,6 +46,12 @@ export default async function CategoriesPage() {
                   <tr key={c.id}>
                     <td style={{ paddingInlineStart: 12 + c.depth * 22 }}>
                       {c.depth > 0 && <span className={styles.muted}>└ </span>}
+                      {c.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={mediaUrl(c.image) ?? ""} alt="" width={28} height={28} className={styles.catThumb} />
+                      ) : (
+                        <span className={styles.catThumb} aria-hidden="true" />
+                      )}
                       <Link href={`/admin/categories/${c.id}`}>{c.nameFa}</Link>
                       {c.source === "demo" && (
                         <span className={`${styles.badge} ${styles.badgeMuted}`} style={{ marginInlineStart: 6 }}>

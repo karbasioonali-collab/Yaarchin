@@ -1,10 +1,14 @@
 import { Field } from "@/components/ui/Field";
 import ui from "@/components/ui/ui.module.css";
 import { SLUG_HINT } from "@/lib/catalog/admin-input";
+import { CATEGORY_ICONS, categoryIconPath, iconKeyFromImage } from "@/lib/catalog/category-icons";
+import styles from "../panel.module.css";
 import { type AdminCategory, categoryLabel } from "@/lib/catalog/admin-tree";
 
 // فیلدهای مشترک فرم ساخت و ویرایش دسته. excluded: خودش و زیرشاخه‌هایش (نمی‌توانند والد شوند).
 export function CategoryFields({ tree, value, excluded }: { tree: AdminCategory[]; value?: Partial<AdminCategory>; excluded?: Set<string> }) {
+  // آیکون آماده (اگر عکس فعلی یکی از آیکون‌هاست) از قبل انتخاب‌شده نشان داده می‌شود
+  const icon = iconKeyFromImage(value?.image);
   return (
     <>
       <Field label="نام فارسی" name="nameFa" defaultValue={value?.nameFa ?? ""} required maxLength={120} />
@@ -27,7 +31,31 @@ export function CategoryFields({ tree, value, excluded }: { tree: AdminCategory[
         <span className={ui.label}>توضیح کوتاه</span>
         <textarea name="descriptionFa" defaultValue={value?.descriptionFa ?? ""} className={ui.textarea} maxLength={1000} />
       </label>
-      <Field label="آدرس عکس" name="image" defaultValue={value?.image ?? ""} ltr maxLength={1000} hint="https://… (آپلود عکس در مرحله‌ی بعد)" />
+      <fieldset className={styles.iconPicker}>
+        <legend className={ui.label}>آیکون دسته</legend>
+        <div className={styles.iconGrid}>
+          <label className={styles.iconOption}>
+            <input type="radio" name="icon" value="" defaultChecked={!icon} />
+            <span className={styles.iconNone}>بدون آیکون</span>
+          </label>
+          {CATEGORY_ICONS.map((i) => (
+            <label key={i.key} className={styles.iconOption} title={i.labelFa}>
+              <input type="radio" name="icon" value={i.key} defaultChecked={icon === i.key} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={categoryIconPath(i.key)} alt="" width={64} height={64} loading="lazy" />
+              <span>{i.labelFa}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      <Field
+        label="یا آدرس عکس"
+        name="image"
+        defaultValue={icon ? "" : (value?.image ?? "")}
+        ltr
+        maxLength={1000}
+        hint="https://… — اگر پر باشد، عکس به‌جای آیکون استفاده می‌شود (آپلود عکس در مرحله‌ی بعد)."
+      />
       <Field
         label="ترتیب نمایش"
         name="sortOrder"
