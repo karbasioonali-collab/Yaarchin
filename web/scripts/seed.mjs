@@ -56,6 +56,33 @@ try {
     );
   }
 
+  // نرخ‌ها و هزینه‌ها (migration ۰۰۰۵): ارزهای پایه، چهار روش حمل و نسخه‌ی اول مالیات.
+  // فقط اگر migration اجرا شده باشد؛ ارز/روش موجود دست نمی‌خورد و نسخه‌ی مالیات فقط وقتی جدول خالی است ساخته می‌شود.
+  const has0005 = (await client.query(`select to_regclass('public.tax_versions') is not null as ok`)).rows[0].ok;
+  if (has0005) {
+    for (const c of seed.rates.currencies) {
+      await client.query(
+        `insert into currencies (code, name_fa, is_base, sort_order) values ($1,$2,$3,$4) on conflict (code) do nothing`,
+        [c.code, c.nameFa, c.isBase, c.sortOrder],
+      );
+    }
+    for (const m of seed.rates.shippingMethods) {
+      await client.query(
+        `insert into shipping_methods (key, name_fa, sort_order) values ($1,$2,$3)
+         on conflict (key) do update set name_fa = excluded.name_fa, sort_order = excluded.sort_order`,
+        [m.key, m.nameFa, m.sortOrder],
+      );
+    }
+    const t = seed.rates.tax;
+    await client.query(
+      `insert into tax_versions (vat_percent, vat_base, customs_rate_for, note)
+       select $1, $2, $3, $4 where not exists (select 1 from tax_versions)`,
+      [t.vatPercent, t.vatBase, t.customsRateFor, t.note],
+    );
+  } else {
+    console.log("جدول‌های نرخ (migration ۰۰۰۵) هنوز نیستند؛ اول npm run db:migrate و بعد دوباره db:seed.");
+  }
+
   await client.query("commit");
   console.log("seed انجام شد.");
 } catch (e) {

@@ -12,12 +12,13 @@ import { can, requirePermission } from "@/lib/auth/can";
 import { COMPANY_STATUS_FA, CURRENCY_FA, LISTING_STATUS_FA, PRODUCT_STATUS_FA } from "@/lib/catalog/admin-labels";
 import { latestByCurrency, leadTimeHistory, priceHistory, priceText, qtyRange } from "@/lib/catalog/admin-listing";
 import { adminCategoryTree } from "@/lib/catalog/admin-tree";
-import { catalogAdminReady } from "@/lib/db-ready";
+import { catalogAdminReady, ratesReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum, UNITS, unitFa } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
 import styles from "../../panel.module.css";
 import { addMediaAction, createListingAction, mediaCommandAction, updateProductAction } from "../actions";
 import { ProductFields } from "../ProductFields";
+import { hsLookup } from "@/lib/pricing/admin";
 
 export const metadata: Metadata = { title: "محصول" };
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -128,7 +129,7 @@ export default async function ProductPage({ params }: PageProps<"/admin/products
         <h2 className={styles.cardTitle}>مشخصات محصول</h2>
         <ActionForm action={updateProductAction} submitLabel="ذخیره‌ی محصول">
           <input type="hidden" name="id" value={p.id} />
-          <ProductFields tree={tree} value={p} />
+          <ProductFields tree={tree} value={p} hs={{ ready: await ratesReady(), current: await hsLookup(p.hsCode) }} />
           <div className={ui.field}>
             <span className={ui.label}>مشخصات مشترک (در صفحه‌ی محصول نمایش داده می‌شود)</span>
             <RowsEditor
@@ -237,8 +238,8 @@ export default async function ProductPage({ params }: PageProps<"/admin/products
       <div className={styles.card} style={{ marginTop: 16 }}>
         <h2 className={styles.cardTitle}>کارخانه‌های این محصول ({fmtNum(listings.length)})</h2>
         <p className={styles.muted} style={{ marginTop: 0 }}>
-          سایت میانگین و بازه‌ی قیمت، حداقل سفارش و زمان آماده‌سازی را خودکار از آخرین قیمت‌های لیستینگ‌های فعالِ کارخانه‌های فعال حساب می‌کند. قیمت یوانی تا مرحله‌ی نرخ‌ها در
-          میانگین سایت نمی‌آید.
+          سایت میانگین و بازه‌ی قیمت، حداقل سفارش و زمان آماده‌سازی را خودکار از آخرین قیمت‌های لیستینگ‌های فعالِ کارخانه‌های فعال حساب می‌کند. قیمت یوانی با نسبت
+          نرخ روز یوان به دلار تبدیل می‌شود (تا هر دو نرخ ثبت نشده باشند، در میانگین نمی‌آید). <Link href={`/admin/rates/calculator?product=${p.id}`}>ماشین‌حساب قیمت تمام‌شده</Link>
         </p>
         {listings.length ? (
           <div className={styles.tableWrap}>
@@ -282,7 +283,7 @@ export default async function ProductPage({ params }: PageProps<"/admin/products
                             ))}
                             <div className={styles.muted} style={{ fontSize: 12 }}>
                               {fmtDateTime(b.observedAt)}
-                              {b.currency === "CNY" && " · در میانگین سایت نمی‌آید"}
+                              {b.currency === "CNY" && " · با نرخ روز به دلار تبدیل می‌شود"}
                             </div>
                           </div>
                         ))}

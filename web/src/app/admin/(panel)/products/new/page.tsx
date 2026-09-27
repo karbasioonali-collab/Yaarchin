@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { requirePermission } from "@/lib/auth/can";
 import { adminCategoryTree } from "@/lib/catalog/admin-tree";
+import { ratesReady } from "@/lib/db-ready";
 import styles from "../../panel.module.css";
 import { createProductAction } from "../actions";
 import { ProductFields } from "../ProductFields";
@@ -11,7 +12,7 @@ export const metadata: Metadata = { title: "محصول جدید" };
 
 export default async function NewProductPage() {
   await requirePermission("products.manage");
-  const tree = await adminCategoryTree();
+  const [tree, hsReady] = await Promise.all([adminCategoryTree(), ratesReady()]);
   return (
     <>
       <div className={styles.pageHead}>
@@ -24,7 +25,7 @@ export default async function NewProductPage() {
       </div>
       <div className={styles.card}>
         <ActionForm action={createProductAction} submitLabel="ساخت محصول">
-          <ProductFields tree={tree} />
+          <ProductFields tree={tree} hs={{ ready: hsReady, current: null }} />
         </ActionForm>
       </div>
     </>

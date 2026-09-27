@@ -12,10 +12,11 @@ export const str = (fd: FormData, k: string, max = 500): string =>
 
 export const optStr = (fd: FormData, k: string, max = 500): string | null => str(fd, k, max) || null;
 
-// عدد (ارقام فارسی و «٫» هم پذیرفته می‌شود). خالی ← null؛ نامعتبر ← NaN (تا پیام خطا بدهیم، نه اینکه بی‌صدا خالی شود).
+// عدد (ارقام فارسی و «٫» هم پذیرفته می‌شود؛ جداکننده‌ی هزارگان «٬» یا «,» یا «،» نادیده گرفته می‌شود).
+// خالی ← null؛ نامعتبر ← NaN (تا پیام خطا بدهیم، نه اینکه بی‌صدا خالی شود).
 export function num(raw: unknown): number | null {
   const s = toLatinDigits(String(raw ?? ""))
-    .replace(/[٫،,]/g, (c) => (c === "٫" ? "." : ""))
+    .replace(/[٫،,٬]/g, (c) => (c === "٫" ? "." : ""))
     .trim();
   if (!s) return null;
   const n = Number(s);

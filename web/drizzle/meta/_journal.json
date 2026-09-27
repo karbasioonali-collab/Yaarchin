@@ -36,6 +36,13 @@
       "when": 1790460093352,
       "tag": "0004_catalog_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790516371657,
+      "tag": "0005_rates",
+      "breakpoints": true
     }
   ]
 }

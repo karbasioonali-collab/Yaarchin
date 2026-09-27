@@ -126,7 +126,7 @@ export const products = pgTable(
     specs: jsonb("specs").notNull().default([]),
     // واحد قیمت (piece، set، kg، …) برای «قیمت هر …»
     priceUnit: text("price_unit").notNull().default("piece"),
-    // HS code پیشنهادی؛ تأیید با انسان (مرحله‌ی ۶). فعلاً متن؛ در مرحله‌ی نرخ‌ها به جدول HS وصل می‌شود.
+    // HS code محصول (متن). با رقم‌هایش (بدون نقطه و فاصله) به لیست hs_codes وصل می‌شود (migration ۰۰۰۵؛ src/lib/pricing/snapshot.ts → normHs).
     hsCode: text("hs_code"),
     // وزن و بسته‌بندی برای ماشین‌حساب هزینه‌ی حمل (migration ۰۰۰۴). همه اختیاری؛ اگر پر باشند > ۰.
     unitWeightKg: numeric("unit_weight_kg", { precision: 10, scale: 3 }),

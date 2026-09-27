@@ -2,6 +2,9 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { canAny } from "@/lib/auth/can";
 import { requireStaff } from "@/lib/auth/current";
+import { fmtDate } from "@/lib/format";
+import { missingTodayRates } from "@/lib/pricing/admin";
+import { RATE_PERMS } from "@/lib/pricing/labels";
 import { logoutAction } from "../(auth)/actions";
 import { stopImpersonationAction } from "./users/actions";
 import { NavLinks, type NavItem } from "./NavLinks";
@@ -16,6 +19,7 @@ const NAV: (NavItem & { permission: string | string[] })[] = [
   { href: "/admin/products", label: "محصولات", permission: ["products.manage", "products.rate"] },
   { href: "/admin/categories", label: "دسته‌بندی‌ها", permission: "categories.manage" },
   { href: "/admin/companies", label: "کارخانه‌ها", permission: "companies.view" },
+  { href: "/admin/rates", label: "نرخ‌ها و هزینه‌ها", permission: RATE_PERMS },
   { href: "/admin/site", label: "محتوای سایت", permission: "site.manage" },
   { href: "/admin/messages", label: "پیام‌های تماس", permission: "contact.view" },
   { href: "/admin/activity", label: "لاگ فعالیت", permission: "activity.view" },
@@ -26,6 +30,8 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
   const a = await requireStaff();
   const items: NavItem[] = [];
   for (const n of NAV) if (await canAny(a.user, [n.permission].flat())) items.push({ href: n.href, label: n.label });
+  // هشدار «نرخ امروز ثبت نشده» برای هر کسی که بخش نرخ‌ها را می‌بیند (سایت تا آن موقع با آخرین نرخ و تاریخش حساب می‌کند)
+  const missingRates = (await canAny(a.user, RATE_PERMS)) ? await missingTodayRates() : [];
 
   return (
     <div className={styles.shell}>
@@ -37,7 +43,7 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
         <Link href="/" className={styles.navSoon} target="_blank">
           دیدن سایت ↗
         </Link>
-        <div className={styles.navSoon}>آپلود عکس، چت‌ها و نرخ‌ها — مرحله‌های بعد</div>
+        <div className={styles.navSoon}>آپلود عکس و چت‌ها — مرحله‌های بعد</div>
         <div className={styles.userBox}>
           <div>
             <div className={styles.userName}>{a.user.fullName}</div>
@@ -60,6 +66,17 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
             <form action={stopImpersonationAction}>
               <button type="submit" className={styles.btnGhost}>پایان</button>
             </form>
+          </div>
+        )}
+        {missingRates.length > 0 && (
+          <div className={styles.rateWarn} role="status">
+            <span>
+              نرخ امروز {missingRates.map((m) => `${m.nameFa}${m.lastDate ? ` (آخرین: ${fmtDate(m.lastDate)})` : " (هنوز هیچ نرخی)"}`).join("، ")} ثبت نشده؛ سایت با آخرین نرخ ثبت‌شده
+              حساب می‌کند.
+            </span>
+            <Link href="/admin/rates" className={styles.btnGhost}>
+              ثبت نرخ
+            </Link>
           </div>
         )}
         {children}

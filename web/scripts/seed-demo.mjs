@@ -1,10 +1,10 @@
-// داده‌ی آزمایشی سایت عمومی (دسته، محصول، کارخانه‌ی ساختگی، قیمت، عکس).
+// داده‌ی آزمایشی سایت عمومی (دسته، محصول، کارخانه‌ی ساختگی، قیمت، عکس) و نرخ‌ها و هزینه‌های آزمایشی (migration ۰۰۰۵).
 //   npm run db:seed-demo              ← داده‌ی demo قبلی را پاک و از نو می‌سازد
 //   npm run db:seed-demo -- --remove  ← فقط همه‌ی داده‌ی demo را پاک می‌کند
 // فقط ردیف‌های source = 'demo' را می‌سازد یا پاک می‌کند؛ به داده‌ی واقعی دست نمی‌زند.
 // (قانون «قیمت‌ها پاک نمی‌شوند» برای داده‌ی واقعی است؛ قیمت‌های demo استثنا هستند.)
 import pg from "pg";
-import { categories, companies, products } from "./demo/demo-data.mjs";
+import { categories, companies, products, rates } from "./demo/demo-data.mjs";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -17,6 +17,17 @@ async function removeDemo(c) {
   // هر چیزی که به محصول یا کارخانه‌ی demo وصل است هم پاک می‌شود، حتی اگر دستی در پنل اضافه شده باشد
   // (مثلاً قیمتی که کارشناس برای لیستینگ یک کارخانه‌ی demo ثبت کرده). وگرنه قیدهای RESTRICT جلوی پاک شدن را می‌گیرند.
   const has0004 = (await c.query(`select to_regclass('public.lead_time_observations') is not null as ok`)).rows[0].ok;
+  // نرخ‌ها و هزینه‌های demo (migration ۰۰۰۵). فقط ردیف‌های demo پاک می‌شوند؛ نرخ یا نسخه‌ی واقعی دست نمی‌خورد و
+  // با پاک شدن نسخه‌ی demo، آخرین نسخه‌ی واقعی دوباره «فعلی» می‌شود.
+  if ((await c.query(`select to_regclass('public.tax_versions') is not null as ok`)).rows[0].ok) {
+    await c.query(`delete from exchange_rates where source = 'demo'`);
+    await c.query(`delete from shipping_method_versions where source = 'demo'`);
+    await c.query(`delete from cost_item_versions where source = 'demo'`);
+    await c.query(`delete from cost_items i where i.source = 'demo' and not exists (select 1 from cost_item_versions v where v.item_id = i.id)`);
+    await c.query(`delete from hs_code_versions where source = 'demo'`);
+    await c.query(`delete from hs_codes h where h.source = 'demo' and not exists (select 1 from hs_code_versions v where v.code = h.code)`);
+    await c.query(`delete from tax_versions where source = 'demo'`);
+  }
   const demoListings = `select pl.id from product_listings pl
       where pl.source = 'demo'
          or pl.product_id in (select id from products where source = 'demo')
@@ -45,6 +56,53 @@ async function removeDemo(c) {
 }
 
 const daysAgo = (d) => new Date(Date.now() - d * 86400000);
+
+// نرخ‌ها و هزینه‌های demo. هر بخش فقط وقتی ساخته می‌شود که برای همان ارز/روش/آیتم/کد هیچ داده‌ی واقعی نباشد،
+// تا اجرای seed-demo روی سایت واقعی هرگز جای نرخ یا حقوق ورودی واقعی را نگیرد.
+async function seedRates(c) {
+  const cur = await c.query(`select code from currencies`);
+  if (!cur.rowCount) throw new Error("ارزها نیستند؛ اول npm run db:seed را اجرا کنید.");
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  for (const r of rates.exchange) {
+    await c.query(
+      `insert into exchange_rates (currency_code, kind, rate_toman, rate_date, note, source)
+       select $1, $2, $3, $4, 'نرخ نمونه (demo)', 'demo'
+       where not exists (select 1 from exchange_rates where currency_code = $1 and kind = $2 and source <> 'demo')`,
+      [r.currency, r.kind, r.toman, today],
+    );
+  }
+  for (const m of rates.shipping) {
+    await c.query(
+      `insert into shipping_method_versions (method_key, is_active, rate_per_kg, rate_per_cbm, volumetric_factor, min_charge, currency_code,
+                                             transit_min_days, transit_max_days, note, source)
+       select $1, true, $2, $3, $4, $5, $6, $7, $8, 'نرخ نمونه (demo)', 'demo'
+       where not exists (select 1 from shipping_method_versions where method_key = $1 and source <> 'demo')`,
+      [m.method, m.perKg, m.perCbm, m.factor, m.min, m.currency, m.days[0], m.days[1]],
+    );
+  }
+  const realCosts = (await c.query(`select count(*)::int as n from cost_items where source <> 'demo'`)).rows[0].n;
+  if (!realCosts) {
+    let order = 100;
+    for (const it of rates.costs) {
+      const { rows } = await c.query(`insert into cost_items (name_fa, sort_order, source) values ($1, $2, 'demo') returning id`, [it.nameFa, order++]);
+      await c.query(
+        `insert into cost_item_versions (item_id, calc_type, amount, percent_base, formula, currency_code, methods, note, source)
+         values ($1, $2, $3, $4, $5, $6, $7, 'نمونه (demo)', 'demo')`,
+        [rows[0].id, it.calcType, it.amount ?? null, it.percentBase, it.formula ?? null, it.currency, it.methods],
+      );
+    }
+  }
+  for (const h of rates.hs) {
+    const real = await c.query(`select 1 from hs_code_versions where code = $1 and source <> 'demo' limit 1`, [h.code]);
+    if (real.rowCount) continue;
+    await c.query(`insert into hs_codes (code, source) values ($1, 'demo') on conflict (code) do nothing`, [h.code]);
+    await c.query(
+      `insert into hs_code_versions (code, title_fa, duty_type, duty_value, duty_base, duty_currency, fixed_per, note, source)
+       values ($1, $2, $3, $4, $5, $6, $7, 'نمونه (demo)', 'demo')`,
+      [h.code, h.titleFa, h.type, h.value, h.type === "percent" ? ["goods", "shipping", "costs"] : null, h.currency ?? null, h.per ?? null],
+    );
+  }
+}
 
 const client = new pg.Client({ connectionString: url });
 await client.connect();
@@ -143,8 +201,8 @@ try {
           for (const [minQty, maxQty, lo, hi] of tiers) {
             await client.query(
               `insert into price_observations (listing_id, observed_at, currency, unit, min_qty, max_qty, price_min, price_max, source)
-               values ($1,$2,'USD',$3,$4,$5,$6,$7,'demo')`,
-              [lr[0].id, at, p.priceUnit ?? "piece", minQty, maxQty, lo, hi],
+               values ($1,$2,$3,$4,$5,$6,$7,$8,'demo')`,
+              [lr[0].id, at, l.currency ?? "USD", p.priceUnit ?? "piece", minQty, maxQty, lo, hi],
             );
           }
         }
@@ -172,6 +230,10 @@ try {
         );
       }
     }
+  }
+
+  if (!removeOnly && (await client.query(`select to_regclass('public.tax_versions') is not null as ok`)).rows[0].ok) {
+    await seedRates(client);
   }
 
   await client.query(

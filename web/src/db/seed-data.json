@@ -118,6 +118,21 @@
       "key": "products.manage",
       "groupKey": "products",
       "nameFa": "مدیریت محصولات، عکس‌ها، لیستینگ‌ها، قیمت‌ها و زمان آماده‌سازی"
+    },
+    {
+      "key": "rates.enter",
+      "groupKey": "rates",
+      "nameFa": "ثبت نرخ روزانه‌ی ارز (بازار و گمرکی)"
+    },
+    {
+      "key": "costs.manage",
+      "groupKey": "rates",
+      "nameFa": "مدیریت ارزها، روش‌های حمل، بیمه و هزینه‌ها و مالیات ارزش افزوده"
+    },
+    {
+      "key": "hs.manage",
+      "groupKey": "rates",
+      "nameFa": "مدیریت HS code و حقوق ورودی (ثبت تکی و ورود فایل)"
     }
   ],
   "rolePermissions": {
@@ -266,5 +281,61 @@
       },
       "labelFa": "مدل AI: گزارش روزانه"
     }
-  ]
+  ],
+  "rates": {
+    "currencies": [
+      {
+        "code": "IRT",
+        "nameFa": "تومان",
+        "isBase": true,
+        "sortOrder": 0
+      },
+      {
+        "code": "USD",
+        "nameFa": "دلار آمریکا",
+        "isBase": false,
+        "sortOrder": 1
+      },
+      {
+        "code": "CNY",
+        "nameFa": "یوان چین",
+        "isBase": false,
+        "sortOrder": 2
+      }
+    ],
+    "shippingMethods": [
+      {
+        "key": "air",
+        "nameFa": "هوایی",
+        "sortOrder": 1
+      },
+      {
+        "key": "sea",
+        "nameFa": "دریایی",
+        "sortOrder": 2
+      },
+      {
+        "key": "land",
+        "nameFa": "زمینی",
+        "sortOrder": 3
+      },
+      {
+        "key": "rail",
+        "nameFa": "ریلی",
+        "sortOrder": 4
+      }
+    ],
+    "tax": {
+      "vatPercent": 10,
+      "vatBase": [
+        "goods",
+        "shipping"
+      ],
+      "customsRateFor": [
+        "duty",
+        "vat"
+      ],
+      "note": "مقدار اولیه (seed)"
+    }
+  }
 }
