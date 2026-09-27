@@ -9,6 +9,7 @@ import { categories, products } from "@/db/schema";
 import { logActivity } from "@/lib/activity";
 import { requirePermission } from "@/lib/auth/can";
 import { httpsUrl, num, optStr, SLUG_RE, str } from "@/lib/catalog/admin-input";
+import { categoryIconPath, isCategoryIcon } from "@/lib/catalog/category-icons";
 import { adminCategoryTree, subtree } from "@/lib/catalog/admin-tree";
 
 // مدیریت دسته‌ها (دسترسی categories.manage). همه‌ی تغییرات در لاگ فعالیت.
@@ -36,6 +37,9 @@ async function read(fd: FormData, selfId?: string, currentImage?: string | null)
   // مقدار فعلی (مثلاً کلید storage دسته‌های demo مثل demo/categories/x.svg) بدون تغییر پذیرفته می‌شود
   const keepImage = !!imageRaw && imageRaw === currentImage;
   if (imageRaw && !keepImage && !httpsUrl(imageRaw)) return { error: "آدرس عکس باید با https:// شروع شود." };
+  // آیکون آماده: فقط از فهرست (مقدار دستکاری‌شده رد می‌شود). اگر آدرس عکس هم وارد شده، عکس اولویت دارد.
+  const iconRaw = str(fd, "icon", 40);
+  if (iconRaw && !isCategoryIcon(iconRaw)) return { error: "آیکون انتخاب‌شده معتبر نیست." };
   if (sort !== null && (Number.isNaN(sort) || !Number.isInteger(sort))) return { error: "ترتیب نمایش باید عدد صحیح باشد." };
   const parentId = parentRaw && UUID.test(parentRaw) ? parentRaw : null;
   if (parentRaw && !parentId) return { error: "دسته‌ی والد نامعتبر است." };
@@ -57,7 +61,7 @@ async function read(fd: FormData, selfId?: string, currentImage?: string | null)
       slug,
       parentId,
       descriptionFa: optStr(fd, "descriptionFa", 1000),
-      image: keepImage ? imageRaw : imageRaw ? httpsUrl(imageRaw) : null,
+      image: keepImage ? imageRaw : imageRaw ? httpsUrl(imageRaw) : isCategoryIcon(iconRaw) ? categoryIconPath(iconRaw) : null,
       sortOrder: sort ?? 0,
       status: fd.get("status") === "hidden" ? "hidden" : "active",
     },
