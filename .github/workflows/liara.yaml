@@ -10,6 +10,11 @@ on:
       - "web/**"
       - ".github/workflows/liara.yaml"
   workflow_dispatch:
+    inputs:
+      no_cache:
+        description: "بدون کش build لیارا (liara deploy --no-cache). فقط برای عیب‌یابی؛ پیش‌فرض خاموش"
+        type: boolean
+        default: false
 
 concurrency:
   group: liara-deploy
@@ -39,9 +44,12 @@ jobs:
       - name: Deploy
         env:
           LIARA_API_TOKEN: ${{ secrets.LIARA_API_TOKEN }}
+          # فقط در اجرای دستی با تیک «no_cache»؛ در push روی main همیشه خالی (رفتار عادی با کش)
+          NO_CACHE_FLAG: ${{ inputs.no_cache && '--no-cache' || '' }}
         run: |
           if [ -z "$LIARA_API_TOKEN" ]; then
             echo "::error::Secret LIARA_API_TOKEN تنظیم نشده است."
             exit 1
           fi
-          npx --yes @liara/cli@9 deploy --api-token "$LIARA_API_TOKEN" --no-app-logs --message "${GITHUB_SHA::7}"
+          if [ -n "$NO_CACHE_FLAG" ]; then echo "کش build: خاموش (--no-cache)"; else echo "کش build: روشن"; fi
+          npx --yes @liara/cli@9 deploy --api-token "$LIARA_API_TOKEN" --no-app-logs --message "${GITHUB_SHA::7}" $NO_CACHE_FLAG
