@@ -5,6 +5,10 @@ import { requireStaff } from "@/lib/auth/current";
 import { fmtDate } from "@/lib/format";
 import { missingTodayRates } from "@/lib/pricing/admin";
 import { RATE_PERMS } from "@/lib/pricing/labels";
+import { CHAT_PERMS, chatAccess } from "@/lib/chat/access";
+import { chatCounters } from "@/lib/chat/admin";
+import { chatReady } from "@/lib/db-ready";
+import { PanelPulse } from "./PanelPulse";
 import { logoutAction } from "../(auth)/actions";
 import { stopImpersonationAction } from "./users/actions";
 import { NavLinks, type NavItem } from "./NavLinks";
@@ -15,6 +19,7 @@ const NAV: (NavItem & { permission: string | string[] })[] = [
   { href: "/admin", label: "داشبورد", permission: "dashboard.view" },
   { href: "/admin/users", label: "کاربران", permission: "users.view" },
   { href: "/admin/customers", label: "مشتریان", permission: "customers.view" },
+  { href: "/admin/chats", label: "گفتگوها", permission: CHAT_PERMS, badge: "chats" },
   { href: "/admin/roles", label: "نقش‌ها و دسترسی", permission: "roles.manage" },
   { href: "/admin/products", label: "محصولات", permission: ["products.manage", "products.rate"] },
   { href: "/admin/categories", label: "دسته‌بندی‌ها", permission: "categories.manage" },
@@ -29,7 +34,10 @@ const NAV: (NavItem & { permission: string | string[] })[] = [
 export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
   const a = await requireStaff();
   const items: NavItem[] = [];
-  for (const n of NAV) if (await canAny(a.user, [n.permission].flat())) items.push({ href: n.href, label: n.label });
+  for (const n of NAV) if (await canAny(a.user, [n.permission].flat())) items.push({ href: n.href, label: n.label, badge: n.badge });
+  // گفتگوها: تعداد اولیه‌ی نشان منو؛ بعد PanelPulse هر چند ثانیه به‌روزش می‌کند
+  const chatsOn = items.some((i) => i.badge === "chats") && (await chatReady());
+  const chatCount = chatsOn ? (await chatCounters(await chatAccess(a.user))).total : 0;
   // هشدار «نرخ امروز ثبت نشده» برای هر کسی که بخش نرخ‌ها را می‌بیند (سایت تا آن موقع با آخرین نرخ و تاریخش حساب می‌کند)
   const missingRates = (await canAny(a.user, RATE_PERMS)) ? await missingTodayRates() : [];
 
@@ -39,11 +47,12 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
         <div className={styles.brand}>
           <Logo size="sm" tagline={false} />
         </div>
-        <NavLinks items={items} />
+        <NavLinks items={items} chatCount={chatCount} />
+        {chatsOn && <PanelPulse initialCount={chatCount} />}
         <Link href="/" className={styles.navSoon} target="_blank">
           دیدن سایت ↗
         </Link>
-        <div className={styles.navSoon}>آپلود عکس و چت‌ها — مرحله‌های بعد</div>
+        <div className={styles.navSoon}>آپلود عکس — مرحله‌ی بعد</div>
         <div className={styles.userBox}>
           <div>
             <div className={styles.userName}>{a.user.fullName}</div>

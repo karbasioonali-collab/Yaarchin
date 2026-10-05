@@ -3,6 +3,10 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "./Icon";
+import Link from "next/link";
+import type { CustomerMsg } from "@/lib/chat/dto";
+import { ChatThread } from "./ChatThread";
+import ct from "./ChatThread.module.css";
 import { callProtected, LoginPrompt, Toast } from "./LoginPrompt";
 import styles from "./ProductActions.module.css";
 import s from "./site.module.css";
@@ -91,27 +95,28 @@ export function ChatButton({ compact = false }: { compact?: boolean }) {
   );
 }
 
-// باکس چت: فعلاً فقط ظاهر و ورودی پیام. ارسال به /api/v1/chat می‌رود که ورود لازم دارد؛
-// پاسخ هوش مصنوعی در مرحله‌ی ۵ وصل می‌شود.
-export function ChatBox({ slug, title }: { slug: string; title: string }) {
-  const [text, setText] = useState("");
-  const [prompt, setPrompt] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const clearToast = useCallback(() => setToast(null), []);
+// باکس «گفتگو با دستیار یارچین» صفحه‌ی محصول (چت واقعی با کارشناس؛ AI در مرحله‌ی بعد).
+// viewer: guest ← «باید وارد شوید» و برگشت به همین باکس بعد از ورود؛ staff ← توضیح که کارشناسان از پنل پاسخ می‌دهند؛
+// customer ← گفتگوی همین محصول (اگر هست) با سابقه، و ورودی پیام. ساخت گفتگو با اولین پیام (api/v1/chat).
+export function ChatBox({
+  slug,
+  title,
+  viewer,
+  conversation,
+  initial,
+}: {
+  slug: string;
+  title: string;
+  viewer: "guest" | "customer" | "staff";
+  conversation: { id: string; status: "open" | "closed" } | null;
+  initial: CustomerMsg[];
+}) {
   const suggestions = ["قیمت برای ۱۰۰۰ عدد چقدر می‌شود؟", "امکان چاپ لوگوی ما هست؟", "چند روزه به ایران می‌رسد؟"];
-
-  async function send(message: string) {
-    const m = message.trim();
-    if (!m) return;
-    setBusy(true);
-    const r = await callProtected("/api/v1/chat", { product: slug, message: m });
-    setBusy(false);
-    if (r === "login") setPrompt(true);
-    else if (r === "soon") setToast("گفتگو به‌زودی فعال می‌شود؛ پیام شما پاک نشد.");
-    else if (r === "error") setToast(ERROR);
-  }
-
+  const greeting = (
+    <div className={styles.bubble}>
+      سلام! سؤالی درباره‌ی «{title}» دارید؟ قیمت، حداقل سفارش، چاپ لوگو یا هزینه‌ی رسیدن به ایران را بپرسید؛ کارشناس یارچین پاسخ می‌دهد.
+    </div>
+  );
   return (
     <section id="chat" className={styles.chat} aria-labelledby="chat-title">
       <header className={styles.chatHead}>
@@ -122,52 +127,26 @@ export function ChatBox({ slug, title }: { slug: string; title: string }) {
           <h2 id="chat-title" className={styles.chatTitle}>
             گفتگو با دستیار یارچین
           </h2>
-          <span className={styles.chatSub}>پاسخ فوری با هوش مصنوعی؛ در صورت نیاز، کارشناس ادامه می‌دهد.</span>
+          <span className={styles.chatSub}>پیامتان مستقیم به کارشناس یارچین می‌رسد؛ پاسخ همین‌جا و در «گفتگوهای من» دیده می‌شود.</span>
         </span>
       </header>
-      <div className={styles.messages} aria-live="polite">
-        <div className={styles.bubble}>
-          سلام! سؤالی درباره‌ی «{title}» دارید؟ قیمت، حداقل سفارش، چاپ لوگو یا هزینه‌ی رسیدن به ایران را بپرسید.
+      {viewer === "customer" ? (
+        <ChatThread conversationId={conversation?.id ?? null} product={slug} initial={initial} initialStatus={conversation?.status ?? null} intro={greeting} suggestions={suggestions} />
+      ) : (
+        <div className={ct.loginBox}>
+          {greeting}
+          {viewer === "guest" ? (
+            <>
+              <p>برای گفتگو با کارشناس باید وارد شوید.</p>
+              <Link href={`/login?next=${encodeURIComponent(`/p/${slug}#chat`)}`} className={s.btn}>
+                ورود / ثبت‌نام
+              </Link>
+            </>
+          ) : (
+            <p>این حساب مخصوص پنل است؛ گفتگوی مشتریان را در پنل ← «گفتگوها» ببینید و پاسخ دهید.</p>
+          )}
         </div>
-        <div className={styles.suggestions}>
-          {suggestions.map((q) => (
-            <button key={q} type="button" className={s.chip} onClick={() => setText(q)}>
-              {q}
-            </button>
-          ))}
-        </div>
-      </div>
-      <form
-        className={styles.composer}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void send(text);
-        }}
-      >
-        <label htmlFor="chat-input" className={s.srOnly}>
-          پیام شما
-        </label>
-        <textarea
-          id="chat-input"
-          className={styles.input}
-          rows={1}
-          maxLength={2000}
-          placeholder="پیامتان را بنویسید…"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
-              e.preventDefault();
-              void send(text);
-            }
-          }}
-        />
-        <button type="submit" className={styles.send} disabled={busy || !text.trim()} aria-label="ارسال">
-          <Icon name="send" />
-        </button>
-      </form>
-      <LoginPrompt open={prompt} onClose={() => setPrompt(false)} text="برای گفتگو درباره‌ی محصول و دریافت پاسخ، وارد حساب کاربری شوید یا ثبت‌نام کنید." />
-      <Toast text={toast} onDone={clearToast} />
+      )}
     </section>
   );
 }

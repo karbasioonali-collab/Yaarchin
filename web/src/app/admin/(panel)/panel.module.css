@@ -142,3 +142,11 @@
 }
 .hsHits button { width: 100%; text-align: start; background: none; border: 0; padding: 8px; border-radius: 8px; cursor: pointer; font: inherit; font-size: 13px; }
 .hsHits button:hover, .hsHits button:focus { background: rgba(47, 125, 92, .08); }
+
+/* نشان تعداد در منو (گفتگوها) */
+.navBadge {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-inline-start: 6px; border-radius: 999px;
+  background: var(--orange); color: #FFFFFF; font-size: 11px; font-weight: 800; line-height: 1;
+}
+.notifyBtn { background: none; border: 0; text-align: start; cursor: pointer; color: var(--muted); font: inherit; font-size: 13px; padding: 6px 12px; }
+.notifyBtn[aria-pressed="true"] { color: var(--green-dark); }
