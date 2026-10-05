@@ -3,13 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, gt, inArray, isNull, or } from "drizzle-orm";
 import { db } from "@/db/client";
-import { activityLog, categories, favorites, products, sessions, users } from "@/db/schema";
+import { activityLog, categories, conversations, favorites, products, sessions, users } from "@/db/schema";
+import { canSee, chatAccess } from "@/lib/chat/access";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { can, requirePermission } from "@/lib/auth/can";
 import { hasCustomerRole } from "@/lib/customer/auth";
 import { behaviorSummary } from "@/lib/customer/events";
 import { BUSINESS_TYPE_FA, getProfile } from "@/lib/customer/profile";
-import { customerReady } from "@/lib/db-ready";
+import { chatReady, customerReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import { startImpersonationAction } from "../../users/actions";
 import { setCustomerStatusAction } from "../actions";
@@ -28,6 +29,19 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
   if (!u) notFound();
 
   const ready = await customerReady();
+  // گفتگوهای همین مشتری (فقط برای کسی که گفتگوها را می‌بیند؛ قاعده‌ی دیدن در lib/chat/access.ts)
+  const chatSee = (await chatReady()) ? await chatAccess(a.user) : null;
+  const chats = chatSee
+    ? (
+        await db
+          .select({ id: conversations.id, kind: conversations.kind, subject: conversations.subject, status: conversations.status, assignedTo: conversations.assignedTo, lastMessageAt: conversations.lastMessageAt, productTitle: products.titleFa })
+          .from(conversations)
+          .leftJoin(products, eq(products.id, conversations.productId))
+          .where(eq(conversations.customerId, id))
+          .orderBy(desc(conversations.lastMessageAt))
+          .limit(20)
+      ).filter((c) => canSee(chatSee, c))
+    : [];
   const [profile, summary, favRows, activeSessions, history, canManage, canImpersonate] = await Promise.all([
     getProfile(id),
     behaviorSummary(id),
@@ -277,6 +291,23 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
             <ActionForm action={startImpersonationAction} submitLabel="شروع" submitVariant="secondary">
               <input type="hidden" name="id" value={u.id} />
             </ActionForm>
+          </div>
+        )}
+
+        {chatSee && (
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>گفتگوها</h2>
+            {chats.map((c) => (
+              <div key={c.id} className={styles.batch}>
+                <Link href={`/admin/chats/${c.id}`}>{c.kind === "general" ? (c.subject ?? "گفتگوی عمومی") : (c.productTitle ?? "محصول حذف‌شده")}</Link>{" "}
+                {c.kind === "general" && <span className={`${styles.badge} ${styles.badgeWarn}`}>عمومی</span>}
+                {c.status === "closed" && <span className={`${styles.badge} ${styles.badgeMuted}`}>بسته</span>}
+                <div className={styles.muted} style={{ fontSize: 12 }}>
+                  {fmtDateTime(c.lastMessageAt)}
+                </div>
+              </div>
+            ))}
+            {!chats.length && <p className={styles.muted}>گفتگویی نیست (یا به گفتگوهای این مشتری دسترسی ندارید).</p>}
           </div>
         )}
 

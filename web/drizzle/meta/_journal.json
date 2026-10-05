@@ -43,6 +43,13 @@
       "when": 1790516371657,
       "tag": "0005_rates",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791225611904,
+      "tag": "0006_chat",
+      "breakpoints": true
     }
   ]
 }

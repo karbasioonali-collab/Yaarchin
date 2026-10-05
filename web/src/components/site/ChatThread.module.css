@@ -1,0 +1,16 @@
+/* رشته‌ی پیام‌های چت مشتری (ChatThread.tsx). پایه‌ی حباب و ورودی از ProductActions.module.css است. */
+.list { max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
+.tall { max-height: min(62vh, 640px); min-height: 280px; }
+.mine {
+  align-self: flex-end; background: rgba(47, 125, 92, .1); border-start-start-radius: 16px; border-start-end-radius: 4px;
+}
+.system { background: rgba(255, 122, 0, .08); }
+.who { font-size: 11px; font-weight: 700; color: var(--green-dark); margin-bottom: 2px; }
+.mine .who { color: var(--green); }
+.body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; }
+.time { font-size: 11px; color: var(--muted); margin-top: 4px; text-align: end; }
+.day { align-self: center; font-size: 11px; color: var(--muted); background: var(--surface); padding: 2px 10px; border-radius: 999px; }
+.event { align-self: center; max-width: 92%; text-align: center; font-size: 12px; color: var(--muted); }
+.closed { margin: 0; padding: 8px 16px; font-size: 12px; color: var(--orange-dark); background: rgba(255, 122, 0, .06); }
+.loginBox { padding: 16px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; background: var(--bg); }
+.loginBox p { margin: 0; font-size: 14px; }

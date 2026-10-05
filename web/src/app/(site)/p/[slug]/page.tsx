@@ -8,7 +8,11 @@ import { ChatBox, ChatButton, FavoriteButton, MobileProductBar } from "@/compone
 import { ProductGrid } from "@/components/site/ProductCard";
 import s from "@/components/site/site.module.css";
 import { getCategoryPage, getProduct, listProducts, publishedProductId, type PublicProduct } from "@/lib/catalog/public";
+import { getAuth } from "@/lib/auth/current";
+import { toCustomerMsg } from "@/lib/chat/dto";
+import { customerProductConversation, markRead, messagesOf } from "@/lib/chat/service";
 import { getCustomer } from "@/lib/customer/auth";
+import { chatReady } from "@/lib/db-ready";
 import { isFavorite } from "@/lib/customer/favorites";
 import { fmtDate, fmtMoney, fmtNum, unitFa } from "@/lib/format";
 import { isEnabled } from "@/lib/settings";
@@ -88,10 +92,17 @@ function LandedCard({ p }: { p: PublicProduct }) {
 export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
   const p = await getProduct((await params).slug);
   if (!p) notFound();
-  const [chatOn, favOn, customer] = await Promise.all([isEnabled("chat"), isEnabled("favorites"), getCustomer()]);
+  // چت فقط وقتی سوئیچ features.chat روشن و migration ۰۰۰۶ اجرا شده باشد (دکمه، باکس و نوار موبایل با هم)
+  const [chatSwitch, chatTables, favOn, customer, auth] = await Promise.all([isEnabled("chat"), chatReady(), isEnabled("favorites"), getCustomer(), getAuth()]);
+  const chatOn = chatSwitch && chatTables;
   // وضعیت قلب برای مشتری واردشده (برای بقیه خالی)
-  const productId = favOn && customer ? await publishedProductId(p.slug) : null;
-  const fav = customer && productId ? await isFavorite(customer.user.id, productId) : false;
+  const productId = (favOn || chatOn) && customer ? await publishedProductId(p.slug) : null;
+  const fav = favOn && customer && productId ? await isFavorite(customer.user.id, productId) : false;
+  // گفتگوی همین محصول برای مشتری (با سابقه؛ تا اینجا خوانده‌شده حساب می‌شود)
+  const conv = chatOn && customer && productId ? await customerProductConversation(customer.user.id, productId) : null;
+  const convMsgs = conv ? await messagesOf(conv.id, { forCustomer: true }) : [];
+  if (conv && customer) await markRead(conv.id, customer.user.id, convMsgs.at(-1)?.id ?? 0);
+  const viewer = customer ? "customer" : auth?.user.isStaff ? "staff" : "guest";
   const last = p.breadcrumb.at(-1);
   const catPage = last ? await getCategoryPage(last.slug) : null;
   const related = catPage ? await listProducts({ categoryIds: catPage.ids, limit: 4, excludeSlug: p.slug }) : [];
@@ -196,7 +207,13 @@ export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
         </div>
         {chatOn && (
           <div className={styles.detailsSide}>
-            <ChatBox slug={p.slug} title={p.titleFa} />
+            <ChatBox
+              slug={p.slug}
+              title={p.titleFa}
+              viewer={viewer}
+              conversation={conv ? { id: conv.id, status: conv.status } : null}
+              initial={convMsgs.map(toCustomerMsg)}
+            />
           </div>
         )}
       </div>

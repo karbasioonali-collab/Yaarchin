@@ -133,6 +133,21 @@
       "key": "hs.manage",
       "groupKey": "rates",
       "nameFa": "مدیریت HS code و حقوق ورودی (ثبت تکی و ورود فایل)"
+    },
+    {
+      "key": "chats.view_all",
+      "groupKey": "chats",
+      "nameFa": "دیدن همه‌ی گفتگوهای مشتریان (فقط خواندن)"
+    },
+    {
+      "key": "chats.reply",
+      "groupKey": "chats",
+      "nameFa": "دیدن، پاسخ، بستن و بازکردن گفتگوهای ارجاع‌شده به خود"
+    },
+    {
+      "key": "chats.assign",
+      "groupKey": "chats",
+      "nameFa": "دیدن همه‌ی گفتگوها، ارجاع و جابه‌جایی، بستن و بازکردن، و ویرایش پیام خودکار"
     }
   ],
   "rolePermissions": {
@@ -280,6 +295,13 @@
         "model": ""
       },
       "labelFa": "مدل AI: گزارش روزانه"
+    },
+    {
+      "key": "chat.auto_reply",
+      "groupKey": "chat",
+      "value": "سلام، پیامتان رسید. کارشناس یارچین به‌زودی پاسخ می‌دهد.",
+      "labelFa": "پیام خودکار بعد از اولین پیام مشتری",
+      "description": "در پنل ← گفتگوها ← تنظیمات قابل ویرایش است."
     }
   ],
   "rates": {

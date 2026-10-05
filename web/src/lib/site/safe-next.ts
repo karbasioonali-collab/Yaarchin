@@ -7,10 +7,13 @@ const ALLOWED = [
   /^\/about$/,
   /^\/contact$/,
   /^\/c\/[a-z0-9-]+$/,
-  /^\/p\/[a-z0-9-]+$/,
+  // #chat: بعد از ورود، صفحه‌ی محصول روی باکس گفتگو باز می‌شود
+  /^\/p\/[a-z0-9-]+(#chat)?$/,
   /^\/favorites$/,
   /^\/account$/,
   /^\/account\/recent$/,
+  /^\/account\/chats$/,
+  /^\/account\/chats\/[0-9a-f-]{36}$/,
 ];
 
 export function safeNext(next: unknown): string {
