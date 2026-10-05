@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne } from "drizzle-orm";
 import { ActionForm } from "@/components/ui/ActionForm";
 import ui from "@/components/ui/ui.module.css";
 import { db } from "@/db/client";
-import { categories, conversationFlags, products, users } from "@/db/schema";
+import { categories, conversationFlags, inquiries, products, users } from "@/db/schema";
 import { can, requireAnyPermission } from "@/lib/auth/can";
 import { CHAT_PERMS, canChangeStatus, canReply, canSee, chatAccess } from "@/lib/chat/access";
 import { toStaffMsg } from "@/lib/chat/dto";
 import { assignableStaff, getConversation, markRead, messagesOf } from "@/lib/chat/service";
-import { chatReady } from "@/lib/db-ready";
+import { chatReady, followupReady } from "@/lib/db-ready";
+import { INQUIRY_STATUS_FA, shortId } from "@/lib/followup/service";
+import { InquiryForm } from "./InquiryForm";
 import { fmtDateTime } from "@/lib/format";
 import styles from "../../panel.module.css";
 import c from "../chats.module.css";
@@ -46,6 +48,20 @@ export default async function ChatPage({ params }: PageProps<"/admin/chats/[id]"
     can(a.user, "customers.view"),
   ]);
   await markRead(conv.id, a.user.id, msgs.at(-1)?.id ?? 0);
+  // درخواست‌های این گفتگو (پیگیری کارخانه‌ها، migration ۰۰۰۷). ساخت: کارشناس ارجاع‌گرفته یا کسی که ارجاع می‌دهد.
+  const followup = await followupReady();
+  const manageInquiry = followup && (access.assign || canReply(access, { ...conv, status: "open" }));
+  const [inqs, productOptions] = followup
+    ? await Promise.all([
+        db
+          .select({ id: inquiries.id, status: inquiries.status, qty: inquiries.qty, title: products.titleFa, productTitle: inquiries.productTitle })
+          .from(inquiries)
+          .leftJoin(products, eq(products.id, inquiries.productId))
+          .where(eq(inquiries.conversationId, conv.id))
+          .orderBy(desc(inquiries.createdAt)),
+        manageInquiry ? db.select({ id: products.id, titleFa: products.titleFa }).from(products).where(ne(products.status, "archived")).orderBy(asc(products.titleFa)) : Promise.resolve([]),
+      ])
+    : [[], []];
   const reply = canReply(access, conv);
   const replyHint = reply
     ? null
@@ -152,6 +168,30 @@ export default async function ChatPage({ params }: PageProps<"/admin/chats/[id]"
               </div>
             )}
           </div>
+
+          {followup && (
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>درخواست‌ها و پیگیری کارخانه‌ها</h2>
+              {inqs.map((q) => (
+                <div key={q.id} className={styles.batch}>
+                  <Link href={`/admin/inquiries/${q.id}`}>
+                    #{shortId(q.id)} · {q.title ?? q.productTitle}
+                  </Link>
+                  <div className={styles.muted} style={{ fontSize: 12 }}>
+                    {q.qty ? `${q.qty.toLocaleString("fa-IR")} عدد · ` : ""}
+                    {INQUIRY_STATUS_FA[q.status]}
+                  </div>
+                </div>
+              ))}
+              {!inqs.length && <p className={styles.muted} style={{ marginTop: 0 }}>هنوز درخواستی ساخته نشده.</p>}
+              {manageInquiry && (
+                <details className={styles.detailsBox} style={{ marginTop: 10 }}>
+                  <summary>ساخت درخواست تازه</summary>
+                  <InquiryForm conversationId={conv.id} products={productOptions} defaultProductId={conv.productId} />
+                </details>
+              )}
+            </div>
+          )}
 
           {flags.length > 0 && (
             <div className={styles.card}>

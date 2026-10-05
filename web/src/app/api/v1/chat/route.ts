@@ -1,6 +1,6 @@
 import { apiError, apiJson } from "@/lib/api";
 import { publishedProductId } from "@/lib/catalog/public";
-import { chatCustomerGuard } from "@/lib/chat/customer-api";
+import { chatCustomerGuard, queueNewChatAlert } from "@/lib/chat/customer-api";
 import { toCustomerMsg } from "@/lib/chat/dto";
 import { cleanBody, customerProductConversation, customerRateLimited, MAX_SUBJECT, markRead, messagesOf, postCustomerMessage } from "@/lib/chat/service";
 
@@ -43,6 +43,7 @@ export async function POST(req: Request) {
   if (limited) return apiError(429, "rate_limited", limited);
   const r = await postCustomerMessage({ customerId: g.a.user.id, body, productId, subject });
   if ("error" in r) return apiError(404, "not_found", "گفتگو پیدا نشد.");
+  await queueNewChatAlert(r, g.a.user.fullName);
   return apiJson({
     conversation: { id: r.conversation.id, status: r.conversation.status },
     messages: [r.message, ...(r.autoReply ? [r.autoReply] : [])].map((m) => toCustomerMsg(m)),

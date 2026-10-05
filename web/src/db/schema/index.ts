@@ -5,3 +5,4 @@ export * from "./system";
 export * from "./customer";
 export * from "./rates";
 export * from "./chat";
+export * from "./followup";

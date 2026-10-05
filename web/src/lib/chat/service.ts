@@ -70,7 +70,8 @@ export async function isAssignable(userId: string): Promise<boolean> {
 }
 
 // ---------- مشتری ----------
-export type CustomerPostResult = { conversation: Conversation; message: ChatMessage; autoReply: ChatMessage | null; reopened: boolean };
+// queued: گفتگو تازه به صف «ارجاع‌نشده» آمد (اولین پیام گفتگو، یا بازشدن دوباره بدون کارشناس) ← هشدار پیامکی (lib/chat/alerts.ts)
+export type CustomerPostResult = { conversation: Conversation; message: ChatMessage; autoReply: ChatMessage | null; reopened: boolean; queued: boolean };
 
 // پیام مشتری: گفتگوی محصول (پیدا یا ساخته می‌شود)، گفتگوی عمومی تازه (subject)، یا گفتگوی موجود (conversationId).
 export async function postCustomerMessage(input: {
@@ -137,7 +138,7 @@ export async function postCustomerMessage(input: {
     const now = new Date();
     [conv] = await tx.update(conversations).set({ lastMessageAt: now, lastCustomerMessageAt: now }).where(eq(conversations.id, conv.id)).returning();
     await markRead(conv.id, input.customerId, (autoReply ?? message).id, tx);
-    return { conversation: conv, message, autoReply, reopened };
+    return { conversation: conv, message, autoReply, reopened, queued: !conv.assignedTo && (n === 1 || reopened) };
   });
 }
 

@@ -1,15 +1,21 @@
 import type { Metadata } from "next";
 import { ActionForm } from "@/components/ui/ActionForm";
-import { Field } from "@/components/ui/Field";
+import { Checkbox, Field } from "@/components/ui/Field";
 import { requireStaff } from "@/lib/auth/current";
 import { PASSWORD_HINT, PASSWORD_MIN_LENGTH } from "@/lib/auth/password";
-import { changeOwnPasswordAction } from "./actions";
+import { eq } from "drizzle-orm";
+import { db } from "@/db/client";
+import { staffNotificationPrefs } from "@/db/schema";
+import { followupReady } from "@/lib/db-ready";
+import { changeOwnPasswordAction, setOwnSmsAlertsAction } from "./actions";
 import styles from "../panel.module.css";
 
 export const metadata: Metadata = { title: "حساب من" };
 
 export default async function AccountPage() {
   const a = await requireStaff();
+  const smsReady = await followupReady();
+  const [pref] = smsReady ? await db.select().from(staffNotificationPrefs).where(eq(staffNotificationPrefs.userId, a.user.id)) : [];
 
   return (
     <>
@@ -48,6 +54,18 @@ export default async function AccountPage() {
             />
           </ActionForm>
         </div>
+        {smsReady && (
+          <div className={styles.card}>
+            <h2 className={styles.cardTitle}>پیامک هشدار گفتگو</h2>
+            <p className={styles.muted} style={{ marginTop: -6, fontSize: 13 }}>
+              گفتگوی تازه‌ی ارجاع‌نشده (اگر ارجاع می‌دهید)، ارجاع گفتگو به شما و یادآوری پیام بی‌پاسخ مشتری؛ فقط در ساعت کاری.
+              {!a.user.mobile && <strong> برای حساب شما موبایل ثبت نشده؛ تا ثبت نشود پیامکی نمی‌رسد.</strong>}
+            </p>
+            <ActionForm action={setOwnSmsAlertsAction} submitLabel="ذخیره" submitVariant="secondary">
+              <Checkbox label="پیامک هشدار گفتگو برای من فرستاده شود" name="smsEnabled" defaultChecked={pref?.smsEnabled ?? true} />
+            </ActionForm>
+          </div>
+        )}
       </div>
     </>
   );

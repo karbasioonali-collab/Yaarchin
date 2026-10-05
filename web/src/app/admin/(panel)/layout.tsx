@@ -20,6 +20,7 @@ const NAV: (NavItem & { permission: string | string[] })[] = [
   { href: "/admin/users", label: "کاربران", permission: "users.view" },
   { href: "/admin/customers", label: "مشتریان", permission: "customers.view" },
   { href: "/admin/chats", label: "گفتگوها", permission: CHAT_PERMS, badge: "chats" },
+  { href: "/admin/inquiries", label: "درخواست‌های مشتری", permission: ["chats.view_all", "chats.assign"] },
   { href: "/admin/roles", label: "نقش‌ها و دسترسی", permission: "roles.manage" },
   { href: "/admin/products", label: "محصولات", permission: ["products.manage", "products.rate"] },
   { href: "/admin/categories", label: "دسته‌بندی‌ها", permission: "categories.manage" },
@@ -28,6 +29,7 @@ const NAV: (NavItem & { permission: string | string[] })[] = [
   { href: "/admin/site", label: "محتوای سایت", permission: "site.manage" },
   { href: "/admin/messages", label: "پیام‌های تماس", permission: "contact.view" },
   { href: "/admin/activity", label: "لاگ فعالیت", permission: "activity.view" },
+  { href: "/admin/sms", label: "پیامک‌های ارسالی", permission: ["settings.manage", "chats.assign"] },
   { href: "/admin/settings", label: "تنظیمات و سوئیچ‌ها", permission: "settings.manage" },
 ];
 

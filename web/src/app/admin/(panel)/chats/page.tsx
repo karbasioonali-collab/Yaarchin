@@ -9,6 +9,7 @@ import { chatReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import styles from "../panel.module.css";
 import c from "./chats.module.css";
+import { NotifyBanner } from "./NotifyBanner";
 
 export const metadata: Metadata = { title: "گفتگوها" };
 const UUID = /^[0-9a-f-]{36}$/i;
@@ -70,6 +71,8 @@ export default async function ChatsPage({ searchParams }: PageProps<"/admin/chat
           </Link>
         )}
       </div>
+
+      <NotifyBanner />
 
       {access.viewAll && (
         <nav className={styles.tabs} aria-label="صف‌ها">

@@ -32,6 +32,13 @@ async function removeDemo(c) {
       where pl.source = 'demo'
          or pl.product_id in (select id from products where source = 'demo')
          or pl.company_id in (select id from companies where source = 'demo')`;
+  // پیگیری کارخانه‌ها (migration ۰۰۰۷): ردیف‌هایی که به کارخانه‌ی demo وصل‌اند پاک می‌شوند (وگرنه RESTRICT جلوی پاک شدن کارخانه را می‌گیرد).
+  // خود درخواست مشتری می‌ماند؛ فقط ردیف کارخانه‌ی demo از فهرستش حذف می‌شود.
+  if ((await c.query(`select to_regclass('public.inquiry_suppliers') is not null as ok`)).rows[0].ok) {
+    const demoSup = `select id from inquiry_suppliers where company_id in (select id from companies where source = 'demo')`;
+    await c.query(`delete from inquiry_supplier_events where inquiry_supplier_id in (${demoSup})`);
+    await c.query(`delete from inquiry_suppliers where id in (${demoSup})`);
+  }
   if (has0004) {
     await c.query(`delete from company_correspondence where source = 'demo' or company_id in (select id from companies where source = 'demo')`);
     await c.query(`delete from lead_time_observations where source = 'demo' or listing_id in (${demoListings})`);

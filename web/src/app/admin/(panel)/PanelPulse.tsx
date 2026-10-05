@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useSyncExternalStore } from "react";
+import { beep, notifyEnabled, setNotify, subscribeNotify, unlockAudio } from "./notify-client";
 import styles from "./panel.module.css";
 
 // «نبض» پنل: هر ۱۵ ثانیه (پس‌زمینه ۴۵ ثانیه) از /admin/pulse می‌پرسد چه خبر است.
@@ -11,58 +12,16 @@ import styles from "./panel.module.css";
 // صدا با WebAudio ساخته می‌شود (فایل صوتی لازم نیست). docs/infoyaarchin.md بخش ۲۴.
 const VISIBLE_MS = 15000;
 const HIDDEN_MS = 45000;
-const KEY = "yc_notify";
 type Ev = { id: number; type: "new_chat" | "assigned_to_me" | "new_message"; conversationId: string; text: string };
 const TITLE: Record<Ev["type"], string> = { new_chat: "گفتگوی تازه", assigned_to_me: "ارجاع به شما", new_message: "پیام تازه" };
 
-let audio: AudioContext | null = null;
-function unlockAudio() {
-  try {
-    audio ??= new AudioContext();
-    if (audio.state === "suspended") void audio.resume();
-  } catch {
-    /* مرورگر قدیمی */
-  }
-}
-function beep() {
-  if (!audio || audio.state !== "running") return;
-  const t = audio.currentTime;
-  for (const [i, f] of [880, 1320].entries()) {
-    const o = audio.createOscillator();
-    const g = audio.createGain();
-    o.frequency.value = f;
-    g.gain.setValueAtTime(0.0001, t + i * 0.16);
-    g.gain.exponentialRampToValueAtTime(0.2, t + i * 0.16 + 0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.16 + 0.15);
-    o.connect(g).connect(audio.destination);
-    o.start(t + i * 0.16);
-    o.stop(t + i * 0.16 + 0.16);
-  }
-}
 const fa = (n: number) => n.toLocaleString("fa-IR");
-
-// روشن/خاموش اعلان در localStorage همین مرورگر؛ با useSyncExternalStore تا رندر سرور (خاموش) و مرورگر با هم بخوانند
-const readOn = () => {
-  try {
-    return localStorage.getItem(KEY) === "1";
-  } catch {
-    return false;
-  }
-};
-const subscribe = (cb: () => void) => {
-  window.addEventListener("storage", cb);
-  window.addEventListener("yc:notify", cb);
-  return () => {
-    window.removeEventListener("storage", cb);
-    window.removeEventListener("yc:notify", cb);
-  };
-};
 const stripCount = (t: string) => t.replace(/^\([۰-۹0-9]+\)\s/, "");
 
 export function PanelPulse({ initialCount }: { initialCount: number }) {
   const router = useRouter();
   const path = usePathname();
-  const on = useSyncExternalStore(subscribe, readOn, () => false);
+  const on = useSyncExternalStore(subscribeNotify, notifyEnabled, () => false);
   const countRef = useRef(initialCount);
   const cursorRef = useRef(0);
   const onRef = useRef(false);
@@ -132,19 +91,8 @@ export function PanelPulse({ initialCount }: { initialCount: number }) {
   }, [path, router]);
 
   async function toggle() {
-    const next = !on;
-    if (next) {
-      unlockAudio();
-      if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission();
-      beep();
-    }
-    onRef.current = next;
-    try {
-      localStorage.setItem(KEY, next ? "1" : "0");
-    } catch {
-      /* حالت خصوصی */
-    }
-    window.dispatchEvent(new Event("yc:notify"));
+    onRef.current = !on;
+    await setNotify(!on);
   }
 
   const denied = typeof window !== "undefined" && "Notification" in window && Notification.permission === "denied";

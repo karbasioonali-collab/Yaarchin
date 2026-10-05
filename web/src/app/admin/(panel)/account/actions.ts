@@ -2,7 +2,8 @@
 
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
-import { users } from "@/db/schema";
+import { staffNotificationPrefs, users } from "@/db/schema";
+import { followupReady } from "@/lib/db-ready";
 import type { FormState } from "@/components/ui/ActionForm";
 import { logActivity } from "@/lib/activity";
 import { requireStaff } from "@/lib/auth/current";
@@ -22,4 +23,17 @@ export async function changeOwnPasswordAction(_prev: FormState, fd: FormData): P
   await revokeAllSessions(a.user.id, a.session.id);
   await logActivity({ actorUserId: a.user.id, action: "account.change_password", entityType: "user", entityId: a.user.id });
   return { ok: "رمز تغییر کرد. نشست‌های دیگر بسته شدند." };
+}
+
+// دریافت پیامک هشدار گفتگو برای خود کاربر (روشن/خاموش). ردیف نبود = روشن. docs/infoyaarchin.md بخش ۲۵.
+export async function setOwnSmsAlertsAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requireStaff();
+  if (!(await followupReady())) return { error: "جدول‌های پیامک هنوز ساخته نشده‌اند؛ در کنسول لیارا npm run db:migrate را اجرا کنید." };
+  const on = fd.get("smsEnabled") === "on";
+  await db
+    .insert(staffNotificationPrefs)
+    .values({ userId: a.user.id, smsEnabled: on })
+    .onConflictDoUpdate({ target: staffNotificationPrefs.userId, set: { smsEnabled: on, updatedAt: new Date() } });
+  await logActivity({ actorUserId: a.user.id, action: "account.sms_alerts", entityType: "user", entityId: a.user.id, after: { smsEnabled: on } });
+  return { ok: on ? "پیامک هشدار گفتگو برای شما روشن شد." : "پیامک هشدار گفتگو برای شما خاموش شد." };
 }
