@@ -150,3 +150,6 @@
 }
 .notifyBtn { background: none; border: 0; text-align: start; cursor: pointer; color: var(--muted); font: inherit; font-size: 13px; padding: 6px 12px; }
 .notifyBtn[aria-pressed="true"] { color: var(--green-dark); }
+
+/* پیام راهنمای سبز (مثلاً «بعد از ذخیره‌ی محصول، عکس و ویدیو را اضافه کنید») */
+.notice { margin: 0 0 14px; padding: 10px 14px; border-radius: var(--radius-sm); background: rgba(47, 125, 92, .08); color: var(--green-dark); font-size: 14px; line-height: 1.8; }

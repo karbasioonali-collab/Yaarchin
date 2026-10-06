@@ -115,7 +115,8 @@ export async function createProductAction(_prev: FormState, fd: FormData): Promi
     .returning({ id: products.id });
   await logActivity({ actorUserId: a.user.id, action: "product.create", entityType: "product", entityId: row.id, after: r.v });
   revalidatePath("/", "layout");
-  redirect(`/admin/products/${row.id}`);
+  // مستقیم به بخش «عکس و ویدیو»ی همین محصول (فرم ساخت آپلود ندارد)
+  redirect(`/admin/products/${row.id}?created=1#media`);
 }
 
 export async function updateProductAction(_prev: FormState, fd: FormData): Promise<FormState> {

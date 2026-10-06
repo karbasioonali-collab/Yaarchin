@@ -10,6 +10,7 @@ import { fmtNum } from "@/lib/format";
 import { getSetting } from "@/lib/settings";
 import { isUploadKey, storageMode, variantFile } from "@/lib/storage";
 import { IMAGE_TYPES, rejectReason, sniff, VIDEO_TYPES } from "./detect";
+import { requestLogoCheck } from "./logo-check";
 import { ImageError, processImage } from "./process";
 import { deleteFile, localFree, localUsage, putFile } from "./store";
 
@@ -159,7 +160,8 @@ export async function storeMedia(input: StoreInput): Promise<StoreResult> {
       createdBy: input.byUserId,
     })
     .returning();
-  // جای تشخیص لوگو با AI: requestLogoCheck(file) — فعلاً پیاده‌سازی نشده و همه «unchecked» می‌مانند
+  // جای تشخیص لوگو با AI (فعلاً کاری نمی‌کند؛ همه «unchecked» می‌مانند)
+  await requestLogoCheck(file);
   return { ok: true, file };
 }
 
