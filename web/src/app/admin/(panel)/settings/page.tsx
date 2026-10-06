@@ -16,8 +16,8 @@ const GROUPS: { key: string; title: string; desc: string }[] = [
 
 export default async function SettingsPage() {
   const a = await requirePermission("settings.manage");
-  // گروه chat (متن پیام خودکار) فرم خودش را در «گفتگوها ← تنظیمات» دارد؛ اینجا تکرار نمی‌شود
-  const all = (await getAllSettings()).filter((s) => s.groupKey !== "chat");
+  // گروه‌های chat و sms فرم خودشان را در «گفتگوها ← تنظیمات گفتگو» دارند؛ اینجا تکرار نمی‌شوند
+  const all = (await getAllSettings()).filter((s) => s.groupKey !== "chat" && s.groupKey !== "sms");
   const known = new Set(GROUPS.map((g) => g.key));
   const other = all.filter((s) => !known.has(s.groupKey));
 

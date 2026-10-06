@@ -2,6 +2,9 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { alertAssigned } from "@/lib/chat/alerts";
+import { absoluteUrl } from "@/lib/site/url";
 import type { FormState } from "@/components/ui/ActionForm";
 import { db } from "@/db/client";
 import { users } from "@/db/schema";
@@ -12,6 +15,7 @@ import { type StaffMsg, toStaffMsg } from "@/lib/chat/dto";
 import { assignConversation, cleanBody, getConversation, isAssignable, postStaffMessage, setConversationStatus } from "@/lib/chat/service";
 import { chatReady } from "@/lib/db-ready";
 import { getSetting, setSetting } from "@/lib/settings";
+import { toLatinDigits } from "@/lib/validation";
 
 // نوشتنی‌های بخش «گفتگوها»ی پنل. هر کدام دسترسی را خودش دوباره بررسی می‌کند (lib/chat/access.ts)؛ همه در لاگ فعالیت.
 const NOT_READY = "جدول‌های گفتگو هنوز ساخته نشده‌اند؛ در کنسول لیارا npm run db:migrate را اجرا کنید.";
@@ -67,6 +71,13 @@ export async function assignAction(_prev: FormState, fd: FormData): Promise<Form
   }
   const [from] = r.conv.assignedTo ? await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, r.conv.assignedTo)) : [];
   await assignConversation(r.conv, to, { id: r.a.user.id, fullName: r.a.user.fullName }, from?.fullName ?? null);
+  // پیامک به کارشناس ارجاع‌گرفته (بعد از پاسخ؛ اگر به خودش ارجاع داده، نه)
+  if (to && to.id !== r.a.user.id) {
+    const link = await absoluteUrl(`/admin/chats/${r.conv.id}`);
+    const [cust] = await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, r.conv.customerId));
+    const expertId = to.id;
+    after(() => alertAssigned({ conversationId: r.conv.id, expertId, byId: r.a.user.id, customerName: cust?.fullName ?? "مشتری", link }).catch((e) => console.error("assign alert failed", e)));
+  }
   await logActivity({
     actorUserId: r.a.user.id,
     actingAsUserId: r.a.session.impersonatingUserId,
@@ -116,4 +127,31 @@ export async function saveAutoReplyAction(_prev: FormState, fd: FormData): Promi
   await logActivity({ actorUserId: a.user.id, action: "setting.update", entityType: "setting", entityId: "chat.auto_reply", before, after: text });
   revalidatePath("/admin", "layout");
   return { ok: text ? "ذخیره شد." : "ذخیره شد؛ پیام خودکار خاموش است." };
+}
+
+// قاعده‌های پیامک هشدار گفتگو (تنظیم‌های sms.*). با chats.assign (ادمین همیشه). docs/infoyaarchin.md بخش ۲۵.
+export async function saveSmsRulesAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requireStaff();
+  if (!(await chatAccess(a.user)).assign) return { error: "دسترسی ویرایش تنظیمات پیامک ندارید." };
+  const int = (k: string) => Number(toLatinDigits(String(fd.get(k) ?? "")).trim());
+  const cooldown = int("cooldown");
+  const reminder = int("reminder");
+  const start = String(fd.get("workStart") ?? "");
+  const end = String(fd.get("workEnd") ?? "");
+  const days = [...new Set(fd.getAll("workDays").map((d) => Number(d)))].filter((d) => Number.isInteger(d) && d >= 0 && d <= 6).sort();
+  if (!Number.isInteger(cooldown) || cooldown < 1 || cooldown > 1440) return { error: "فاصله‌ی بین دو پیامک باید عدد صحیح بین ۱ و ۱۴۴۰ دقیقه باشد." };
+  if (!Number.isInteger(reminder) || reminder < 1 || reminder > 1440) return { error: "زمان یادآوری باید عدد صحیح بین ۱ و ۱۴۴۰ دقیقه باشد." };
+  const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (!HHMM.test(start) || !HHMM.test(end) || start === end) return { error: "ساعت شروع و پایان کار را درست وارد کنید (و با هم فرق داشته باشند)." };
+  if (!days.length) return { error: "دست‌کم یک روز کاری انتخاب کنید." };
+  const next: Record<string, unknown> = { "sms.chat_cooldown_minutes": cooldown, "sms.reminder_minutes": reminder, "sms.work_start": start, "sms.work_end": end, "sms.work_days": days };
+  const before: Record<string, unknown> = {};
+  try {
+    for (const [k, v] of Object.entries(next)) before[k] = (await setSetting(k, v, a.user.id)).before;
+  } catch {
+    return { error: "تنظیم‌های sms.* در دیتابیس نیستند؛ در کنسول لیارا npm run db:seed را اجرا کنید." };
+  }
+  await logActivity({ actorUserId: a.user.id, action: "setting.update", entityType: "setting", entityId: "sms.*", before, after: next });
+  revalidatePath("/admin", "layout");
+  return { ok: "ذخیره شد." };
 }
