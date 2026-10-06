@@ -71,8 +71,11 @@ async function recentlySent(conversationId: string, userId: string, minutes: num
   return (r.rows[0]?.n ?? 0) > 0;
 }
 
-async function deliver(to: Recipient, text: string, kind: string, conversationId: string, rules: SmsRules, checkHours = true) {
-  if (await recentlySent(conversationId, to.id, rules.cooldownMin)) return "cooldown" as const;
+// opts.cooldown = false: پیامک ارجاع همیشه می‌رود (تصمیم مالک، گزینه‌ی ج)؛ ولی خودش در شمارش فاصله‌ی همان گفتگو حساب می‌شود،
+// پس پیامک «گفتگوی تازه» و «یادآوری» بعد از آن تا پایان بازه نمی‌روند. ساعت کاری برای ارجاع هم اعمال می‌شود.
+async function deliver(to: Recipient, text: string, kind: string, conversationId: string, rules: SmsRules, opts: { checkHours?: boolean; cooldown?: boolean } = {}) {
+  const { checkHours = true, cooldown = true } = opts;
+  if (cooldown && (await recentlySent(conversationId, to.id, rules.cooldownMin))) return "cooldown" as const;
   const meta = { kind, userId: to.id, conversationId };
   if (checkHours && !inWorkHours(rules)) {
     await recordSkippedSms(to.mobile, text, meta, "خارج از ساعت کاری");
@@ -92,12 +95,12 @@ export async function alertNewChat(c: { conversationId: string; customerName: st
   for (const to of await recipients({ perm: "chats.assign" })) await deliver(to, text, "chat_new", c.conversationId, rules);
 }
 
-// ۲) ارجاع به کارشناس (اگر خودش به خودش ارجاع داده، پیامک لازم نیست)
+// ۲) ارجاع به کارشناس (اگر خودش به خودش ارجاع داده، پیامک لازم نیست). بدون محدودیت فاصله: هر ارجاع یک پیامک.
 export async function alertAssigned(c: { conversationId: string; expertId: string; byId: string; customerName: string; link: string | null }): Promise<void> {
   if (!(await followupReady()) || c.expertId === c.byId) return;
   const rules = await smsRules();
   const text = withLink(`یارچین: گفتگوی ${c.customerName} به شما ارجاع شد.`, c.link);
-  for (const to of await recipients({ perm: null, userId: c.expertId })) await deliver(to, text, "chat_assigned", c.conversationId, rules);
+  for (const to of await recipients({ perm: null, userId: c.expertId })) await deliver(to, text, "chat_assigned", c.conversationId, rules, { cooldown: false });
 }
 
 // ۳) یادآوری پیام بی‌پاسخ (زمان‌بند هر دقیقه). فقط در ساعت کاری؛ برای هر «نوبت بی‌پاسخ» یک یادآوری (بعد از آخرین پیام مشتری)،
@@ -118,7 +121,7 @@ export async function runReminders(link: (conversationId: string) => string | nu
   let n = 0;
   for (const c of due.rows) {
     const text = withLink(`یارچین: پیام ${c.customer_name} در گفتگوی شما بیش از ${rules.reminderMin.toLocaleString("fa-IR")} دقیقه بی‌پاسخ مانده.`, link(c.id));
-    for (const to of await recipients({ perm: null, userId: c.assigned_to })) if ((await deliver(to, text, "chat_reminder", c.id, rules, false)) === "sent") n++;
+    for (const to of await recipients({ perm: null, userId: c.assigned_to })) if ((await deliver(to, text, "chat_reminder", c.id, rules, { checkHours: false })) === "sent") n++;
   }
   return n;
 }
