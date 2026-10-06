@@ -2,6 +2,7 @@
 
 import { and, count, eq, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { isUploadKey } from "@/lib/storage";
 import { redirect } from "next/navigation";
 import type { FormState } from "@/components/ui/ActionForm";
 import { db } from "@/db/client";
@@ -36,7 +37,8 @@ async function read(fd: FormData, selfId?: string, currentImage?: string | null)
   if (!SLUG_RE.test(slug)) return { error: "slug فقط حروف کوچک انگلیسی، عدد و خط تیره (مثل led-lighting)." };
   // مقدار فعلی (مثلاً کلید storage دسته‌های demo مثل demo/categories/x.svg) بدون تغییر پذیرفته می‌شود
   const keepImage = !!imageRaw && imageRaw === currentImage;
-  if (imageRaw && !keepImage && !httpsUrl(imageRaw)) return { error: "آدرس عکس باید با https:// شروع شود." };
+  // عکس آپلودی (کلید img/…) یا آدرس https
+  if (imageRaw && !keepImage && !httpsUrl(imageRaw) && !(isUploadKey(imageRaw) && imageRaw.startsWith("img/"))) return { error: "عکس را آپلود کنید یا آدرسی که با https:// شروع شود بدهید." };
   // آیکون آماده: فقط از فهرست (مقدار دستکاری‌شده رد می‌شود). اگر آدرس عکس هم وارد شده، عکس اولویت دارد.
   const iconRaw = str(fd, "icon", 40);
   if (iconRaw && !isCategoryIcon(iconRaw)) return { error: "آیکون انتخاب‌شده معتبر نیست." };
@@ -61,7 +63,7 @@ async function read(fd: FormData, selfId?: string, currentImage?: string | null)
       slug,
       parentId,
       descriptionFa: optStr(fd, "descriptionFa", 1000),
-      image: keepImage ? imageRaw : imageRaw ? httpsUrl(imageRaw) : isCategoryIcon(iconRaw) ? categoryIconPath(iconRaw) : null,
+      image: keepImage ? imageRaw : imageRaw ? (isUploadKey(imageRaw) ? imageRaw : httpsUrl(imageRaw)) : isCategoryIcon(iconRaw) ? categoryIconPath(iconRaw) : null,
       sortOrder: sort ?? 0,
       status: fd.get("status") === "hidden" ? "hidden" : "active",
     },

@@ -68,7 +68,7 @@ export function Gallery({ media, title }: { media: PublicMedia[]; title: string 
               onClick={() => setIndex(i)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {(m.kind === "image" || m.posterUrl) && <img src={m.kind === "image" ? m.url : (m.posterUrl as string)} alt="" loading="lazy" />}
+              {(m.kind === "image" || m.posterUrl) && <img src={m.thumbUrl} alt="" loading="lazy" />}
               {m.kind === "video" && (
                 <span className={styles.play}>
                   <Icon name="play" size={18} filled />
@@ -211,7 +211,7 @@ function Lightbox({ media, index, onIndex, onClose, title }: { media: PublicMedi
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={cur.url}
+            src={cur.zoomUrl}
             alt={cur.alt}
             draggable={false}
             className={styles.lbImage}

@@ -48,7 +48,8 @@ export type ProductCard = {
 };
 
 export type PublicSpec = { label: string; value: string };
-export type PublicMedia = { kind: "image" | "video"; url: string; posterUrl: string | null; alt: string; width: number | null; height: number | null };
+// url = اندازه‌ی صفحه‌ی محصول؛ thumbUrl = عکس کوچک؛ zoomUrl = بزرگ‌نمایی. برای عکس با آدرس دستی هر سه یکی است.
+export type PublicMedia = { kind: "image" | "video"; url: string; thumbUrl: string; zoomUrl: string; posterUrl: string | null; alt: string; width: number | null; height: number | null };
 
 export type PublicProduct = ProductCard & {
   titleEn: string | null;
@@ -107,7 +108,7 @@ function buildNode(idx: CatIndex, row: CatRow, depth = 0): PublicCategory {
     slug: row.slug,
     nameFa: row.nameFa,
     descriptionFa: row.descriptionFa,
-    imageUrl: mediaUrl(row.image),
+    imageUrl: mediaUrl(row.image, "sm"),
     productCount: (idx.ownCount.get(row.id) ?? 0) + kids.reduce((s, k) => s + k.productCount, 0),
     children: kids,
   };
@@ -274,7 +275,7 @@ async function toCards(rows: CardRow[]): Promise<ProductCard[]> {
       titleFa: r.titleFa,
       summaryFa: r.summaryFa,
       importScore: toImportScore(r.importScore),
-      coverUrl: mediaUrl(coverOf.get(r.id)),
+      coverUrl: mediaUrl(coverOf.get(r.id), "sm"),
       categoryName: (r.categoryId && idx.byId.get(r.categoryId)?.nameFa) || null,
       suppliers: s?.suppliers ?? 0,
       price: s?.price ? { ...s.price, unit: r.priceUnit } : null,
@@ -393,10 +394,21 @@ export async function getProduct(slug: string): Promise<PublicProduct | null> {
     descriptionFa: p.descriptionFa,
     specs: publicSpecs(p.specs),
     media: media.flatMap((m) => {
-      const url = mediaUrl(m.key);
-      return url
-        ? [{ kind: m.kind, url, posterUrl: mediaUrl(m.poster), alt: m.alt ?? p.titleFa, width: m.width, height: m.height }]
-        : [];
+      const url = mediaUrl(m.key, "md");
+      if (!url) return [];
+      const img = m.kind === "image";
+      return [
+        {
+          kind: m.kind,
+          url,
+          thumbUrl: (img ? mediaUrl(m.key, "sm") : mediaUrl(m.poster, "sm")) ?? url,
+          zoomUrl: (img ? mediaUrl(m.key, "lg") : null) ?? url,
+          posterUrl: mediaUrl(m.poster, "md"),
+          alt: m.alt ?? p.titleFa,
+          width: m.width,
+          height: m.height,
+        },
+      ];
     }),
     moqMin: s?.moqMin ?? null,
     leadTimeDays: s?.ltMin != null && s?.ltMax != null ? { min: s.ltMin, max: s.ltMax } : null,

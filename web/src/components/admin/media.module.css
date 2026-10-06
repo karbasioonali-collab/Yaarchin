@@ -1,0 +1,20 @@
+.pickRow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pick { position: relative; display: inline-flex; align-items: center; gap: 6px; background: var(--bg); color: var(--green-dark); padding: 8px 14px; border-radius: var(--radius-sm); font-weight: 600; font-size: 14px; cursor: pointer; border: 1.5px dashed rgba(47, 125, 92, .45); }
+.pick:hover { background: rgba(47, 125, 92, .08); }
+.pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.pick[aria-disabled="true"] { opacity: .5; pointer-events: none; }
+.camera { display: none; }
+@media (pointer: coarse) { .camera { display: inline-flex; } }
+.status { font-size: 13px; }
+.statusErr { font-size: 13px; color: #B3261E; }
+.statusOk { font-size: 13px; color: var(--green); }
+.preview { width: 96px; height: 64px; object-fit: cover; border-radius: 8px; background: var(--bg); }
+.fieldRow { display: flex; gap: 10px; align-items: flex-start; }
+.fieldRow > :first-child { flex: 1; min-width: 0; }
+.list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.item { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; font-size: 13px; padding: 8px 10px; border-radius: 8px; background: var(--bg); }
+.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: ltr; text-align: left; }
+.bar { grid-column: 1 / -1; height: 4px; border-radius: 4px; background: rgba(34, 34, 34, .08); overflow: hidden; }
+.bar > span { display: block; height: 100%; background: var(--green); transition: width .2s; }
+.uploader { display: grid; gap: 10px; padding: 12px; border-radius: 12px; border: 1.5px dashed rgba(47, 125, 92, .35); }
+.uploaderDrag { background: rgba(47, 125, 92, .06); }

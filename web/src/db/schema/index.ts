@@ -6,3 +6,4 @@ export * from "./customer";
 export * from "./rates";
 export * from "./chat";
 export * from "./followup";
+export * from "./media";
