@@ -14,6 +14,8 @@ import { UNITS } from "@/lib/format";
 import { fmtImportScore, IMPORT_SCORES, toImportScore } from "@/lib/catalog/import-score";
 import { catalogAdminReady, importScoreReady, ratesReady } from "@/lib/db-ready";
 import { hsLookup } from "@/lib/pricing/admin";
+import { releaseKey } from "@/lib/media/service";
+import { isUploadKey } from "@/lib/storage";
 
 // ثبت/ویرایش امتیاز «جذاب برای واردات». فقط با دسترسی products.rate (ادمین همیشه).
 // مقدار فقط از فهرست مجاز پذیرفته می‌شود؛ دیتابیس هم با CHECK constraint همین را کنترل می‌کند.
@@ -179,7 +181,8 @@ const PACKING_COLS = {
   unitsPerCarton: products.unitsPerCarton,
 };
 
-// ---------- عکس و ویدیو (فعلاً با آدرس؛ آپلود در مرحله‌ی بعد) ----------
+// ---------- عکس و ویدیو ----------
+// آپلود فایل: /api/admin/media/upload (docs/infoyaarchin.md بخش ۲۶). اینجا: افزودن با آدرس دستی و دستورهای هر فایل.
 export async function addMediaAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("products.manage");
   const productId = str(fd, "productId", 40);
@@ -216,19 +219,60 @@ export async function mediaCommandAction(fd: FormData): Promise<void> {
     await logActivity({ actorUserId: a.user.id, action: "product.media.visibility", entityType: "product", entityId: m.productId, before: { id, isPublic: m.isPublic }, after: { id, isPublic: !m.isPublic } });
   } else if (cmd === "delete") {
     await db.delete(productMedia).where(eq(productMedia.id, id));
-    await logActivity({ actorUserId: a.user.id, action: "product.media.delete", entityType: "product", entityId: m.productId, before: { id, kind: m.kind, url: m.storageKey, isPublic: m.isPublic } });
-  } else if (cmd === "up" || cmd === "down") {
+    await logActivity({
+      actorUserId: a.user.id,
+      actingAsUserId: a.session.impersonatingUserId,
+      action: "product.media.delete",
+      entityType: "product",
+      entityId: m.productId,
+      before: { id, kind: m.kind, url: m.storageKey, poster: m.posterKey, isPublic: m.isPublic },
+    });
+    // فایل آپلودی که دیگر جایی استفاده نمی‌شود از storage هم پاک می‌شود (تصمیم مالک ۴؛ لاگ media.delete)
+    const actor = { userId: a.user.id, actingAs: a.session.impersonatingUserId };
+    await releaseKey(m.storageKey, actor);
+    await releaseKey(m.posterKey, actor);
+  } else if (cmd === "up" || cmd === "down" || cmd === "main") {
     const all = await db.select({ id: productMedia.id }).from(productMedia).where(eq(productMedia.productId, m.productId)).orderBy(asc(productMedia.sortOrder), asc(productMedia.createdAt));
     const i = all.findIndex((x) => x.id === id);
-    const j = cmd === "up" ? i - 1 : i + 1;
-    if (j < 0 || j >= all.length) return;
-    [all[i], all[j]] = [all[j], all[i]];
+    if (cmd === "main") {
+      // «عکس اصلی» = اول فهرست (کارت محصول و اول گالری سایت)
+      if (i <= 0 || m.kind !== "image") return;
+      all.unshift(...all.splice(i, 1));
+    } else {
+      const j = cmd === "up" ? i - 1 : i + 1;
+      if (j < 0 || j >= all.length) return;
+      [all[i], all[j]] = [all[j], all[i]];
+    }
     await db.transaction(async (tx) => {
       for (const [k, x] of all.entries()) await tx.update(productMedia).set({ sortOrder: k }).where(eq(productMedia.id, x.id));
     });
-    await logActivity({ actorUserId: a.user.id, action: "product.media.reorder", entityType: "product", entityId: m.productId, after: { order: all.map((x) => x.id) } });
+    await logActivity({
+      actorUserId: a.user.id,
+      action: cmd === "main" ? "product.media.main" : "product.media.reorder",
+      entityType: "product",
+      entityId: m.productId,
+      after: { order: all.map((x) => x.id), ...(cmd === "main" ? { main: id } : {}) },
+    });
   }
   revalidatePath("/", "layout");
+}
+
+// عکس پیش‌نمایش ویدیو: کلید فایل آپلودی یا آدرس https (خالی = حذف)
+export async function setPosterAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("products.manage");
+  const id = str(fd, "id", 40);
+  const raw = str(fd, "poster", 1000);
+  if (!UUID.test(id)) return { error: "فایل نامعتبر است." };
+  const poster = !raw ? null : isUploadKey(raw) && raw.startsWith("img/") ? raw : httpsUrl(raw);
+  if (raw && !poster) return { error: "عکس پیش‌نمایش باید آپلود شود یا آدرسش با https:// شروع شود." };
+  const [m] = await db.select({ productId: productMedia.productId, kind: productMedia.kind, posterKey: productMedia.posterKey }).from(productMedia).where(eq(productMedia.id, id));
+  if (!m || m.kind !== "video") return { error: "ویدیو پیدا نشد." };
+  if (m.posterKey === poster) return { ok: "بدون تغییر." };
+  await db.update(productMedia).set({ posterKey: poster }).where(eq(productMedia.id, id));
+  await logActivity({ actorUserId: a.user.id, actingAsUserId: a.session.impersonatingUserId, action: "product.media.poster", entityType: "product", entityId: m.productId, before: { id, poster: m.posterKey }, after: { id, poster } });
+  await releaseKey(m.posterKey, { userId: a.user.id, actingAs: a.session.impersonatingUserId });
+  revalidatePath("/", "layout");
+  return { ok: "ذخیره شد." };
 }
 
 // ---------- لیستینگ هر کارخانه برای محصول ----------

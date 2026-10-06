@@ -342,6 +342,38 @@
       ],
       "labelFa": "روزهای کاری پیامک",
       "description": "۰ یکشنبه … ۵ جمعه، ۶ شنبه (پیش‌فرض: شنبه تا پنجشنبه)."
+    },
+    {
+      "key": "media.image_max_mb",
+      "groupKey": "media",
+      "value": 15,
+      "labelFa": "حداکثر حجم هر عکس آپلودی (مگابایت)",
+      "description": "عکس بزرگ‌تر رد می‌شود. عکس ذخیره‌شده بعد از فشرده‌سازی خیلی کوچک‌تر است."
+    },
+    {
+      "key": "media.batch_max",
+      "groupKey": "media",
+      "value": 20,
+      "labelFa": "حداکثر تعداد عکس در یک بار آپلود محصول"
+    },
+    {
+      "key": "media.video_max_mb",
+      "groupKey": "media",
+      "value": 50,
+      "labelFa": "حداکثر حجم ویدیو (مگابایت، فضای ابری)"
+    },
+    {
+      "key": "media.test_total_mb",
+      "groupKey": "media",
+      "value": 150,
+      "labelFa": "سقف کل فایل‌های حالت آزمایشی (مگابایت)",
+      "description": "فقط وقتی فضای ابری وصل نیست. فضای قابل نوشتن پلن فعلی لیارا ۲۵۰ مگابایت است."
+    },
+    {
+      "key": "media.test_video_max_mb",
+      "groupKey": "media",
+      "value": 20,
+      "labelFa": "حداکثر حجم ویدیو در حالت آزمایشی (مگابایت)"
     }
   ],
   "rates": {

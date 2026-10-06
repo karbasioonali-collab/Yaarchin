@@ -20,7 +20,7 @@ export default async function HomePage() {
   const slides = slider.isVisible
     ? slider.data.slides
         .filter((x) => x.visible)
-        .map((x) => ({ title: x.title, text: x.text, imageUrl: mediaUrl(x.image), href: x.href, cta: x.cta, tone: x.tone }))
+        .map((x) => ({ title: x.title, text: x.text, imageUrl: mediaUrl(x.image, "lg"), href: x.href, cta: x.cta, tone: x.tone }))
     : [];
 
   return (

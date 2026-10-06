@@ -6,8 +6,8 @@ import { db } from "@/db/client";
 // کدام migrationها روی دیتابیس فعلی اجرا شده‌اند؟ (یک کوئری سبک در هر درخواست)
 // روی لیارا فایل migration همراه کد جدید می‌رسد، پس npm run db:migrate فقط «بعد» از استقرار کد جدید قابل اجراست.
 // در این فاصله کد جدید نباید به جدول یا ستونی که هنوز نیست دست بزند (docs/infoyaarchin.md بخش ۱۵ و ۱۶).
-const schemaState = cache(async (): Promise<{ catalog: boolean; importScore: boolean; customer: boolean; catalogAdmin: boolean; rates: boolean; chat: boolean; followup: boolean }> => {
-  const r = await db.execute<{ catalog: boolean; import_score: boolean; customer: boolean; catalog_admin: boolean; rates: boolean; chat: boolean; followup: boolean }>(sql`
+const schemaState = cache(async (): Promise<{ catalog: boolean; importScore: boolean; customer: boolean; catalogAdmin: boolean; rates: boolean; chat: boolean; followup: boolean; media: boolean }> => {
+  const r = await db.execute<{ catalog: boolean; import_score: boolean; customer: boolean; catalog_admin: boolean; rates: boolean; chat: boolean; followup: boolean; media: boolean }>(sql`
     select
       (to_regclass('public.site_blocks') is not null and to_regclass('public.price_observations') is not null
         and to_regclass('public.contact_messages') is not null) as catalog,
@@ -25,7 +25,8 @@ const schemaState = cache(async (): Promise<{ catalog: boolean; importScore: boo
       (to_regclass('public.conversations') is not null and to_regclass('public.chat_messages') is not null
         and to_regclass('public.conversation_reads') is not null and to_regclass('public.conversation_flags') is not null) as chat,
       (to_regclass('public.inquiries') is not null and to_regclass('public.inquiry_supplier_events') is not null
-        and to_regclass('public.sms_outbox') is not null and to_regclass('public.staff_notification_prefs') is not null) as followup`);
+        and to_regclass('public.sms_outbox') is not null and to_regclass('public.staff_notification_prefs') is not null) as followup,
+      to_regclass('public.media_files') is not null as media`);
   return {
     catalog: r.rows[0]?.catalog === true,
     importScore: r.rows[0]?.import_score === true,
@@ -34,6 +35,7 @@ const schemaState = cache(async (): Promise<{ catalog: boolean; importScore: boo
     rates: r.rows[0]?.rates === true,
     chat: r.rows[0]?.chat === true,
     followup: r.rows[0]?.followup === true,
+    media: r.rows[0]?.media === true,
   };
 });
 
@@ -57,3 +59,6 @@ export const chatReady = cache(async () => (await schemaState()).chat);
 
 // migration ۰۰۰۷: پیگیری کارخانه‌ها برای درخواست مشتری، صف پیامک و تنظیم پیامک هر کارمند
 export const followupReady = cache(async () => (await schemaState()).followup);
+
+// migration ۰۰۰۸: فایل‌های آپلودی (media_files). قبل از آن آپلود خاموش است و فقط آدرس دستی کار می‌کند.
+export const mediaReady = cache(async () => (await schemaState()).media);

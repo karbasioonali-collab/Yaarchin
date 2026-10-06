@@ -1,14 +1,20 @@
+import { MediaModeNote } from "@/components/admin/MediaModeNote";
+import { UploadImageField } from "@/components/admin/UploadImageField";
 import { Field } from "@/components/ui/Field";
 import ui from "@/components/ui/ui.module.css";
 import { SLUG_HINT } from "@/lib/catalog/admin-input";
 import { CATEGORY_ICONS, categoryIconPath, iconKeyFromImage } from "@/lib/catalog/category-icons";
 import styles from "../panel.module.css";
 import { type AdminCategory, categoryLabel } from "@/lib/catalog/admin-tree";
+import { mediaReady } from "@/lib/db-ready";
+import { mediaUrl } from "@/lib/storage";
 
 // فیلدهای مشترک فرم ساخت و ویرایش دسته. excluded: خودش و زیرشاخه‌هایش (نمی‌توانند والد شوند).
-export function CategoryFields({ tree, value, excluded }: { tree: AdminCategory[]; value?: Partial<AdminCategory>; excluded?: Set<string> }) {
+export async function CategoryFields({ tree, value, excluded }: { tree: AdminCategory[]; value?: Partial<AdminCategory>; excluded?: Set<string> }) {
   // آیکون آماده (اگر عکس فعلی یکی از آیکون‌هاست) از قبل انتخاب‌شده نشان داده می‌شود
   const icon = iconKeyFromImage(value?.image);
+  const uploads = await mediaReady();
+  const image = icon ? "" : (value?.image ?? "");
   return (
     <>
       <Field label="نام فارسی" name="nameFa" defaultValue={value?.nameFa ?? ""} required maxLength={120} />
@@ -48,13 +54,15 @@ export function CategoryFields({ tree, value, excluded }: { tree: AdminCategory[
           ))}
         </div>
       </fieldset>
-      <Field
-        label="یا آدرس عکس"
+      <MediaModeNote ready={uploads} />
+      <UploadImageField
+        label="یا عکس دلخواه"
         name="image"
-        defaultValue={icon ? "" : (value?.image ?? "")}
-        ltr
-        maxLength={1000}
-        hint="https://… — اگر پر باشد، عکس به‌جای آیکون استفاده می‌شود (آپلود عکس در مرحله‌ی بعد)."
+        purpose="category"
+        defaultValue={image}
+        previewUrl={mediaUrl(image, "sm")}
+        uploadEnabled={uploads}
+        hint="آپلود کنید یا آدرس https://… بدهید. اگر پر باشد، عکس به‌جای آیکون استفاده می‌شود."
       />
       <Field
         label="ترتیب نمایش"

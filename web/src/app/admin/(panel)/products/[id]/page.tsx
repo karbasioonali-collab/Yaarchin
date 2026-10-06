@@ -12,11 +12,15 @@ import { can, requirePermission } from "@/lib/auth/can";
 import { COMPANY_STATUS_FA, CURRENCY_FA, LISTING_STATUS_FA, PRODUCT_STATUS_FA } from "@/lib/catalog/admin-labels";
 import { latestByCurrency, leadTimeHistory, priceHistory, priceText, qtyRange } from "@/lib/catalog/admin-listing";
 import { adminCategoryTree } from "@/lib/catalog/admin-tree";
-import { catalogAdminReady, ratesReady } from "@/lib/db-ready";
+import { catalogAdminReady, mediaReady, ratesReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum, UNITS, unitFa } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
 import styles from "../../panel.module.css";
-import { addMediaAction, createListingAction, mediaCommandAction, updateProductAction } from "../actions";
+import { addMediaAction, createListingAction, mediaCommandAction, setPosterAction, updateProductAction } from "../actions";
+import { MediaModeNote } from "@/components/admin/MediaModeNote";
+import { ProductMediaUploader } from "@/components/admin/ProductMediaUploader";
+import { UploadImageField } from "@/components/admin/UploadImageField";
+import { mediaLimits } from "@/lib/media/service";
 import { ProductFields } from "../ProductFields";
 import { hsLookup } from "@/lib/pricing/admin";
 
@@ -61,6 +65,8 @@ export default async function ProductPage({ params }: PageProps<"/admin/products
   if (!p) notFound();
 
   const seeCompanies = await can(a.user, "companies.view");
+  const [uploads, limits] = await Promise.all([mediaReady(), mediaLimits()]);
+  const videoMaxMb = limits.mode === "local" ? Math.min(limits.videoMaxMb, limits.testVideoMaxMb) : limits.videoMaxMb;
   const [tree, media, listings] = await Promise.all([
     adminCategoryTree(),
     db.select().from(productMedia).where(eq(productMedia.productId, id)).orderBy(asc(productMedia.sortOrder), asc(productMedia.createdAt)),
@@ -165,18 +171,25 @@ export default async function ProductPage({ params }: PageProps<"/admin/products
       <div className={styles.card} style={{ marginTop: 16 }}>
         <h2 className={styles.cardTitle}>عکس و ویدیو ({fmtNum(media.length)})</h2>
         <p className={styles.muted} style={{ marginTop: 0 }}>
-          فعلاً با آدرس (آپلود در مرحله‌ی بعد). «منتشر نشود» برای عکسی است که لوگو یا اسم کارخانه دارد: در پنل می‌ماند ولی هرگز در سایت نمایش داده نمی‌شود.
+          عکس اول «عکس اصلی» است (کارت محصول و اول گالری). «منتشر نشود» برای عکسی است که لوگو یا اسم کارخانه دارد: در پنل می‌ماند ولی هرگز در سایت نمایش داده نمی‌شود.
         </p>
-        <div className={styles.mediaGrid}>
+        <MediaModeNote ready={uploads} />
+        {uploads && <ProductMediaUploader productId={p.id} batchMax={limits.batchMax} imageMaxMb={limits.imageMaxMb} videoMaxMb={videoMaxMb} />}
+        <div className={styles.mediaGrid} style={{ marginTop: 12 }}>
           {media.map((m, i) => (
             <div key={m.id} className={styles.mediaItem}>
               {m.kind === "image" ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={mediaUrl(m.storageKey) ?? ""} alt={m.altFa ?? ""} loading="lazy" referrerPolicy="no-referrer" />
+                <img src={mediaUrl(m.storageKey, "sm") ?? ""} alt={m.altFa ?? ""} loading="lazy" referrerPolicy="no-referrer" />
+              ) : m.posterKey ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={mediaUrl(m.posterKey, "sm") ?? ""} alt="پیش‌نمایش ویدیو" loading="lazy" referrerPolicy="no-referrer" />
               ) : (
                 <div className={styles.mediaVideo}>🎬 ویدیو</div>
               )}
               <div className={styles.mediaMeta}>
+                {i === 0 && <span className={styles.badge}>عکس اصلی</span>}
+                {m.kind === "video" && <span className={styles.badge}>ویدیو</span>}
                 {m.isPublic ? <span className={styles.badge}>در سایت</span> : <span className={`${styles.badge} ${styles.badgeWarn}`}>منتشر نشود (لوگو)</span>}
                 <div className={`${styles.ltr} ${styles.muted}`} style={{ fontSize: 11, overflowWrap: "anywhere" }}>
                   {m.storageKey}
@@ -185,26 +198,46 @@ export default async function ProductPage({ params }: PageProps<"/admin/products
               <div className={styles.mediaActions}>
                 {(
                   [
+                    ["main", "عکس اصلی"],
                     ["toggle", m.isPublic ? "منتشر نشود" : "انتشار"],
                     ["up", "↑"],
                     ["down", "↓"],
                     ["delete", "حذف"],
                   ] as const
-                ).map(([cmd, label]) => (
-                  <form key={cmd} action={mediaCommandAction}>
-                    <input type="hidden" name="id" value={m.id} />
-                    <input type="hidden" name="cmd" value={cmd} />
-                    <button type="submit" className={styles.btnGhost} disabled={(cmd === "up" && i === 0) || (cmd === "down" && i === media.length - 1)}>
-                      {label}
-                    </button>
-                  </form>
-                ))}
+                )
+                  // «عکس اصلی» فقط برای عکسی که الان اول نیست
+                  .filter(([cmd]) => cmd !== "main" || (i > 0 && m.kind === "image"))
+                  .map(([cmd, label]) => (
+                    <form key={cmd} action={mediaCommandAction}>
+                      <input type="hidden" name="id" value={m.id} />
+                      <input type="hidden" name="cmd" value={cmd} />
+                      <button type="submit" className={styles.btnGhost} disabled={(cmd === "up" && i === 0) || (cmd === "down" && i === media.length - 1)}>
+                        {label}
+                      </button>
+                    </form>
+                  ))}
               </div>
+              {m.kind === "video" && (
+                <details>
+                  <summary style={{ fontSize: 12, cursor: "pointer" }}>عکس پیش‌نمایش</summary>
+                  <ActionForm action={setPosterAction} submitLabel="ذخیره" submitVariant="secondary">
+                    <input type="hidden" name="id" value={m.id} />
+                    <UploadImageField
+                      name="poster"
+                      label="عکس پیش‌نمایش"
+                      purpose="poster"
+                      defaultValue={m.posterKey ?? ""}
+                      previewUrl={mediaUrl(m.posterKey, "sm")}
+                      uploadEnabled={uploads}
+                    />
+                  </ActionForm>
+                </details>
+              )}
             </div>
           ))}
         </div>
         <details className={styles.detailsBox} style={{ marginTop: 12 }}>
-          <summary>+ افزودن عکس یا ویدیو</summary>
+          <summary>+ افزودن با آدرس (لینک مستقیم فایل)</summary>
           <ActionForm action={addMediaAction} submitLabel="افزودن" submitVariant="secondary">
             <input type="hidden" name="productId" value={p.id} />
             <div className={styles.row}>

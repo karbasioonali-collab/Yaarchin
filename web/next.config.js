@@ -32,6 +32,11 @@ const nextConfig = {
       "./node_modules/@node-rs/**/*",
     ],
   },
+  // sharp (پردازش عکس آپلودی، docs/infoyaarchin.md بخش ۲۶) نسخه‌ی WebAssembly خودش را هم دارد (۹ مگابایت) که روی
+  // سرور لینوکسی لیارا هرگز استفاده نمی‌شود (نسخه‌ی native لینوکس هست)؛ از خروجی standalone حذف می‌شود.
+  outputFileTracingExcludes: {
+    "*": ["./node_modules/@img/sharp-wasm32/**/*"],
+  },
 };
 
 module.exports = nextConfig;

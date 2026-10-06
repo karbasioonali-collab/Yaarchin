@@ -9,6 +9,9 @@ import { fmtNum } from "@/lib/format";
 import { type BlockMap, MAX_SLIDES } from "@/lib/site/blocks";
 import { getBlock } from "@/lib/site/get";
 import { mediaUrl } from "@/lib/storage";
+import { UploadImageField } from "@/components/admin/UploadImageField";
+import { mediaReady } from "@/lib/db-ready";
+import { MediaModeNote } from "@/components/admin/MediaModeNote";
 import panel from "../../panel.module.css";
 import { resetBlockAction, saveBlockAction } from "../actions";
 import { BLOCK_PAGES } from "../blocks-meta";
@@ -99,16 +102,18 @@ function FooterForm({ d }: { d: BlockMap["footer"] }) {
   );
 }
 
-function SliderForm({ d }: { d: BlockMap["home.slider"] }) {
+async function SliderForm({ d }: { d: BlockMap["home.slider"] }) {
+  const uploads = await mediaReady();
   const rows = [...d.slides, ...Array.from({ length: Math.max(0, MAX_SLIDES - d.slides.length) }, () => null)];
   return (
     <>
+      <MediaModeNote ready={uploads} />
       <Part title="تنظیمات">
         <Num name="intervalSec" label="فاصله‌ی عوض شدن اسلاید (ثانیه)" value={d.intervalSec} min={3} max={20} />
         <span className={ui.hint}>پیشنهاد: ۵ تا ۷ اسلاید. اسلایدی که عنوان و عکس ندارد ذخیره نمی‌شود.</span>
       </Part>
       {rows.map((sl, i) => {
-        const url = sl ? mediaUrl(sl.image) : null;
+        const url = sl ? mediaUrl(sl.image, "md") : null;
         return (
           <Part key={i} title={`اسلاید ${fmtNum(i + 1)}`} visible={{ name: `slides.${i}.visible`, value: sl?.visible ?? true }}>
             <div className={styles.slide}>
@@ -126,13 +131,14 @@ function SliderForm({ d }: { d: BlockMap["home.slider"] }) {
                   <Text name={`slides.${i}.href`} label="آدرس دکمه" value={sl?.href ?? ""} ltr max={500} />
                 </div>
                 <div className={styles.grid2}>
-                  <Text
+                  <UploadImageField
                     name={`slides.${i}.image`}
                     label="عکس"
-                    value={sl?.image ?? ""}
-                    ltr
-                    max={500}
-                    hint="آدرس https://… یا مسیر فایل (مثل demo/slides/slide-1.svg). آپلود مستقیم با فعال‌شدن فضای ذخیره‌سازی اضافه می‌شود."
+                    purpose="slide"
+                    defaultValue={sl?.image ?? ""}
+                    maxLength={500}
+                    uploadEnabled={uploads}
+                    hint="آپلود کنید (پیشنهاد: افقی، حداقل ۱۶۰۰ پیکسل عرض) یا آدرس https://… یا مسیر فایل (مثل demo/slides/slide-1.svg)."
                   />
                   <label className={ui.field}>
                     <span className={ui.label}>رنگ متن‌باکس</span>
