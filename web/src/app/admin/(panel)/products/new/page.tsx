@@ -24,6 +24,11 @@ export default async function NewProductPage() {
         </div>
       </div>
       <div className={styles.card}>
+        {/* آپلود در همین فرم نیست: قبل از ساخت، محصولی نیست که فایل به آن وصل شود (فایل بی‌صاحب در فضای محدود آزمایشی می‌ماند).
+            بعد از ساخت مستقیم به بخش عکس‌های همان محصول می‌رود. docs/infoyaarchin.md بخش ۲۷ */}
+        <p className={styles.notice} role="note">
+          📷 <strong>عکس و ویدیو:</strong> بعد از ذخیره‌ی محصول، عکس و ویدیو را اضافه کنید؛ با زدن «ساخت محصول» مستقیم به بخش عکس‌های همین محصول می‌روید.
+        </p>
         <ActionForm action={createProductAction} submitLabel="ساخت محصول">
           <ProductFields tree={tree} hs={{ ready: hsReady, current: null }} />
         </ActionForm>

@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { asc, eq, inArray, max, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, max, ne } from "drizzle-orm";
 import { db } from "@/db/client";
-import { companies, companyCorrespondence, productListings, productMedia, products } from "@/db/schema";
+import { companies, companyCorrespondence, mediaFiles, productListings, productMedia, products } from "@/db/schema";
 import { ActionForm } from "@/components/ui/ActionForm";
 import { Checkbox, Field } from "@/components/ui/Field";
 import { RowsEditor } from "@/components/ui/RowsEditor";
@@ -14,11 +14,12 @@ import { latestByCurrency, leadTimeHistory, priceHistory, priceText, qtyRange } 
 import { adminCategoryTree } from "@/lib/catalog/admin-tree";
 import { catalogAdminReady, mediaReady, ratesReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum, UNITS, unitFa } from "@/lib/format";
-import { mediaUrl } from "@/lib/storage";
+import { isUploadKey, mediaUrl } from "@/lib/storage";
 import styles from "../../panel.module.css";
 import { addMediaAction, createListingAction, mediaCommandAction, setPosterAction, updateProductAction } from "../actions";
 import { MediaModeNote } from "@/components/admin/MediaModeNote";
 import { ProductMediaUploader } from "@/components/admin/ProductMediaUploader";
+import { ProductUrlImporter } from "@/components/admin/ProductUrlImporter";
 import { UploadImageField } from "@/components/admin/UploadImageField";
 import { mediaLimits } from "@/lib/media/service";
 import { ProductFields } from "../ProductFields";
@@ -29,9 +30,10 @@ const UUID = /^[0-9a-f-]{36}$/i;
 
 type Spec = { labelFa?: string; valueFa?: string; unit?: string };
 
-export default async function ProductPage({ params }: PageProps<"/admin/products/[id]">) {
+export default async function ProductPage({ params, searchParams }: PageProps<"/admin/products/[id]">) {
   const a = await requirePermission("products.manage");
   const { id } = await params;
+  const justCreated = (await searchParams).created === "1";
   if (!UUID.test(id)) notFound();
   const ready = await catalogAdminReady();
   const [p] = await db
@@ -105,6 +107,18 @@ export default async function ProductPage({ params }: PageProps<"/admin/products
   const lastMsgOf = new Map(lastMsgs.map((m) => [m.companyId, m.at]));
   // بدون دسترسی «دیدن کارخانه‌ها» اسم کارخانه نمایش داده نمی‌شود
   const companyLabel = (l: (typeof listings)[number], i: number) => (seeCompanies ? l.companyName : `کارخانه‌ی ${fmtNum(i + 1)}`);
+  // فایل‌های واردشده از لینک یا اکستنشن (برای برچسب «از لینک» و لینک منبع)
+  const uploadKeys = media.map((m) => m.storageKey).filter((k) => isUploadKey(k));
+  const imported = new Map(
+    uploads && uploadKeys.length
+      ? (
+          await db
+            .select({ key: mediaFiles.key, source: mediaFiles.source, sourceUrl: mediaFiles.sourceUrl })
+            .from(mediaFiles)
+            .where(and(inArray(mediaFiles.key, uploadKeys), ne(mediaFiles.source, "upload")))
+        ).map((f) => [f.key, f])
+      : [],
+  );
   const specs = (Array.isArray(p.specs) ? (p.specs as Spec[]) : []).map((s) => ({ specLabel: s.labelFa ?? "", specValue: s.valueFa ?? "", specUnit: s.unit ?? "" }));
   // numeric از دیتابیس رشته با صفرهای اضافه می‌آید («19.000»)؛ برای فرم عدد ساده
   const pk = (k: string) => {
@@ -168,13 +182,24 @@ export default async function ProductPage({ params }: PageProps<"/admin/products
         </ActionForm>
       </div>
 
-      <div className={styles.card} style={{ marginTop: 16 }}>
+      <div id="media" className={styles.card} style={{ marginTop: 16, scrollMarginTop: 16 }}>
         <h2 className={styles.cardTitle}>عکس و ویدیو ({fmtNum(media.length)})</h2>
+        {justCreated && (
+          <p className={styles.notice} role="status">
+            ✓ محصول ساخته شد. حالا عکس و ویدیوی آن را اینجا آپلود کنید یا از لینک وارد کنید.
+          </p>
+        )}
         <p className={styles.muted} style={{ marginTop: 0 }}>
           عکس اول «عکس اصلی» است (کارت محصول و اول گالری). «منتشر نشود» برای عکسی است که لوگو یا اسم کارخانه دارد: در پنل می‌ماند ولی هرگز در سایت نمایش داده نمی‌شود.
         </p>
         <MediaModeNote ready={uploads} />
         {uploads && <ProductMediaUploader productId={p.id} batchMax={limits.batchMax} imageMaxMb={limits.imageMaxMb} videoMaxMb={videoMaxMb} />}
+        {uploads && (
+          <details className={styles.detailsBox} style={{ marginTop: 10 }}>
+            <summary>+ وارد کردن عکس از لینک (مثلاً علی‌بابا)</summary>
+            <ProductUrlImporter productId={p.id} batchMax={limits.batchMax} listings={listings.map((l, i) => ({ id: l.id, label: companyLabel(l, i) }))} />
+          </details>
+        )}
         <div className={styles.mediaGrid} style={{ marginTop: 12 }}>
           {media.map((m, i) => (
             <div key={m.id} className={styles.mediaItem}>
@@ -190,7 +215,16 @@ export default async function ProductPage({ params }: PageProps<"/admin/products
               <div className={styles.mediaMeta}>
                 {i === 0 && <span className={styles.badge}>عکس اصلی</span>}
                 {m.kind === "video" && <span className={styles.badge}>ویدیو</span>}
-                {m.isPublic ? <span className={styles.badge}>در سایت</span> : <span className={`${styles.badge} ${styles.badgeWarn}`}>منتشر نشود (لوگو)</span>}
+                {imported.has(m.storageKey) && (
+                  <a className={styles.badge} href={imported.get(m.storageKey)?.sourceUrl ?? undefined} target="_blank" rel="noreferrer noopener" title={imported.get(m.storageKey)?.sourceUrl ?? ""}>
+                    {imported.get(m.storageKey)?.source === "extension" ? "از اکستنشن" : "از لینک"}
+                  </a>
+                )}
+                {m.isPublic ? (
+                  <span className={styles.badge}>در سایت</span>
+                ) : (
+                  <span className={`${styles.badge} ${styles.badgeWarn}`}>{imported.has(m.storageKey) ? "منتشر نشود (بررسی کنید)" : "منتشر نشود (لوگو)"}</span>
+                )}
                 <div className={`${styles.ltr} ${styles.muted}`} style={{ fontSize: 11, overflowWrap: "anywhere" }}>
                   {m.storageKey}
                 </div>

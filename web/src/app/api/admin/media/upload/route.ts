@@ -6,7 +6,7 @@
 //   purpose=poster                          ← عکس پیش‌نمایش ویدیو (products.manage)
 //   purpose=category                        ← عکس دسته (categories.manage)
 //   purpose=slide                           ← عکس اسلایدر و محتوای سایت (site.manage)
-// ضد CSRF: هدر سفارشی x-yc-upload (فرم یا سایت دیگر بدون preflight نمی‌تواند بفرستد) + یکی بودن Origin با میزبان.
+// ضد CSRF: src/lib/media/request-guard.ts (هدر سفارشی x-yc-upload + یکی بودن Origin با میزبان).
 import { count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
@@ -16,6 +16,7 @@ import { logActivity } from "@/lib/activity";
 import { can } from "@/lib/auth/can";
 import { getAuth } from "@/lib/auth/current";
 import { mediaReady } from "@/lib/db-ready";
+import { isTrustedPanelRequest } from "@/lib/media/request-guard";
 import { fmtMb, maxInputBytes, mediaLimits, type MediaPurpose, storeMedia } from "@/lib/media/service";
 import { mediaUrl } from "@/lib/storage";
 
@@ -25,17 +26,6 @@ export const dynamic = "force-dynamic";
 const PERM: Record<MediaPurpose, string> = { product: "products.manage", poster: "products.manage", category: "categories.manage", slide: "site.manage" };
 const UUID = /^[0-9a-f-]{36}$/i;
 const err = (error: string, status: number) => NextResponse.json({ ok: false, error }, { status });
-
-function sameOrigin(req: NextRequest): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin) return false;
-  const host = (req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "").split(",")[0].trim();
-  try {
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
-}
 
 // خواندن بدنه با سقف حجم: اگر Content-Length بزرگ‌تر باشد فوراً رد می‌شود، وگرنه هنگام خواندن شمرده می‌شود
 async function readCapped(req: NextRequest, max: number): Promise<Buffer | "too_big" | "empty"> {
@@ -59,7 +49,7 @@ async function readCapped(req: NextRequest, max: number): Promise<Buffer | "too_
 }
 
 export async function POST(req: NextRequest) {
-  if (req.headers.get("x-yc-upload") !== "1" || !sameOrigin(req)) return err("درخواست نامعتبر است.", 403);
+  if (!isTrustedPanelRequest(req)) return err("درخواست نامعتبر است.", 403);
   const a = await getAuth();
   if (!a || !a.user.isStaff) return err("اول وارد پنل شوید.", 401);
   const sp = req.nextUrl.searchParams;
