@@ -1,5 +1,6 @@
 "use client";
 
+import { JalaliDateInput } from "@/components/admin/JalaliDateInput";
 import { useState } from "react";
 import { Checkbox, Field } from "@/components/ui/Field";
 import ui from "@/components/ui/ui.module.css";
@@ -90,7 +91,7 @@ export function CostFields({ currencies, initial }: { currencies: { code: string
           ))}
         </div>
       </fieldset>
-      <Field label="معتبر از (اختیاری؛ خالی = همین حالا)" name="validFrom" type="datetime-local" ltr hint="ساعت تهران. برای تغییر زمان‌بندی‌شده، تاریخ آینده بدهید." />
+      <JalaliDateInput label="معتبر از (اختیاری؛ خالی = همین حالا)" name="validFrom" withTime hint="ساعت تهران؛ ساعت خالی = ۰۰:۰۰. برای تغییر زمان‌بندی‌شده، تاریخ آینده بدهید." />
       <Field label="یادداشت (اختیاری)" name="note" maxLength={500} />
     </>
   );

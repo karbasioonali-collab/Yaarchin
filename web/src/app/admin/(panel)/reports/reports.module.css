@@ -1,0 +1,12 @@
+.range { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+.custom { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.kpis { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); margin-bottom: 16px; }
+.kpi { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; display: grid; gap: 4px; }
+.kpiValue { font-size: 26px; font-weight: 800; color: var(--green-dark); }
+.kpiLabel { font-size: 13px; color: var(--muted); }
+.up { color: var(--green); font-size: 12px; font-weight: 700; }
+.down { color: #B3261E; font-size: 12px; font-weight: 700; }
+.flat { color: var(--muted); font-size: 12px; }
+.prev { font-size: 11px; color: var(--muted); }
+.cols { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); margin-bottom: 16px; }
+.soon { border: 1.5px dashed rgba(47, 125, 92, .35); background: rgba(47, 125, 92, .04); }

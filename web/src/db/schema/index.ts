@@ -7,3 +7,4 @@ export * from "./rates";
 export * from "./chat";
 export * from "./followup";
 export * from "./media";
+export * from "./leads";

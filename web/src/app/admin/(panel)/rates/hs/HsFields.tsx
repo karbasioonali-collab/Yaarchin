@@ -1,5 +1,6 @@
 "use client";
 
+import { JalaliDateInput } from "@/components/admin/JalaliDateInput";
 import { useState } from "react";
 import { Checkbox, Field } from "@/components/ui/Field";
 import ui from "@/components/ui/ui.module.css";
@@ -82,7 +83,7 @@ export function HsFields({ currencies, initial, lockCode = false }: { currencies
         </div>
       )}
       <Checkbox label="فعال (در لیست HS)" name="isActive" defaultChecked={initial?.isActive ?? true} />
-      <Field label="معتبر از (اختیاری؛ خالی = همین حالا)" name="validFrom" type="datetime-local" ltr hint="ساعت تهران." />
+      <JalaliDateInput label="معتبر از (اختیاری؛ خالی = همین حالا)" name="validFrom" withTime hint="ساعت تهران؛ ساعت خالی = ۰۰:۰۰." />
       <Field label="یادداشت (اختیاری)" name="note" maxLength={500} />
     </>
   );

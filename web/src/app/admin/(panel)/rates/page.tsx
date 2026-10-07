@@ -1,3 +1,4 @@
+import { JalaliDateInput } from "@/components/admin/JalaliDateInput";
 import type { Metadata } from "next";
 import { desc, eq } from "drizzle-orm";
 import { ActionForm } from "@/components/ui/ActionForm";
@@ -99,7 +100,7 @@ export default async function RatesPage() {
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>ثبت نرخ</h2>
           <ActionForm action={addRatesAction} submitLabel="ثبت نرخ‌ها">
-            <Field label="تاریخ نرخ (میلادی)" name="rateDate" type="date" defaultValue={today} max={today} required ltr />
+            <JalaliDateInput label="تاریخ نرخ" name="rateDate" defaultValue={today} max={today} required />
             {active.map((c) => (
               <div key={c.code} className={styles.row}>
                 <Field label={`${c.nameFa} — بازار (تومان)`} name={`market_${c.code}`} inputMode="decimal" ltr placeholder={c.market ? String(c.market.rate) : ""} />

@@ -1,3 +1,4 @@
+import { JalaliDateInput } from "@/components/admin/JalaliDateInput";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -388,7 +389,7 @@ export default async function CompanyPage({ params }: PageProps<"/admin/companie
                           ))}
                         </select>
                       </label>
-                      <Field label="زمان (به وقت تهران)" name="occurredAt" type="datetime-local" defaultValue={toTehranLocalInput(new Date())} ltr />
+                      <JalaliDateInput label="زمان (به وقت تهران)" name="occurredAt" withTime defaultValue={toTehranLocalInput(new Date())} />
                     </div>
                     <label className={ui.field}>
                       <span className={ui.label}>متن یا خلاصه‌ی مکاتبه</span>

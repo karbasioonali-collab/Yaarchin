@@ -1,3 +1,4 @@
+import { JalaliDateInput } from "@/components/admin/JalaliDateInput";
 import type { Metadata } from "next";
 import { asc, desc, eq } from "drizzle-orm";
 import { ActionForm } from "@/components/ui/ActionForm";
@@ -103,12 +104,11 @@ export default async function ShippingPage() {
                       <Field label="زمان رسیدن: حداقل روز" name="transitMinDays" defaultValue={current?.transitMinDays ?? ""} inputMode="numeric" ltr />
                       <Field label="حداکثر روز" name="transitMaxDays" defaultValue={current?.transitMaxDays ?? ""} inputMode="numeric" ltr />
                     </div>
-                    <Field
+                    <JalaliDateInput
                       label="معتبر از (اختیاری؛ خالی = همین حالا)"
                       name="validFrom"
-                      type="datetime-local"
-                      ltr
-                      hint="ساعت تهران. برای تغییر زمان‌بندی‌شده، تاریخ آینده بدهید."
+                      withTime
+                      hint="ساعت تهران؛ ساعت خالی = ۰۰:۰۰. برای تغییر زمان‌بندی‌شده، تاریخ آینده بدهید."
                     />
                     <Field label="یادداشت (اختیاری)" name="note" maxLength={500} />
                   </ActionForm>

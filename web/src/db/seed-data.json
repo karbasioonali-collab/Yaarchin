@@ -148,6 +148,16 @@
       "key": "chats.assign",
       "groupKey": "chats",
       "nameFa": "دیدن همه‌ی گفتگوها، ارجاع و جابه‌جایی، بستن و بازکردن، و ویرایش پیام خودکار"
+    },
+    {
+      "key": "reports.view",
+      "groupKey": "reports",
+      "nameFa": "دیدن گزارش‌ها (بازدید، مشتری، علاقه‌مندی، گفتگو، امتیاز جدیت)"
+    },
+    {
+      "key": "reports.staff",
+      "groupKey": "reports",
+      "nameFa": "دیدن عملکرد هر کارشناس در گزارش‌ها"
     }
   ],
   "rolePermissions": {
@@ -222,7 +232,8 @@
       "key": "features.reports",
       "groupKey": "features",
       "value": true,
-      "labelFa": "گزارش روزانه‌ی AI"
+      "labelFa": "بخش «گزارش‌ها» در پنل",
+      "description": "خاموش: منو و صفحه‌ی گزارش‌ها پنهان می‌شود. تحلیل هوشمند (AI) جداست و بعداً فعال می‌شود."
     },
     {
       "key": "features.payments",
@@ -431,5 +442,61 @@
       ],
       "note": "مقدار اولیه (seed)"
     }
-  }
+  },
+  "leadRules": [
+    {
+      "key": "favorites",
+      "kind": "favorites",
+      "labelFa": "علاقه‌مندی",
+      "points": 5,
+      "cap": 25,
+      "windowDays": null,
+      "sortOrder": 1
+    },
+    {
+      "key": "visit_days",
+      "kind": "visit_days",
+      "labelFa": "روزهای بازدید از سایت",
+      "points": 3,
+      "cap": 30,
+      "windowDays": 30,
+      "sortOrder": 2
+    },
+    {
+      "key": "product_views",
+      "kind": "product_views",
+      "labelFa": "بازدید محصول متفاوت",
+      "points": 1,
+      "cap": 15,
+      "windowDays": 30,
+      "sortOrder": 3
+    },
+    {
+      "key": "profile_complete",
+      "kind": "profile_complete",
+      "labelFa": "پروفایل کسب‌وکار کامل",
+      "points": 10,
+      "cap": null,
+      "windowDays": null,
+      "sortOrder": 4
+    },
+    {
+      "key": "chats",
+      "kind": "chats",
+      "labelFa": "گفتگو با کارشناس",
+      "points": 10,
+      "cap": 20,
+      "windowDays": null,
+      "sortOrder": 5
+    },
+    {
+      "key": "inquiries",
+      "kind": "inquiries",
+      "labelFa": "درخواست مشتری (پیگیری کارخانه)",
+      "points": 20,
+      "cap": 40,
+      "windowDays": null,
+      "sortOrder": 6
+    }
+  ]
 }
