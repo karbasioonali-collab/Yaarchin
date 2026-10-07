@@ -83,6 +83,18 @@ try {
     console.log("جدول‌های نرخ (migration ۰۰۰۵) هنوز نیستند؛ اول npm run db:migrate و بعد دوباره db:seed.");
   }
 
+  // قانون‌های پیش‌فرض امتیاز جدیت (migration ۰۰۰۹). فقط قانونی که نیست ساخته می‌شود؛ تغییرهای ادمین در پنل دست نمی‌خورد.
+  const has0009 = (await client.query(`select to_regclass('public.lead_score_rules') is not null as ok`)).rows[0].ok;
+  if (has0009) {
+    for (const r of seed.leadRules) {
+      await client.query(
+        `insert into lead_score_rules (key, kind, label_fa, points, cap, window_days, sort_order, source) values ($1,$2,$3,$4,$5,$6,$7,'system')
+         on conflict (key) do nothing`,
+        [r.key, r.kind, r.labelFa, r.points, r.cap, r.windowDays, r.sortOrder],
+      );
+    }
+  }
+
   await client.query("commit");
   console.log("seed انجام شد.");
 } catch (e) {

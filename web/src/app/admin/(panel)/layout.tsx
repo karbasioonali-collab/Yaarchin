@@ -8,6 +8,7 @@ import { RATE_PERMS } from "@/lib/pricing/labels";
 import { CHAT_PERMS, chatAccess } from "@/lib/chat/access";
 import { chatCounters } from "@/lib/chat/admin";
 import { chatReady } from "@/lib/db-ready";
+import { isEnabled } from "@/lib/settings";
 import { PanelPulse } from "./PanelPulse";
 import { logoutAction } from "../(auth)/actions";
 import { stopImpersonationAction } from "./users/actions";
@@ -15,12 +16,14 @@ import { NavLinks, type NavItem } from "./NavLinks";
 import styles from "./panel.module.css";
 
 // permission: یکی از این‌ها کافی است
-const NAV: (NavItem & { permission: string | string[] })[] = [
+// feature: فقط وقتی سوئیچ features.<feature> روشن است
+const NAV: (NavItem & { permission: string | string[]; feature?: string })[] = [
   { href: "/admin", label: "داشبورد", permission: "dashboard.view" },
   { href: "/admin/users", label: "کاربران", permission: "users.view" },
   { href: "/admin/customers", label: "مشتریان", permission: "customers.view" },
   { href: "/admin/chats", label: "گفتگوها", permission: CHAT_PERMS, badge: "chats" },
   { href: "/admin/inquiries", label: "درخواست‌های مشتری", permission: ["chats.view_all", "chats.assign"] },
+  { href: "/admin/reports", label: "گزارش‌ها", permission: "reports.view", feature: "reports" },
   { href: "/admin/roles", label: "نقش‌ها و دسترسی", permission: "roles.manage" },
   { href: "/admin/products", label: "محصولات", permission: ["products.manage", "products.rate"] },
   { href: "/admin/categories", label: "دسته‌بندی‌ها", permission: "categories.manage" },
@@ -36,7 +39,10 @@ const NAV: (NavItem & { permission: string | string[] })[] = [
 export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
   const a = await requireStaff();
   const items: NavItem[] = [];
-  for (const n of NAV) if (await canAny(a.user, [n.permission].flat())) items.push({ href: n.href, label: n.label, badge: n.badge });
+  for (const n of NAV) {
+    if (n.feature && !(await isEnabled(n.feature))) continue;
+    if (await canAny(a.user, [n.permission].flat())) items.push({ href: n.href, label: n.label, badge: n.badge });
+  }
   // گفتگوها: تعداد اولیه‌ی نشان منو؛ بعد PanelPulse هر چند ثانیه به‌روزش می‌کند
   const chatsOn = items.some((i) => i.badge === "chats") && (await chatReady());
   const chatCount = chatsOn ? (await chatCounters(await chatAccess(a.user))).total : 0;

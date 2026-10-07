@@ -1,3 +1,4 @@
+import { JalaliDateInput } from "@/components/admin/JalaliDateInput";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAnyPermission } from "@/lib/auth/can";
@@ -131,12 +132,12 @@ export default async function ChatsPage({ searchParams }: PageProps<"/admin/chat
             </select>
           </label>
           <label>
-            آخرین پیام از (میلادی)
-            <input type="date" name="from" defaultValue={one(sp.from)} dir="ltr" />
+            آخرین پیام از
+            <JalaliDateInput name="from" defaultValue={one(sp.from)} ariaLabel="آخرین پیام از" inline />
           </label>
           <label>
             تا
-            <input type="date" name="to" defaultValue={one(sp.to)} dir="ltr" />
+            <JalaliDateInput name="to" defaultValue={one(sp.to)} ariaLabel="آخرین پیام تا" inline />
           </label>
           <button type="submit" className={styles.btn}>
             فیلتر

@@ -1,3 +1,4 @@
+import { JalaliDateInput } from "@/components/admin/JalaliDateInput";
 import type { Metadata } from "next";
 import { desc, eq } from "drizzle-orm";
 import { ActionForm } from "@/components/ui/ActionForm";
@@ -59,7 +60,7 @@ export default async function TaxPage() {
                   ))}
                 </div>
               </fieldset>
-              <Field label="معتبر از (اختیاری؛ خالی = همین حالا)" name="validFrom" type="datetime-local" ltr hint="ساعت تهران." />
+              <JalaliDateInput label="معتبر از (اختیاری؛ خالی = همین حالا)" name="validFrom" withTime hint="ساعت تهران؛ ساعت خالی = ۰۰:۰۰." />
               <Field label="یادداشت (اختیاری)" name="note" maxLength={500} />
             </ActionForm>
           </>

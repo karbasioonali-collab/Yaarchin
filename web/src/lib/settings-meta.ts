@@ -5,7 +5,6 @@ export const NOT_BUILT_SETTINGS = new Set([
   "features.extension_import",
   "features.ai_agent",
   "features.proposals",
-  "features.reports",
   "features.payments",
   // ساختار ورود پیامکی ساخته شده (lib/customer/otp.ts) ولی تا سرویس‌دهنده‌ی پیامک وصل نشود، سوئیچ اثری ندارد.
   "features.sms",

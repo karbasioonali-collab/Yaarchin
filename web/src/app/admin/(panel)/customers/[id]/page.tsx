@@ -12,6 +12,7 @@ import { behaviorSummary } from "@/lib/customer/events";
 import { BUSINESS_TYPE_FA, getProfile } from "@/lib/customer/profile";
 import { chatReady, customerReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
+import { scoreBreakdown } from "@/lib/leads/score";
 import { startImpersonationAction } from "../../users/actions";
 import { setCustomerStatusAction } from "../actions";
 import styles from "../../panel.module.css";
@@ -42,6 +43,7 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           .limit(20)
       ).filter((c) => canSee(chatSee, c))
     : [];
+  const [lead, seeRules] = await Promise.all([scoreBreakdown(id), can(a.user, "reports.view")]);
   const [profile, summary, favRows, activeSessions, history, canManage, canImpersonate] = await Promise.all([
     getProfile(id),
     behaviorSummary(id),
@@ -158,6 +160,44 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
             <p className={styles.muted}>{ready ? "هنوز پر نشده است." : "بعد از اجرای migration ۰۰۰۳ نمایش داده می‌شود."}</p>
           )}
         </div>
+
+        {lead && (
+          <div className={styles.card} style={{ gridColumn: "1 / -1" }}>
+            <h2 className={styles.cardTitle}>
+              امتیاز جدیت: <span className={styles.badge}>{fmtNum(lead.score)}</span>
+              {lead.max !== null && <span className={styles.muted} style={{ fontSize: 13, fontWeight: 400 }}> از {fmtNum(lead.max)}</span>}
+            </h2>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>قانون</th>
+                  <th>واحد</th>
+                  <th>امتیاز</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lead.items.map((x) => (
+                  <tr key={x.rule.id}>
+                    <td>
+                      {x.rule.labelFa}
+                      {x.rule.windowDays ? <span className={styles.muted}> ({fmtNum(x.rule.windowDays)} روز اخیر)</span> : null}
+                    </td>
+                    <td>{fmtNum(x.units)}</td>
+                    <td>
+                      {fmtNum(x.points)}
+                      {x.rule.cap !== null && <span className={styles.muted}> / سقف {fmtNum(Number(x.rule.cap))}</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {seeRules && (
+              <p style={{ fontSize: 13, marginBottom: 0 }}>
+                <Link href="/admin/reports/scoring">قانون‌های امتیاز جدیت</Link>
+              </p>
+            )}
+          </div>
+        )}
 
         <div className={styles.card} style={{ gridColumn: "1 / -1" }}>
           <h2 className={styles.cardTitle}>خلاصه‌ی بازدیدها و رفتار</h2>
