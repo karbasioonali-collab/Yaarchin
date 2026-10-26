@@ -1,4 +1,5 @@
 import { JalaliDateInput } from "@/components/admin/JalaliDateInput";
+import { aiStatus } from "@/lib/ai/state";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireAnyPermission } from "@/lib/auth/can";
@@ -33,7 +34,10 @@ export default async function ChatsPage({ searchParams }: PageProps<"/admin/chat
   const sp = await searchParams;
   const defTab = access.assign ? "unassigned" : access.viewAll ? "all" : "mine";
   const tabRaw = one(sp.tab);
-  const tab = (access.viewAll && (tabRaw === "unassigned" || tabRaw === "all" || tabRaw === "mine") ? tabRaw : access.viewAll ? defTab : "mine") as ChatFilters["tab"];
+  const aiLive = (await aiStatus()) === "live";
+  const tab = (
+    access.viewAll && (tabRaw === "unassigned" || tabRaw === "all" || tabRaw === "mine" || (tabRaw === "ai" && aiLive)) ? tabRaw : access.viewAll ? defTab : "mine"
+  ) as ChatFilters["tab"];
   const tree = await adminCategoryTree();
   const catRaw = one(sp.category);
   const status = one(sp.status) === "closed" ? "closed" : one(sp.status) === "any" ? "any" : "open";
@@ -82,6 +86,8 @@ export default async function ChatsPage({ searchParams }: PageProps<"/admin/chat
               ["unassigned", "ارجاع‌نشده", counters.unassigned],
               ["mine", "گفتگوهای من", counters.mine],
               ["all", "همه", 0],
+              // گفتگوهایی که دستیار هوشمند زنده جواب می‌دهد (تا ارجاع نشده‌اند در «ارجاع‌نشده» نمی‌آیند)
+              ...(aiLive ? ([["ai", "در دست دستیار", 0]] as const) : []),
             ] as const
           ).map(([k, label, n]) => (
             <Link key={k} href={qs({ tab: k, page: "" })} className={`${styles.tab} ${tab === k ? styles.tabActive : ""}`} aria-current={tab === k ? "page" : undefined}>

@@ -21,6 +21,7 @@ const required = [
   "scripts/demo/demo-data.mjs",
   "drizzle/meta/_journal.json",
   "src/db/seed-data.json",
+  "src/db/kb-drafts.json",
   "src/lib/auth/password-policy.mjs",
   "src/lib/contact.mjs",
 ];

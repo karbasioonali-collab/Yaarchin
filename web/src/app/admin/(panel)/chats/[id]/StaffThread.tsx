@@ -3,9 +3,9 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import ui from "@/components/ui/ui.module.css";
-import { SENDER_FA, type StaffMsg } from "@/lib/chat/dto";
+import { AI_SOURCE_FA, SENDER_FA, type StaffMsg } from "@/lib/chat/dto";
 import styles from "../chats.module.css";
-import { sendStaffMessageAction } from "../actions";
+import { markAiWrongAction, sendStaffMessageAction } from "../actions";
 
 // رشته‌ی پیام‌ها در پنل: هر پیام با فرستنده (مشتری / سیستم / اسم کارشناس) و زمان. رویدادهای داخلی (ارجاع) با برچسب «داخلی».
 // polling: هر ۴ ثانیه وقتی تب جلوی چشم است، هر ۲۰ ثانیه در پس‌زمینه (/admin/chats/<id>/feed).
@@ -30,6 +30,7 @@ export function StaffThread({
   assignedTo: string | null;
 }) {
   const router = useRouter();
+  const [wrong, setWrong] = useState<Record<number, boolean>>({});
   const [msgs, setMsgs] = useState(initial);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -120,11 +121,29 @@ export function StaffThread({
               {m.internal && <span className={styles.tag}>داخلی</span>} {m.body} <span className={styles.time}>{when.format(new Date(m.at))}</span>
             </div>
           ) : (
-            <div key={m.id} className={`${styles.msg} ${m.from === "customer" ? styles.fromCustomer : m.from === "staff" ? styles.fromStaff : styles.fromSystem}`}>
+            <div
+              key={m.id}
+              className={`${styles.msg} ${m.from === "customer" ? styles.fromCustomer : m.from === "staff" ? styles.fromStaff : m.from === "ai" ? styles.fromAi : styles.fromSystem} ${m.internal ? styles.internal : ""}`}
+            >
               <div className={styles.meta}>
                 <strong>{m.from === "staff" ? (m.name ?? SENDER_FA.staff) : SENDER_FA[m.from]}</strong>
                 {m.from === "customer" && m.name && <span> · {m.name}</span>}
+                {m.from === "ai" && m.aiSource && <span className={styles.tag}>{AI_SOURCE_FA[m.aiSource] ?? m.aiSource}</span>}
+                {m.internal && <span className={styles.tag}>داخلی</span>}
                 <span className={styles.time}>{when.format(new Date(m.at))}</span>
+                {m.from === "ai" && m.aiSource && m.aiSource !== "handoff" && (
+                  <button
+                    type="button"
+                    className={`${styles.wrongBtn} ${wrong[m.id] ? styles.wrongDone : ""}`}
+                    disabled={!!wrong[m.id]}
+                    onClick={async () => {
+                      const r = await markAiWrongAction(conversationId, m.id);
+                      if (r.ok) setWrong((w) => ({ ...w, [m.id]: true }));
+                    }}
+                  >
+                    {wrong[m.id] ? "علامت خورد" : "جواب اشتباه"}
+                  </button>
+                )}
               </div>
               <div className={styles.body} dir="auto">
                 {m.body}

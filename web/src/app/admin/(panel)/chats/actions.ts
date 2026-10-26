@@ -1,19 +1,20 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { alertAssigned } from "@/lib/chat/alerts";
 import { absoluteUrl } from "@/lib/site/url";
 import type { FormState } from "@/components/ui/ActionForm";
 import { db } from "@/db/client";
-import { users } from "@/db/schema";
+import { aiFeedback, chatMessages, conversationFlags, users } from "@/db/schema";
 import { logActivity } from "@/lib/activity";
 import { requireStaff } from "@/lib/auth/current";
 import { canChangeStatus, canReply, canSee, chatAccess } from "@/lib/chat/access";
 import { type StaffMsg, toStaffMsg } from "@/lib/chat/dto";
+import { resume, silence } from "@/lib/ai/state";
 import { assignConversation, cleanBody, getConversation, isAssignable, postStaffMessage, setConversationStatus } from "@/lib/chat/service";
-import { chatReady } from "@/lib/db-ready";
+import { aiReady, chatReady } from "@/lib/db-ready";
 import { getSetting, setSetting } from "@/lib/settings";
 import { toLatinDigits } from "@/lib/validation";
 
@@ -43,6 +44,8 @@ export async function sendStaffMessageAction(conversationId: string, raw: string
   const body = cleanBody(raw);
   if (!body) return { error: "پیام خالی است." };
   const m = await postStaffMessage(r.conv, r.a.user.id, body);
+  // دستیار هوشمند در این گفتگو ساکت می‌شود (فقط «برگرداندن به دستیار» یا بازشدن دوباره بعد از ai.resume_after_hours)
+  await silence(r.conv.id, "staff_reply", r.a.user.id);
   await logActivity({
     actorUserId: r.a.user.id,
     actingAsUserId: r.a.session.impersonatingUserId,
@@ -71,6 +74,7 @@ export async function assignAction(_prev: FormState, fd: FormData): Promise<Form
   }
   const [from] = r.conv.assignedTo ? await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, r.conv.assignedTo)) : [];
   await assignConversation(r.conv, to, { id: r.a.user.id, fullName: r.a.user.fullName }, from?.fullName ?? null);
+  if (to) await silence(r.conv.id, "assigned", r.a.user.id);
   // پیامک به کارشناس ارجاع‌گرفته (بعد از پاسخ؛ اگر به خودش ارجاع داده، نه)
   if (to && to.id !== r.a.user.id) {
     const link = await absoluteUrl(`/admin/chats/${r.conv.id}`);
@@ -154,4 +158,54 @@ export async function saveSmsRulesAction(_prev: FormState, fd: FormData): Promis
   await logActivity({ actorUserId: a.user.id, action: "setting.update", entityType: "setting", entityId: "sms.*", before, after: next });
   revalidatePath("/admin", "layout");
   return { ok: "ذخیره شد." };
+}
+
+// ---------- دستیار هوشمند (docs/infoyaarchin.md بخش ۲۹) ----------
+// «جواب اشتباه»: هر کسی که گفتگو را می‌بیند؛ بازخورد staff + برچسب «نیاز به بررسی»
+export async function markAiWrongAction(conversationId: string, messageId: number): Promise<{ error?: string; ok?: boolean }> {
+  const r = await load(conversationId);
+  if ("error" in r) return { error: r.error };
+  if (!(await aiReady())) return { error: "بعد از migration ۰۰۱۰." };
+  const [m] = await db
+    .select({ id: chatMessages.id })
+    .from(chatMessages)
+    .where(and(eq(chatMessages.id, messageId), eq(chatMessages.conversationId, r.conv.id), eq(chatMessages.senderType, "ai")));
+  if (!m) return { error: "پیام پیدا نشد." };
+  await db
+    .insert(aiFeedback)
+    .values({ messageId, userId: r.a.user.id, source: "staff", value: "wrong" })
+    .onConflictDoUpdate({ target: [aiFeedback.messageId, aiFeedback.userId, aiFeedback.source], set: { value: "wrong", updatedAt: new Date() } });
+  await db.insert(conversationFlags).values({ conversationId: r.conv.id, messageId, flag: "needs_review", reason: `جواب اشتباه (علامت ${r.a.user.fullName})`, source: "staff", createdBy: r.a.user.id });
+  await logActivity({ actorUserId: r.a.user.id, actingAsUserId: r.a.session.impersonatingUserId, action: "ai.mark_wrong", entityType: "conversation", entityId: r.conv.id, after: { messageId } });
+  revalidatePath(`/admin/chats/${r.conv.id}`);
+  return { ok: true };
+}
+
+// برداشتن برچسب بعد از بررسی
+export async function resolveFlagAction(fd: FormData): Promise<void> {
+  const id = Number(fd.get("flagId"));
+  const conversationId = String(fd.get("conversationId") ?? "");
+  const r = await load(conversationId);
+  if ("error" in r || !Number.isInteger(id)) return;
+  const done = await db
+    .update(conversationFlags)
+    .set({ resolvedAt: new Date(), resolvedBy: r.a.user.id })
+    .where(and(eq(conversationFlags.id, id), eq(conversationFlags.conversationId, r.conv.id), isNull(conversationFlags.resolvedAt)))
+    .returning({ reason: conversationFlags.reason });
+  if (done.length) await logActivity({ actorUserId: r.a.user.id, action: "chat.flag_resolve", entityType: "conversation", entityId: r.conv.id, after: { flagId: id, reason: done[0].reason } });
+  revalidatePath(`/admin/chats/${r.conv.id}`);
+}
+
+// واگذاری به کارشناس / برگرداندن به دستیار (کسی که وضعیت گفتگو را عوض می‌کند)
+export async function aiModeAction(fd: FormData): Promise<void> {
+  const conversationId = String(fd.get("conversationId") ?? "");
+  const to = fd.get("to") === "ai" ? "ai" : "human";
+  const r = await load(conversationId);
+  if ("error" in r || !(await aiReady()) || !canChangeStatus(r.access, r.conv)) return;
+  if (to === "ai") {
+    if (r.conv.assignedTo) return; // گفتگوی ارجاع‌شده به کارشناس، به دستیار برنمی‌گردد
+    await resume(r.conv.id);
+  } else await silence(r.conv.id, "manual", r.a.user.id);
+  await logActivity({ actorUserId: r.a.user.id, action: to === "ai" ? "ai.resume" : "ai.silence", entityType: "conversation", entityId: r.conv.id });
+  revalidatePath(`/admin/chats/${r.conv.id}`);
 }

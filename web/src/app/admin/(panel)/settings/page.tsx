@@ -12,13 +12,13 @@ const GROUPS: { key: string; title: string; desc: string }[] = [
   { key: "features", title: "سوئیچ بخش‌ها", desc: "هر بخش سایت را می‌شود بدون تغییر کد روشن یا خاموش کرد." },
   { key: "auth", title: "ورود و دسترسی", desc: "" },
   { key: "media", title: "آپلود عکس و ویدیو", desc: "سقف‌های آپلود. «حالت آزمایشی» = تا وقتی فضای ابری لیارا وصل نشده و فایل‌ها روی دیسک خود برنامه‌اند." },
-  { key: "ai", title: "مدل هوش مصنوعی هر وظیفه", desc: "برای هر وظیفه جدا؛ اتصال واقعی به مدل‌ها در مرحله‌ی چت ساخته می‌شود." },
 ];
 
 export default async function SettingsPage() {
   const a = await requirePermission("settings.manage");
   // گروه‌های chat و sms فرم خودشان را در «گفتگوها ← تنظیمات گفتگو» دارند؛ اینجا تکرار نمی‌شوند
-  const all = (await getAllSettings()).filter((s) => s.groupKey !== "chat" && s.groupKey !== "sms");
+  // گروه ai فرم خودش را در «دستیار هوشمند» دارد
+  const all = (await getAllSettings()).filter((s) => s.groupKey !== "chat" && s.groupKey !== "sms" && s.groupKey !== "ai");
   const known = new Set(GROUPS.map((g) => g.key));
   const other = all.filter((s) => !known.has(s.groupKey));
 

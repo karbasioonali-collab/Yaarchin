@@ -158,6 +158,16 @@
       "key": "reports.staff",
       "groupKey": "reports",
       "nameFa": "دیدن عملکرد هر کارشناس در گزارش‌ها"
+    },
+    {
+      "key": "ai.settings",
+      "groupKey": "ai",
+      "nameFa": "تنظیمات دستیار هوشمند: سقف‌ها، لیست سیاه، تست اتصال و لاگ درخواست‌ها"
+    },
+    {
+      "key": "ai.knowledge",
+      "groupKey": "ai",
+      "nameFa": "مدیریت پایگاه دانش دستیار هوشمند"
     }
   ],
   "rolePermissions": {
@@ -213,8 +223,9 @@
     {
       "key": "features.ai_agent",
       "groupKey": "features",
-      "value": true,
-      "labelFa": "ایجنت هوش مصنوعی"
+      "value": false,
+      "labelFa": "دستیار هوشمند یارچین (AI) در چت",
+      "description": "خاموش: همان لحظه همه‌ی چت‌ها مثل قبل مستقیم به صف کارشناس می‌روند. بدون کلید لیارا «حالت آزمایشی» است (جواب‌ها فقط در پنل)."
     },
     {
       "key": "features.favorites",
@@ -252,60 +263,6 @@
       "groupKey": "features",
       "value": false,
       "labelFa": "ایمیل"
-    },
-    {
-      "key": "ai.task.customer_chat",
-      "groupKey": "ai",
-      "value": {
-        "provider": "",
-        "model": ""
-      },
-      "labelFa": "مدل AI: چت مشتری"
-    },
-    {
-      "key": "ai.task.page_extraction",
-      "groupKey": "ai",
-      "value": {
-        "provider": "",
-        "model": ""
-      },
-      "labelFa": "مدل AI: استخراج اطلاعات صفحه"
-    },
-    {
-      "key": "ai.task.price_extraction",
-      "groupKey": "ai",
-      "value": {
-        "provider": "",
-        "model": ""
-      },
-      "labelFa": "مدل AI: استخراج قیمت"
-    },
-    {
-      "key": "ai.task.negotiation_translation",
-      "groupKey": "ai",
-      "value": {
-        "provider": "",
-        "model": ""
-      },
-      "labelFa": "مدل AI: ترجمه‌ی مذاکره"
-    },
-    {
-      "key": "ai.task.hs_code_suggestion",
-      "groupKey": "ai",
-      "value": {
-        "provider": "",
-        "model": ""
-      },
-      "labelFa": "مدل AI: پیشنهاد HS code"
-    },
-    {
-      "key": "ai.task.daily_report",
-      "groupKey": "ai",
-      "value": {
-        "provider": "",
-        "model": ""
-      },
-      "labelFa": "مدل AI: گزارش روزانه"
     },
     {
       "key": "chat.auto_reply",
@@ -385,6 +342,64 @@
       "groupKey": "media",
       "value": 20,
       "labelFa": "حداکثر حجم ویدیو در حالت آزمایشی (مگابایت)"
+    },
+    {
+      "key": "ai.max_replies_per_chat",
+      "groupKey": "ai",
+      "value": 12,
+      "labelFa": "سقف جواب دستیار در هر گفتگو",
+      "description": "با رسیدن به سقف، گفتگو با دلیل «گفتگوی طولانی» به صف کارشناس می‌رود."
+    },
+    {
+      "key": "ai.customer_daily_messages",
+      "groupKey": "ai",
+      "value": 40,
+      "labelFa": "سقف پیام هر مشتری به دستیار در ۲۴ ساعت"
+    },
+    {
+      "key": "ai.daily_requests",
+      "groupKey": "ai",
+      "value": 1500,
+      "labelFa": "سقف کل درخواست‌های روزانه‌ی دستیار"
+    },
+    {
+      "key": "ai.daily_cost_toman",
+      "groupKey": "ai",
+      "value": 50000,
+      "labelFa": "سقف کل هزینه‌ی روزانه‌ی دستیار (تومان)",
+      "description": "با رسیدن به ۸۰٪ هشدار در پنل؛ با رسیدن به سقف، دستیار تا فردا جواب نمی‌دهد و چت‌ها به کارشناس می‌روند."
+    },
+    {
+      "key": "ai.big_order_qty",
+      "groupKey": "ai",
+      "value": 5000,
+      "labelFa": "آستانه‌ی «سفارش بزرگ» (تعداد)",
+      "description": "مشتری که این تعداد یا بیشتر بخواهد به کارشناس ارجاع می‌شود."
+    },
+    {
+      "key": "ai.lead_score_handoff",
+      "groupKey": "ai",
+      "value": 80,
+      "labelFa": "آستانه‌ی امتیاز جدیت برای ارجاع به کارشناس"
+    },
+    {
+      "key": "ai.resume_after_hours",
+      "groupKey": "ai",
+      "value": 24,
+      "labelFa": "ساعت لازم برای برگشتن دستیار به گفتگوی بسته‌ای که دوباره باز شد"
+    },
+    {
+      "key": "ai.kb_review_days",
+      "groupKey": "ai",
+      "value": 30,
+      "labelFa": "بازه‌ی بررسی مجدد پایگاه دانش (روز)"
+    },
+    {
+      "key": "ai.blacklist",
+      "groupKey": "ai",
+      "value": [],
+      "labelFa": "لیست سیاه کلمه‌ها برای محافظ خروجی دستیار",
+      "description": "اسم همه‌ی کارخانه‌ها و تماس‌هایشان خودکار هم بررسی می‌شود."
     }
   ],
   "rates": {

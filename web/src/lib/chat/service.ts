@@ -80,8 +80,10 @@ export async function postCustomerMessage(input: {
   productId?: string | null;
   conversationId?: string | null;
   subject?: string | null;
+  // false وقتی دستیار هوشمند زنده جواب می‌دهد (پیام خودکار لازم نیست؛ lib/ai/agent.ts)
+  autoReply?: boolean;
 }): Promise<CustomerPostResult | { error: "not_found" }> {
-  const autoReplyText = cleanBody(await getSetting<string>("chat.auto_reply"), 1000);
+  const autoReplyText = input.autoReply === false ? null : cleanBody(await getSetting<string>("chat.auto_reply"), 1000);
   return db.transaction(async (tx) => {
     let conv: Conversation | undefined;
     if (input.conversationId) {

@@ -22,6 +22,7 @@ const nextConfig = {
       "./scripts/**/*",
       "./drizzle/**/*",
       "./src/db/seed-data.json",
+      "./src/db/kb-drafts.json",
       "./src/lib/auth/password-policy.mjs",
       "./src/lib/contact.mjs",
       // فقط فایل‌هایی که Node واقعاً اجرا می‌کند (ESM .js)؛ .d.ts/.cjs/.map حذف شدند (۴۴۹ فایل به‌جای ۲۶۹۰).

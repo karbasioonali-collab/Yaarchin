@@ -4,7 +4,7 @@ import "server-only";
 // «بازدید» فقط برای مشتری واردشده ثبت می‌شود (جدول events)؛ مهمان‌ها شمرده نمی‌شوند (کار آینده، بخش ۲۸).
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
-import { chatReady, followupReady } from "@/lib/db-ready";
+import { aiReady, chatReady, followupReady } from "@/lib/db-ready";
 
 export type Win = { start: Date; end: Date };
 const inWin = (col: string, w: Win) => sql`${sql.raw(col)} >= ${w.start} and ${sql.raw(col)} < ${w.end}`;
@@ -141,20 +141,21 @@ export async function staffPerformance(w: Win) {
 // ---------- آمار AI (فقط ساختار؛ تا AI راه نیفتد صفر/خالی است) ----------
 export async function aiStats(w: Win) {
   if (!(await chatReady())) return { autoReplyPct: null, referralPct: null, thumbsDown: null };
-  const r = await db.execute<{ ai: string; staff: string; ai_convs: string; flagged: string }>(sql`
+  const r = await db.execute<{ ai: string; staff: string; ai_convs: string; flagged: string; down: string | null }>(sql`
     select
       count(*) filter (where sender_type = 'ai' and kind = 'text') as ai,
       count(*) filter (where sender_type = 'staff' and kind = 'text') as staff,
       count(distinct conversation_id) filter (where sender_type = 'ai') as ai_convs,
-      (select count(distinct conversation_id) from conversation_flags where ${inWin("created_at", w)}) as flagged
+      (select count(distinct conversation_id) from conversation_flags where ${inWin("created_at", w)}) as flagged,
+      ${(await aiReady()) ? sql`(select count(*) from ai_feedback where value = 'down' and source = 'customer' and ${inWin("created_at", w)})` : sql`null`} as down
     from chat_messages where ${inWin("created_at", w)}`);
   const x = r.rows[0];
   const replies = n(x.ai) + n(x.staff);
   return {
     autoReplyPct: replies ? Math.round((n(x.ai) / replies) * 100) : null,
     referralPct: n(x.ai_convs) ? Math.round((n(x.flagged) / n(x.ai_convs)) * 100) : null,
-    // 👎 هنوز جایی ثبت نمی‌شود (بعد از ساخت بازخورد پاسخ AI)
-    thumbsDown: null as number | null,
+    // 👎 مشتری زیر جواب‌های دستیار (ai_feedback؛ migration ۰۰۱۰)
+    thumbsDown: x.down === null ? null : n(x.down),
   };
 }
 
