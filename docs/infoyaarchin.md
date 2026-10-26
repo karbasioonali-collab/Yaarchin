@@ -1433,3 +1433,30 @@ web/                  سایت و پنل ادمین (Next.js 16، App Router، T
 - **`isEnabled("ai_agent")`** خودش `features.` را اضافه می‌کند (بخش ۲۸).
 - **ارتقای امن سوئیچ با seed:** «یک بار خاموش کردن» با شرط `updated_by is null` است؛ یعنی هر تغییر دستی ادمین در پنل (که `updated_by` را پر می‌کند) با seedهای بعدی دست نمی‌خورد.
 - **لاگ درخواست** برای تصمیم‌های بدون مدل هم ثبت می‌شود (`model` خالی). شمارش «درخواست روزانه» فقط ردیف‌های دارای `model` را می‌شمارد. «پیام مشتری در ۲۴ ساعت» همه‌ی ردیف‌های گفتگو را می‌شمارد.
+
+## ۳۰. ارتقای امنیتی Next.js به 16.4.3 (2026-10-26، بدون migration)
+- **چرا:** لیارا هشدار داد. نسخه‌های 16.0.0 تا 16.4.0 آسیب‌پذیر هستند و `npm audit` آن را **critical** نشان می‌داد، از جمله:
+  - RCE در Image Optimization با SVG؛
+  - RCE در `use cache`؛
+  - DoS در Server Actions؛
+  - cache poisoning.
+- **قبل:** `next` و `eslint-config-next` روی 16.3.6. **بعد:** هر دو روی **16.4.3** (آخرین نسخه‌ی پایدار شاخه‌ی 16)، با نسخه‌ی دقیق (`--save-exact`، بدون `^`).
+  - React، TypeScript و ESLint دست نخوردند.
+  - تغییر ناسازگاری در کد ما نبود: typecheck، lint، build و همه‌ی تست‌ها بدون تغییر کد رد شدند.
+- **چطور نسخه‌ی واقعی را ببینیم:**
+  - نسخه‌ای که واقعاً نصب و deploy می‌شود، نسخه‌ی lock file است (`node -e 'console.log(require("./package-lock.json").packages["node_modules/next"].version)'` در `web`).
+  - در خروجی build هم خط `▲ Next.js 16.4.3` آمده است.
+  - برای دیدن آسیب‌پذیری‌ها: `npm audit` در `web`. `--omit=dev` فقط پکیج‌های اجرای سرور را نشان می‌دهد.
+- **دستور ارتقا:** `npm install --include=dev --save-exact next@<نسخه> eslint-config-next@<نسخه>`.
+  - `--include=dev` لازم است، چون `web/.npmrc` گزینه‌ی `omit=dev` دارد و بدون آن پکیج‌های توسعه از `node_modules` حذف می‌شوند (بخش ۱۲).
+  - `eslint-config-next` همیشه هم‌نسخه‌ی `next` نگه داشته شود.
+- **sharp هم بالا رفت (فقط در lock):** Next.js 16.4.3 خودش `sharp ^0.35.5` را به‌عنوان وابستگی اختیاری می‌خواهد. npm هم نسخه‌ی خود ما را (بازه‌ی `^0.35.4` در `package.json`، که دست نخورد) از 0.35.4 به 0.35.5 برد تا یک نسخه بماند.
+  - این کار آسیب‌پذیری high جداگانه‌ی sharp (librsvg) را هم برطرف کرد.
+  - تغییرهای lock فقط این‌ها بود: `next`، `@next/*`، `eslint-config-next`، `sharp` و `@img/sharp-*`. بعد از هر ارتقا همین را با `git diff package-lock.json` بررسی کنید.
+- **زمان build** (محلی، `next build` کامل): حدود ۲۳ ثانیه قبل و ۱۷ تا ۱۸ ثانیه بعد. standalone حدود ۶۳ مگابایت. با سقف ۵ دقیقه‌ی لیارا (بخش ۱۲) مشکلی نیست.
+  - ۴ هشدار `Dynamic filesystem access causes tracing of the whole project` (از `src/lib/media/store.ts`، حالت آزمایشی ذخیره روی دیسک) قبل از ارتقا هم بود و تازه نیست.
+- **تست‌هایی که اجرا شد:** typecheck، lint، build همراه `verify-standalone`، تست واحد (۴۷)، e2e قبل از migrate (۱۳)، e2e دستیار در حالت آزمایشی (۲۱) و زنده (۶۷)، و باز شدن صفحه‌های اصلی سایت.
+- **کار آینده — `source-map-js` (کم‌خطر):** `npm audit` هنوز یک مورد high نشان می‌دهد: `source-map-js` 1.2.1 (DoS با source-map دست‌کاری‌شده، GHSA-68fv-2mgg-jv7q).
+  - این پکیج زیرمجموعه‌ی `postcss` داخل خود Next.js است و فقط **موقع build** روی CSS خود ما اجرا می‌شود، نه روی ورودی کاربر در سرور. پس خطرش عملاً صفر است.
+  - رفع: یا ارتقای بعدی Next.js که postcss تازه‌تری بیاورد، یا `npm audit fix` (فقط lock) در یک PR جدا. بعد از رفع، build و تست‌ها دوباره اجرا شوند.
+- **نکته‌ی محیط توسعه:** بعد از ری‌استارت سندباکس، Postgres محلی ممکن است خاموش باشد (`Connection refused`). داده‌ها می‌مانند و `service postgresql start` کافی است.
