@@ -13,11 +13,17 @@ import { assignableStaff, getConversation, markRead, messagesOf } from "@/lib/ch
 import { chatReady, followupReady } from "@/lib/db-ready";
 import { INQUIRY_STATUS_FA, shortId } from "@/lib/followup/service";
 import { InquiryForm } from "./InquiryForm";
-import { fmtDateTime } from "@/lib/format";
+import { fmtDateTime, fmtNum } from "@/lib/format";
 import styles from "../../panel.module.css";
 import c from "../chats.module.css";
-import { assignAction, statusAction } from "../actions";
+import { aiModeAction, assignAction, resolveFlagAction, statusAction } from "../actions";
 import { StaffThread } from "./StaffThread";
+import { aiStatus, getState } from "@/lib/ai/state";
+import { aiLimits } from "@/lib/ai/usage";
+import { HANDOFF_FA } from "@/lib/ai/rules";
+
+const SILENCE_FA: Record<string, string> = { staff_reply: "کارشناس پیام داد", assigned: "ارجاع به کارشناس", manual: "واگذاری دستی به کارشناس" };
+const silenceFa = (r: string) => (r.startsWith("handoff:") ? `ارجاع دستیار: ${HANDOFF_FA[r.slice(8)] ?? r.slice(8)}` : (SILENCE_FA[r] ?? r));
 
 export const metadata: Metadata = { title: "گفتگو" };
 
@@ -48,6 +54,8 @@ export default async function ChatPage({ params }: PageProps<"/admin/chats/[id]"
     can(a.user, "customers.view"),
   ]);
   await markRead(conv.id, a.user.id, msgs.at(-1)?.id ?? 0);
+  // دستیار هوشمند (migration ۰۰۱۰؛ docs/infoyaarchin.md بخش ۲۹)
+  const [aiState, aiMode, aiLimitsNow] = await Promise.all([getState(conv.id), aiStatus(), aiLimits()]);
   // درخواست‌های این گفتگو (پیگیری کارخانه‌ها، migration ۰۰۰۷). ساخت: کارشناس ارجاع‌گرفته یا کسی که ارجاع می‌دهد.
   const followup = await followupReady();
   const manageInquiry = followup && (access.assign || canReply(access, { ...conv, status: "open" }));
@@ -193,6 +201,36 @@ export default async function ChatPage({ params }: PageProps<"/admin/chats/[id]"
             </div>
           )}
 
+          {aiState && (
+            <div className={styles.card}>
+              <h2 className={styles.cardTitle}>دستیار هوشمند</h2>
+              <p style={{ margin: "0 0 6px" }}>
+                {aiState.mode === "ai" ? (
+                  <span className={styles.badge}>{aiMode === "live" ? "دستیار جواب می‌دهد" : aiMode === "test" ? "حالت آزمایشی (فقط داخلی)" : "دستیار خاموش است"}</span>
+                ) : (
+                  <span className={`${styles.badge} ${styles.badgeMuted}`}>ساکت (با کارشناس)</span>
+                )}{" "}
+                <span className={styles.muted} style={{ fontSize: 13 }}>
+                  {fmtNum(aiState.replies)} جواب از سقف {fmtNum(aiLimitsNow.maxRepliesPerChat)}
+                </span>
+              </p>
+              {aiState.mode === "human" && aiState.silencedReason && (
+                <p className={styles.muted} style={{ fontSize: 13, margin: "0 0 6px" }}>
+                  دلیل: {silenceFa(aiState.silencedReason)} · {fmtDateTime(aiState.silencedAt)}
+                </p>
+              )}
+              {canChangeStatus(access, conv) && (
+                <form action={aiModeAction}>
+                  <input type="hidden" name="conversationId" value={conv.id} />
+                  <input type="hidden" name="to" value={aiState.mode === "ai" ? "human" : "ai"} />
+                  <button type="submit" className={styles.btnGhost} disabled={aiState.mode === "human" && !!conv.assignedTo}>
+                    {aiState.mode === "ai" ? "واگذاری به کارشناس (ساکت کردن دستیار)" : "برگرداندن به دستیار"}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
           {flags.length > 0 && (
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>برچسب‌ها</h2>
@@ -203,6 +241,13 @@ export default async function ChatPage({ params }: PageProps<"/admin/chats/[id]"
                   <div className={styles.muted} style={{ fontSize: 12 }}>
                     {fmtDateTime(fl.createdAt)}
                   </div>
+                  <form action={resolveFlagAction} style={{ marginTop: 4 }}>
+                    <input type="hidden" name="flagId" value={fl.id} />
+                    <input type="hidden" name="conversationId" value={conv.id} />
+                    <button type="submit" className={styles.btnGhost}>
+                      بررسی شد، برداشتن برچسب
+                    </button>
+                  </form>
                 </div>
               ))}
             </div>

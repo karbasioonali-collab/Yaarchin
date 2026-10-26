@@ -12,6 +12,8 @@ import { after } from "next/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db/client";
 import { products } from "@/db/schema";
+import { onCustomerMessage } from "@/lib/ai/agent";
+import { aiStatus } from "@/lib/ai/state";
 import { alertNewChat } from "./alerts";
 import type { CustomerPostResult } from "./service";
 
@@ -23,6 +25,20 @@ export async function chatCustomerGuard(req: Request, opts: { json: boolean }): 
   if (!isCustomer(a.user)) return { res: apiError(403, "customers_only", "گفتگو مخصوص حساب مشتری است. کارشناسان از پنل («گفتگوها») پاسخ می‌دهند.") };
   if (!(await chatReady())) return { res: comingSoon() };
   return { a };
+}
+
+// بعد از هر پیام مشتری: دستیار هوشمند (lib/ai/agent.ts) اگر زنده است جواب می‌دهد؛ وگرنه (یا در حالت آزمایشی) هشدار پیامکی مثل قبل.
+export async function afterCustomerPost(r: CustomerPostResult, customerName: string): Promise<void> {
+  const ai = await onCustomerMessage(r).catch((e) => {
+    console.error("ai onCustomerMessage failed", e);
+    return { handled: false };
+  });
+  if (!ai.handled) await queueNewChatAlert(r, customerName);
+}
+
+// پیام خودکار وقتی دستیار زنده است لازم نیست
+export async function autoReplyWanted(): Promise<boolean> {
+  return (await aiStatus()) !== "live";
 }
 
 // گفتگو تازه به صف «ارجاع‌نشده» آمد ← هشدار پیامکی به کسانی که ارجاع می‌دهند، بعد از فرستادن پاسخ به مشتری (after)

@@ -356,6 +356,12 @@ function publicSpecs(v: unknown): PublicSpec[] {
 
 export async function getProduct(slug: string): Promise<PublicProduct | null> {
   await connection();
+  return loadPublishedProduct(slug);
+}
+
+// همان داده‌ی عمومی صفحه‌ی محصول، بدون connection() (برای کاری که بعد از پاسخ و بیرون از رندر صفحه اجرا می‌شود، مثل دستیار هوشمند).
+// مثل getProduct هیچ اطلاعات کارخانه‌ای ندارد.
+export async function loadPublishedProduct(slug: string): Promise<PublicProduct | null> {
   if (!(await catalogReady())) return null;
   const [p] = await db
     .select({

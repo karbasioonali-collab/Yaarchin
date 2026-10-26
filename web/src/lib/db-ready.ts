@@ -6,8 +6,8 @@ import { db } from "@/db/client";
 // کدام migrationها روی دیتابیس فعلی اجرا شده‌اند؟ (یک کوئری سبک در هر درخواست)
 // روی لیارا فایل migration همراه کد جدید می‌رسد، پس npm run db:migrate فقط «بعد» از استقرار کد جدید قابل اجراست.
 // در این فاصله کد جدید نباید به جدول یا ستونی که هنوز نیست دست بزند (docs/infoyaarchin.md بخش ۱۵ و ۱۶).
-const schemaState = cache(async (): Promise<{ catalog: boolean; importScore: boolean; customer: boolean; catalogAdmin: boolean; rates: boolean; chat: boolean; followup: boolean; media: boolean; reports: boolean }> => {
-  const r = await db.execute<{ catalog: boolean; import_score: boolean; customer: boolean; catalog_admin: boolean; rates: boolean; chat: boolean; followup: boolean; media: boolean; reports: boolean }>(sql`
+const schemaState = cache(async (): Promise<{ catalog: boolean; importScore: boolean; customer: boolean; catalogAdmin: boolean; rates: boolean; chat: boolean; followup: boolean; media: boolean; reports: boolean; ai: boolean }> => {
+  const r = await db.execute<{ catalog: boolean; import_score: boolean; customer: boolean; catalog_admin: boolean; rates: boolean; chat: boolean; followup: boolean; media: boolean; reports: boolean; ai: boolean }>(sql`
     select
       (to_regclass('public.site_blocks') is not null and to_regclass('public.price_observations') is not null
         and to_regclass('public.contact_messages') is not null) as catalog,
@@ -27,7 +27,9 @@ const schemaState = cache(async (): Promise<{ catalog: boolean; importScore: boo
       (to_regclass('public.inquiries') is not null and to_regclass('public.inquiry_supplier_events') is not null
         and to_regclass('public.sms_outbox') is not null and to_regclass('public.staff_notification_prefs') is not null) as followup,
       to_regclass('public.media_files') is not null as media,
-      (to_regclass('public.lead_score_rules') is not null and to_regclass('public.customer_signals') is not null) as reports`);
+      (to_regclass('public.lead_score_rules') is not null and to_regclass('public.customer_signals') is not null) as reports,
+      (to_regclass('public.ai_conversation_state') is not null and to_regclass('public.ai_requests') is not null and to_regclass('public.ai_feedback') is not null
+        and to_regclass('public.kb_items') is not null and to_regclass('public.kb_item_versions') is not null) as ai`);
   return {
     catalog: r.rows[0]?.catalog === true,
     importScore: r.rows[0]?.import_score === true,
@@ -38,6 +40,7 @@ const schemaState = cache(async (): Promise<{ catalog: boolean; importScore: boo
     followup: r.rows[0]?.followup === true,
     media: r.rows[0]?.media === true,
     reports: r.rows[0]?.reports === true,
+    ai: r.rows[0]?.ai === true,
   };
 });
 
@@ -67,3 +70,6 @@ export const mediaReady = cache(async () => (await schemaState()).media);
 
 // migration ۰۰۰۹: قانون‌های امتیاز جدیت و نشانه‌های مشتری (گزارش‌ها). قبل از آن گزارش بدون امتیاز جدیت کار می‌کند.
 export const reportsReady = cache(async () => (await schemaState()).reports);
+
+// migration ۰۰۱۰: دستیار هوشمند (وضعیت گفتگو، لاگ درخواست‌ها، بازخورد، پایگاه دانش). قبل از آن دستیار کاملاً خاموش است.
+export const aiReady = cache(async () => (await schemaState()).ai);

@@ -2,13 +2,16 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { canAny } from "@/lib/auth/can";
 import { requireStaff } from "@/lib/auth/current";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, fmtNum } from "@/lib/format";
 import { missingTodayRates } from "@/lib/pricing/admin";
 import { RATE_PERMS } from "@/lib/pricing/labels";
 import { CHAT_PERMS, chatAccess } from "@/lib/chat/access";
 import { chatCounters } from "@/lib/chat/admin";
 import { chatReady } from "@/lib/db-ready";
 import { isEnabled } from "@/lib/settings";
+import { aiReady } from "@/lib/db-ready";
+import { overdueCount } from "@/lib/ai/kb";
+import { costWarning } from "@/lib/ai/usage";
 import { PanelPulse } from "./PanelPulse";
 import { logoutAction } from "../(auth)/actions";
 import { stopImpersonationAction } from "./users/actions";
@@ -24,6 +27,8 @@ const NAV: (NavItem & { permission: string | string[]; feature?: string })[] = [
   { href: "/admin/chats", label: "گفتگوها", permission: CHAT_PERMS, badge: "chats" },
   { href: "/admin/inquiries", label: "درخواست‌های مشتری", permission: ["chats.view_all", "chats.assign"] },
   { href: "/admin/reports", label: "گزارش‌ها", permission: "reports.view", feature: "reports" },
+  { href: "/admin/ai", label: "دستیار هوشمند", permission: "ai.settings" },
+  { href: "/admin/ai/knowledge", label: "پایگاه دانش دستیار", permission: "ai.knowledge" },
   { href: "/admin/roles", label: "نقش‌ها و دسترسی", permission: "roles.manage" },
   { href: "/admin/products", label: "محصولات", permission: ["products.manage", "products.rate"] },
   { href: "/admin/categories", label: "دسته‌بندی‌ها", permission: "categories.manage" },
@@ -48,6 +53,10 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
   const chatCount = chatsOn ? (await chatCounters(await chatAccess(a.user))).total : 0;
   // هشدار «نرخ امروز ثبت نشده» برای هر کسی که بخش نرخ‌ها را می‌بیند (سایت تا آن موقع با آخرین نرخ و تاریخش حساب می‌کند)
   const missingRates = (await canAny(a.user, RATE_PERMS)) ? await missingTodayRates() : [];
+  // دستیار هوشمند: هشدار ۸۰٪ سقف هزینه‌ی روزانه (ai.settings) و موردهای پایگاه دانشِ نیازمند بررسی مجدد (ai.knowledge)
+  const aiOn = await aiReady();
+  const aiCostWarn = aiOn && (await canAny(a.user, ["ai.settings"])) ? await costWarning() : null;
+  const kbOverdue = aiOn && (await canAny(a.user, ["ai.knowledge"])) ? await overdueCount() : 0;
 
   return (
     <div className={styles.shell}>
@@ -93,6 +102,25 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
             </span>
             <Link href="/admin/rates" className={styles.btnGhost}>
               ثبت نرخ
+            </Link>
+          </div>
+        )}
+        {aiCostWarn && (
+          <div className={styles.rateWarn} role="status">
+            <span>
+              دستیار هوشمند امروز {fmtNum(aiCostWarn.pct)}٪ سقف هزینه‌ی روزانه را مصرف کرده ({fmtNum(Math.round(aiCostWarn.cost))} از {fmtNum(aiCostWarn.cap)} تومان). با رسیدن به سقف، تا فردا
+              چت‌ها مستقیم به کارشناس می‌روند.
+            </span>
+            <Link href="/admin/ai" className={styles.btnGhost}>
+              دستیار هوشمند
+            </Link>
+          </div>
+        )}
+        {kbOverdue > 0 && (
+          <div className={styles.rateWarn} role="status">
+            <span>{fmtNum(kbOverdue)} مورد پایگاه دانش دستیار بیش از بازه‌ی تنظیم‌شده بررسی نشده‌اند.</span>
+            <Link href="/admin/ai/knowledge?filter=overdue" className={styles.btnGhost}>
+              فهرست موردها
             </Link>
           </div>
         )}

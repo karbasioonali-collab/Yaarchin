@@ -14,3 +14,10 @@
 .closed { margin: 0; padding: 8px 16px; font-size: 12px; color: var(--orange-dark); background: rgba(255, 122, 0, .06); }
 .loginBox { padding: 16px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; background: var(--bg); }
 .loginBox p { margin: 0; font-size: 14px; }
+
+/* دستیار هوشمند: 👍/👎 زیر هر جواب و «در حال نوشتن…» */
+.rate { display: flex; gap: 4px; margin-top: 4px; }
+.rate button { border: 0; background: transparent; cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 8px; opacity: .55; }
+.rate button:hover { opacity: 1; background: rgba(34, 34, 34, .05); }
+.rate .rated { opacity: 1; background: rgba(47, 125, 92, .12); }
+.typing { opacity: .8; font-style: italic; }

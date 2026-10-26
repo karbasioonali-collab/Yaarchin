@@ -15,10 +15,10 @@ const VISIBLE_MS = 4000;
 const HIDDEN_MS = 20000;
 const time = new Intl.DateTimeFormat("fa-IR", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran" });
 const day = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { dateStyle: "medium", timeZone: "Asia/Tehran" });
-const WHO: Record<CustomerMsg["from"], string> = { me: "شما", staff: "کارشناس یارچین", system: "یارچین", ai: "دستیار یارچین" };
+const WHO: Record<CustomerMsg["from"], string> = { me: "شما", staff: "کارشناس یارچین", system: "یارچین", ai: "دستیار هوشمند یارچین" };
 
 type Status = "open" | "closed";
-type Res = { conversation: { id: string; status: Status } | null; messages: CustomerMsg[]; message?: string };
+type Res = { conversation: { id: string; status: Status } | null; messages: CustomerMsg[]; message?: string; assistantTyping?: boolean };
 
 export function ChatThread({
   conversationId: initialId,
@@ -46,6 +46,9 @@ export function ChatThread({
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [login, setLogin] = useState(false);
+  // دستیار هوشمند در حال نوشتن (از پاسخ polling)، و 👍/👎 هر جواب دستیار
+  const [typing, setTyping] = useState(false);
+  const [rated, setRated] = useState<Record<number, "up" | "down">>({});
   const listRef = useRef<HTMLDivElement>(null);
   const lastId = msgs.at(-1)?.id ?? 0;
   const lastRef = useRef(lastId);
@@ -76,6 +79,7 @@ export function ChatThread({
           const j = (await r.json()) as Res;
           if (!stop) {
             merge(j.messages);
+            setTyping(!!j.assistantTyping);
             if (j.conversation) setStatus(j.conversation.status);
           }
         }
@@ -116,6 +120,7 @@ export function ChatThread({
       if (r.ok && j?.conversation) {
         setText("");
         merge(j.messages);
+        setTyping(!!j.assistantTyping);
         setStatus(j.conversation.status);
         if (!id) {
           setId(j.conversation.id);
@@ -159,11 +164,36 @@ export function ChatThread({
                     {m.body}
                   </div>
                   <div className={styles.time}>{time.format(new Date(m.at))}</div>
+                  {m.rate && id && (
+                    <div className={styles.rate}>
+                      {(["up", "down"] as const).map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          className={rated[m.id] === v ? styles.rated : undefined}
+                          aria-pressed={rated[m.id] === v}
+                          aria-label={v === "up" ? "جواب مفید بود" : "جواب مفید نبود"}
+                          onClick={() => {
+                            setRated((r) => ({ ...r, [m.id]: v }));
+                            void fetch(`/api/v1/chat/${id}/feedback`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messageId: m.id, value: v }) });
+                          }}
+                        >
+                          {v === "up" ? "👍" : "👎"}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
+        {typing && (
+          <div className={`${pa.bubble} ${styles.typing}`} role="status">
+            <div className={styles.who}>{WHO.ai}</div>
+            <div className={styles.body}>در حال نوشتن…</div>
+          </div>
+        )}
       </div>
       {status === "closed" && <p className={styles.closed}>این گفتگو بسته شده؛ با فرستادن پیام تازه دوباره باز می‌شود.</p>}
       <form

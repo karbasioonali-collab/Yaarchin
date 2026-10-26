@@ -159,3 +159,9 @@
 .rowUnread td {
   font-weight: 700;
 }
+
+/* دستیار هوشمند */
+.fromAi { background: rgba(47, 125, 92, .07); border: 1px dashed rgba(47, 125, 92, .35); }
+.wrongBtn { margin-inline-start: auto; border: 0; background: transparent; color: #B3261E; font-size: 12px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+.wrongBtn:hover { background: rgba(179, 38, 30, .08); }
+.wrongDone { color: var(--muted); cursor: default; }

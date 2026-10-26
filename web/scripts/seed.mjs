@@ -1,6 +1,7 @@
 // داده‌ی پایه: نقش‌ها، دسترسی‌ها، اتصال نقش↔دسترسی و تنظیمات پیش‌فرض.
 // قابل اجرای مکرر: فقط موارد نبوده را اضافه می‌کند؛ مقدار تنظیماتی که ادمین عوض کرده دست نمی‌خورد.
 import pg from "pg";
+import { readFileSync } from "node:fs";
 import seed from "../src/db/seed-data.json" with { type: "json" };
 
 const url = process.env.DATABASE_URL;
@@ -92,6 +93,30 @@ try {
          on conflict (key) do nothing`,
         [r.key, r.kind, r.labelFa, r.points, r.cap, r.windowDays, r.sortOrder],
       );
+    }
+  }
+
+  // دستیار هوشمند (migration ۰۰۱۰؛ docs/infoyaarchin.md بخش ۲۹):
+  //  - تنظیم‌های قدیمی «مدل AI برای هر وظیفه» حذف می‌شوند؛ مدل از متغیرهای لیارا (AI_MODEL، …) خوانده می‌شود.
+  //  - سوئیچ features.ai_agent در seedهای قبلی پیش‌فرض «روشن» داشت ولی کاری نمی‌کرد. اگر هیچ‌کس دستی عوضش نکرده
+  //    (updated_by خالی)، یک بار خاموش می‌شود تا وارد کردن کلید لیارا (برای «تست اتصال») دستیار را برای مشتری‌ها روشن نکند.
+  //  - پیش‌نویس‌های پایگاه دانش (kb-drafts.json) فقط اگر پایگاه دانش خالی باشد، با وضعیت «پیش‌نویس» وارد می‌شوند.
+  await client.query(`delete from settings where key like 'ai.task.%'`);
+  const has0010 = (await client.query(`select to_regclass('public.kb_items') is not null as ok`)).rows[0].ok;
+  if (has0010) {
+    await client.query(`update settings set value = 'false'::jsonb where key = 'features.ai_agent' and updated_by is null and value = 'true'::jsonb`);
+    const { rows: kb } = await client.query(`select count(*)::int as n from kb_items`);
+    if (kb[0].n === 0) {
+      const drafts = JSON.parse(readFileSync(new URL("../src/db/kb-drafts.json", import.meta.url), "utf8"));
+      for (const d of drafts) {
+        await client.query(`insert into kb_items (question, answer, variants, category, status) values ($1, $2, $3, $4, 'draft')`, [
+          d.question,
+          d.answer || "[تکمیل شود]",
+          JSON.stringify(d.variants ?? []),
+          d.category ?? null,
+        ]);
+      }
+      console.log(`${drafts.length} پیش‌نویس پایگاه دانش وارد شد (وضعیت «پیش‌نویس»؛ تا فعال نشوند دستیار از آن‌ها استفاده نمی‌کند).`);
     }
   }
 

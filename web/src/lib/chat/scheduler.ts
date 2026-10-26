@@ -6,6 +6,8 @@ import "server-only";
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { siteUrl } from "@/lib/site/url";
+import { sweepStuck } from "@/lib/ai/agent";
+import { aiReady } from "@/lib/db-ready";
 import { runReminders } from "./alerts";
 
 const EVERY_MS = 60_000;
@@ -19,6 +21,8 @@ async function tick() {
       // خارج از درخواست هدری نیست؛ لینک فقط با SITE_URL ساخته می‌شود (docs/liara-setup.md بخش ۱۴)
       const base = siteUrl();
       await runReminders((id) => (base ? `${base}/admin/chats/${id}` : null));
+      // دستیار هوشمند: گفتگوهای «در حال نوشتن» گیرکرده ← کارشناس (lib/ai/agent.ts)
+      if (await aiReady()) await sweepStuck();
     });
   } catch (e) {
     // قبل از migrate یا قطعی کوتاه دیتابیس: فقط لاگ، دور بعد دوباره

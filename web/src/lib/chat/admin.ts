@@ -5,11 +5,13 @@ import { alias } from "drizzle-orm/pg-core";
 import { db } from "@/db/client";
 import { categories, conversations, products, users } from "@/db/schema";
 import { toLatinDigits } from "@/lib/validation";
+import { aiHandledSql } from "@/lib/ai/state";
 import type { ChatAccess } from "./access";
 import { staffUnreadExpr } from "./service";
 
 export type ChatFilters = {
-  tab: "unassigned" | "mine" | "all";
+  // ai = در دست دستیار هوشمند زنده (lib/ai/state.ts)؛ این‌ها در «ارجاع‌نشده» نمی‌آیند تا دستیار ارجاع دهد
+  tab: "unassigned" | "mine" | "all" | "ai";
   expert: string; // uuid | ""
   category: string[]; // شناسه‌های دسته و زیرشاخه‌ها؛ ["general"] = فقط عمومی
   status: "open" | "closed" | "any";
@@ -24,7 +26,8 @@ export async function listConversations(a: ChatAccess, f: ChatFilters, page: num
   const conds: SQL[] = [];
   // کسی که همه را نمی‌بیند (فقط chats.reply) فقط گفتگوهای ارجاع‌شده به خودش را می‌بیند، هر فیلتری که بدهد
   if (!a.viewAll || f.tab === "mine") conds.push(eq(conversations.assignedTo, a.userId));
-  else if (f.tab === "unassigned") conds.push(isNull(conversations.assignedTo));
+  else if (f.tab === "unassigned") conds.push(isNull(conversations.assignedTo), sql`not ${await aiHandledSql(conversations.id)}`);
+  else if (f.tab === "ai") conds.push(await aiHandledSql(conversations.id));
   if (f.expert && a.viewAll) conds.push(eq(conversations.assignedTo, f.expert));
   if (f.status !== "any") conds.push(eq(conversations.status, f.status));
   if (f.category.length === 1 && f.category[0] === "general") conds.push(eq(conversations.kind, "general"));
@@ -84,7 +87,7 @@ export async function chatCounters(a: ChatAccess): Promise<{ mine: number; unass
   const [r] = await db
     .select({
       mine: sql<number>`coalesce(sum(case when ${conversations.assignedTo} = ${a.userId} then ${staffUnreadExpr(a.userId)} else 0 end), 0)::int`,
-      unassigned: sql<number>`count(*) filter (where ${conversations.assignedTo} is null)::int`,
+      unassigned: sql<number>`count(*) filter (where ${conversations.assignedTo} is null and not ${await aiHandledSql(conversations.id)})::int`,
     })
     .from(conversations)
     .where(eq(conversations.status, "open"));
@@ -106,6 +109,7 @@ export async function pulseEvents(a: ChatAccess, cursor: number): Promise<{ curs
   const r = await db.execute<{ id: number; conversation_id: string; type: PulseEvent["type"]; who: string | null; body: string }>(sql`
     select m.id, m.conversation_id, m.body,
       case
+        when m.kind = 'event' and m.meta->>'event' = 'ai_handoff' then 'new_chat'
         when m.kind = 'event' then 'assigned_to_me'
         when not exists (select 1 from chat_messages p where p.conversation_id = m.conversation_id and p.id < m.id) then 'new_chat'
         else 'new_message'
@@ -117,8 +121,9 @@ export async function pulseEvents(a: ChatAccess, cursor: number): Promise<{ curs
     where m.id > ${cursor} and m.id <= ${latest} and (
       (m.kind = 'event' and m.meta->>'event' = 'assign' and m.meta->>'to' = ${a.userId} and m.meta->>'by' <> ${a.userId})
       or (m.sender_type = 'customer' and c.assigned_to = ${a.userId})
-      or (${a.assign} and m.sender_type = 'customer' and c.assigned_to is null
+      or (${a.assign} and m.sender_type = 'customer' and c.assigned_to is null and not ${await aiHandledSql(sql`c.id`)}
           and not exists (select 1 from chat_messages p where p.conversation_id = m.conversation_id and p.id < m.id))
+      or (${a.assign} and m.kind = 'event' and m.meta->>'event' = 'ai_handoff' and not coalesce((m.meta->>'test')::boolean, false) and c.assigned_to is null)
     )
     order by m.id limit 20`);
   const events = r.rows.map((x) => ({

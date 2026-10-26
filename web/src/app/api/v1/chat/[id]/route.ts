@@ -1,5 +1,6 @@
 import { apiError, apiJson } from "@/lib/api";
-import { chatCustomerGuard, queueNewChatAlert } from "@/lib/chat/customer-api";
+import { afterCustomerPost, autoReplyWanted, chatCustomerGuard } from "@/lib/chat/customer-api";
+import { assistantTyping } from "@/lib/ai/state";
 import { toCustomerMsg } from "@/lib/chat/dto";
 import { cleanBody, customerRateLimited, getConversation, markRead, messagesOf, postCustomerMessage } from "@/lib/chat/service";
 
@@ -16,7 +17,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/v1/chat/[id]">) 
   const after = Math.max(0, Math.floor(Number(sp.get("after")) || 0));
   const msgs = await messagesOf(conv.id, { afterId: after || undefined, forCustomer: true });
   if (sp.get("read") === "1") await markRead(conv.id, g.a.user.id, msgs.at(-1)?.id ?? 0);
-  return apiJson({ conversation: { id: conv.id, status: conv.status }, messages: msgs.map(toCustomerMsg) });
+  return apiJson({ conversation: { id: conv.id, status: conv.status }, messages: msgs.map(toCustomerMsg), assistantTyping: await assistantTyping(conv.id) });
 }
 
 export async function POST(req: Request, ctx: RouteContext<"/api/v1/chat/[id]">) {
@@ -27,11 +28,12 @@ export async function POST(req: Request, ctx: RouteContext<"/api/v1/chat/[id]">)
   if (!body) return apiError(400, "empty", "پیام خالی است.");
   const limited = await customerRateLimited(g.a.user.id, false);
   if (limited) return apiError(429, "rate_limited", limited);
-  const r = await postCustomerMessage({ customerId: g.a.user.id, body, conversationId: (await ctx.params).id });
+  const r = await postCustomerMessage({ customerId: g.a.user.id, body, conversationId: (await ctx.params).id, autoReply: await autoReplyWanted() });
   if ("error" in r) return apiError(404, "not_found", "گفتگو پیدا نشد.");
-  await queueNewChatAlert(r, g.a.user.fullName);
+  await afterCustomerPost(r, g.a.user.fullName);
   return apiJson({
     conversation: { id: r.conversation.id, status: r.conversation.status },
     messages: [r.message, ...(r.autoReply ? [r.autoReply] : [])].map((m) => toCustomerMsg(m)),
+    assistantTyping: await assistantTyping(r.conversation.id),
   });
 }
