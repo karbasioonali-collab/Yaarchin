@@ -1,7 +1,7 @@
 // تست واحد دستیار هوشمند (محافظ خروجی، قاعده‌های ارجاع، تعداد، جستجوی پایگاه دانش، خواندن جواب مدل).
 // اجرا (از پوشه‌ی web): node --experimental-strip-types tests/unit/ai.test.mjs   — docs/infoyaarchin.md بخش ۲۹.
 import { checkOutput } from "../../src/lib/ai/guard.ts";
-import { extractQty, preRule } from "../../src/lib/ai/rules.ts";
+import { extractQty, pleasantry, preRule } from "../../src/lib/ai/rules.ts";
 import { compact, normFa } from "../../src/lib/ai/normalize.ts";
 import { scoreKb } from "../../src/lib/ai/kb-score.ts";
 import { parseDecision } from "../../src/lib/ai/decision.ts";
@@ -90,6 +90,44 @@ ok(parseDecision('{"answer":"سلام","source":"general","handoff":null}')?.sou
 ok(parseDecision('```json\n{"answer":"x","source":"product","handoff":null}\n```')?.answer === "x", "decision in code fence");
 ok(parseDecision('{"answer":"","source":"none","handoff":{"reason":"no_source","note":"n"}}')?.handoff?.reason === "no_source", "decision handoff");
 ok(parseDecision("متن آزاد بدون JSON") === null && parseDecision('{"answer":"x","source":"internet"}') === null, "decision rejects bad");
+
+// ---- جواب مدل: قالب‌های رایج (بخش ۳۱)
+const D = (t) => parseDecision(t);
+ok(D('حتماً! این جواب:\n```json\n{"answer":"x","source":"general","handoff":null}\n```\nامیدوارم مفید باشد.')?.answer === "x", "decision: prose + fence");
+ok(D('{"answer":"اول","source":"general","handoff":null} و بعد {"answer":"دوم","source":"general"}')?.answer === "اول", "decision: first of two objects");
+ok(D('سلام {نه JSON} سپس {"answer":"y","source":"product","handoff":null}')?.answer === "y", "decision: skips non-JSON braces");
+ok(D('{"answer":"آکولاد } داخل { متن","source":"general","handoff":null} پایان }')?.answer === "آکولاد } داخل { متن", "decision: braces inside string");
+ok(D('{"answer":"خط اول\nخط دوم\tتب","source":"general","handoff":null}')?.answer === "خط اول\nخط دوم\tتب", "decision: raw newline/tab inside string");
+ok(
+  D('{"reply":"z","source":"Knowledge","handoff":"null"}')?.answer === "z" && D('{"reply":"z","source":"Knowledge","handoff":"null"}')?.handoff === null,
+  'decision: alias field, case, handoff "null"',
+);
+ok(D('{"answer":"","source":"none","handoff":"proforma"}')?.handoff?.reason === "proforma", "decision: handoff as plain reason");
+ok(D('{"answer":"سلام","source":"greeting","handoff":null}') === null, "decision: unknown source still rejected (rules not weakened)");
+ok(D('{"answer":"x"}') === null && D("[]") === null && D("") === null && D('{"answer": 5, "source": "general"}') === null, "decision: missing/invalid fields rejected");
+
+// ---- احوال‌پرسی، تشکر، خداحافظی (جواب آماده)
+for (const t of [
+  "سلام",
+  "سلام!",
+  "سلااام 🌹",
+  "سلام وقت بخیر",
+  "سلام، وقتتون به خیر",
+  "درود",
+  "صبح بخیر",
+  "سلام علیکم",
+  "خسته نباشید",
+  "سلام خوبید؟",
+  "hi",
+  "Hello!",
+  "سلام حالتون خوبه؟",
+])
+  ok(pleasantry(t) === "greeting", `pleasantry greeting: ${t}`);
+for (const t of ["ممنون", "مرسی 🙏", "خیلی ممنون", "سپاس", "متشکرم", "دستتون درد نکنه", "thanks", "باشه ممنونم", "سلام ممنون"])
+  ok(pleasantry(t) === "thanks", `pleasantry thanks: ${t}`);
+for (const t of ["خداحافظ", "خدانگهدار", "ممنون خداحافظ", "bye", "روز خوش"]) ok(pleasantry(t) === "bye", `pleasantry bye: ${t}`);
+for (const t of ["سلام، قیمتش چنده؟", "سلام حداقل سفارش؟", "ممنون، برای ۵۰۰ تا چقدر میشه؟", "سلام کارشناس می‌خوام", "سلام پیش فاکتور", "شما؟", "؟", "", "سلام ".repeat(30)])
+  ok(pleasantry(t) === null, `not pleasantry: ${t.slice(0, 30) || "(empty)"}`);
 
 console.log(`${n} checks${fails ? `, ${fails} FAILED` : ", ALL PASSED"}`);
 process.exitCode = fails ? 1 : 0;

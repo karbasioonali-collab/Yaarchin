@@ -20,4 +20,4 @@ export function toStaffMsg(m: Row): StaffMsg {
 }
 
 export const SENDER_FA: Record<SenderType, string> = { customer: "مشتری", staff: "کارشناس", system: "سیستم", ai: "دستیار هوشمند یارچین" };
-export const AI_SOURCE_FA: Record<string, string> = { product: "از اطلاعات محصول", calculator: "از ماشین‌حساب", knowledge: "از پایگاه دانش", general: "پاسخ عمومی", handoff: "ارجاع به کارشناس", rule: "قاعده‌ی ثابت" };
+export const AI_SOURCE_FA: Record<string, string> = { product: "از اطلاعات محصول", calculator: "از ماشین‌حساب", knowledge: "از پایگاه دانش", general: "پاسخ عمومی", handoff: "ارجاع به کارشناس", rule: "قاعده‌ی ثابت", canned: "جواب آماده" };

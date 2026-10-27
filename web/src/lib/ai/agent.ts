@@ -23,10 +23,11 @@ import { fakeModel } from "./fake";
 import { checkOutput, GUARD_REPLACEMENT } from "./guard";
 import { blacklistTerms } from "./guard-terms";
 import { BusyError, withSlot } from "./limiter";
-import { type Decision, parseDecision } from "./decision";
+import { type Decision, FORMAT_REMINDER, parseDecision } from "./decision";
 import { normFa } from "./normalize";
 import { LANDED_TOOL, PROMPT_VERSION, SYSTEM_PROMPT } from "./prompt";
-import { HANDOFF_FA, preRule } from "./rules";
+import { cannedReply } from "./canned";
+import { HANDOFF_FA, pleasantry, preRule } from "./rules";
 import { addReply, aiStatus, ensureState, getState, resume, setThinking, silence } from "./state";
 import { aiLimits, customerMessages24h, todayUsage } from "./usage";
 
@@ -100,6 +101,15 @@ export async function runAgent(c: RunCtx): Promise<void> {
       .returning({ id: aiRequests.id })
       .then((x) => x[0].id);
 
+  // احوال‌پرسی، تشکر یا خداحافظی خالی ← جواب آماده (بدون مدل، هزینه صفر، خارج از سقف‌ها و شمارش جواب‌ها). بخش ۳۱.
+  const kind = pleasantry(msg.body);
+  if (kind) {
+    const reqId = await rec("ok", "pleasantry", { meta: { kind } });
+    const m = await postAi(c, await cannedReply(kind, conv.productId), { source: "canned", kind, requestId: reqId });
+    await db.update(aiRequests).set({ replyMessageId: m.id }).where(eq(aiRequests.id, reqId));
+    return void (await setThinking(c.conversationId, false));
+  }
+
   // سقف‌ها
   if (state.replies >= limits.maxRepliesPerChat) return handoff(c, "long_chat", null, await rec("handoff", "long_chat"));
   if ((await customerMessages24h(conv.customerId)) >= limits.customerDailyMessages) return handoff(c, "customer_cap", null, await rec("handoff", "customer_cap"));
@@ -128,11 +138,13 @@ export async function runAgent(c: RunCtx): Promise<void> {
   let modelUsed: string | null = null;
   let fallbackUsed = 0;
   let decision: Decision | null = null;
+  let raws: string[] = [];
   try {
     const out = await withSlot(() => converse(c.mode, site, conv.id, msg.id, msg.body));
     usage = out.usage;
     modelUsed = out.model;
     fallbackUsed = out.fallbackUsed;
+    raws = out.raws;
     decision = parseDecision(out.content);
   } catch (e) {
     const kind = e instanceof BusyError ? "busy" : "error";
@@ -148,7 +160,13 @@ export async function runAgent(c: RunCtx): Promise<void> {
     promptTokens: usage.promptTokens,
     completionTokens: usage.completionTokens,
     costToman: String(usage.costToman),
-    meta: { promptVersion: PROMPT_VERSION, kb: site.kb.map((k) => k.id), products: site.products.map((p) => p.slug) },
+    meta: {
+      promptVersion: PROMPT_VERSION,
+      kb: site.kb.map((k) => k.id),
+      products: site.products.map((p) => p.slug),
+      // خروجی خام مدل وقتی قالبش نادرست بود (برای «آخرین درخواست‌ها» در پنل)؛ retry = یک بار با یادآوری قالب دوباره پرسیده شد
+      ...(raws.length > 1 || !decision ? { retry: raws.length > 1 ? 1 : 0, raw: raws.map((r) => r.slice(0, 2000)) } : {}),
+    },
   };
   if (!decision) return handoff(c, "parse", null, await rec("parse_error", "parse", base));
   if (decision.handoff || decision.source === "none" || !decision.answer.trim()) {
@@ -172,6 +190,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
 }
 
 // گفتگو با مدل (یا مدل ساختگی) با حداکثر دو دور ابزار ماشین‌حساب؛ اگر مدل اصلی خطا داد یا جواب نداد، یک بار مدل پشتیبان.
+// اگر جواب نهایی قالب JSON درست نداشت، یک بار با یادآوری قالب (FORMAT_REMINDER) دوباره پرسیده می‌شود. raws = متن خام هر جواب نهایی.
 async function converse(mode: Mode, site: SiteContext, conversationId: string, messageId: number, text: string) {
   const history = await historyOf(conversationId, messageId);
   const prior = history.slice(0, -1);
@@ -190,7 +209,9 @@ async function converse(mode: Mode, site: SiteContext, conversationId: string, m
     const msgs = [...messages];
     let usage: Usage = ZERO_USAGE;
     let useTools = true;
-    for (let round = 0; ; round++) {
+    let toolRounds = 0;
+    const raws: string[] = [];
+    for (;;) {
       let r: ModelReply;
       try {
         r = await call(which, msgs, useTools);
@@ -203,7 +224,8 @@ async function converse(mode: Mode, site: SiteContext, conversationId: string, m
         throw e;
       }
       usage = addUsage(usage, r.usage);
-      if (r.toolCalls.length && round < MAX_TOOL_ROUNDS) {
+      if (r.toolCalls.length && toolRounds < MAX_TOOL_ROUNDS) {
+        toolRounds++;
         msgs.push({ role: "assistant", content: r.content ?? null, tool_calls: r.toolCalls });
         for (const tc of r.toolCalls) {
           let args: Record<string, unknown> = {};
@@ -215,7 +237,14 @@ async function converse(mode: Mode, site: SiteContext, conversationId: string, m
         }
         continue;
       }
-      return { content: r.content ?? "", usage, model: r.model };
+      const content = r.content ?? "";
+      raws.push(content);
+      // قالب نادرست ← یک بار یادآوری. (ابزار در درخواست می‌ماند: Claude درخواستی را که در تاریخچه‌اش tool call هست ولی tools ندارد رد می‌کند.)
+      if (raws.length === 1 && !parseDecision(content)) {
+        msgs.push({ role: "assistant", content: content.trim() || "(خالی)" }, { role: "user", content: FORMAT_REMINDER });
+        continue;
+      }
+      return { content, usage, model: r.model, raws };
     }
   };
   try {

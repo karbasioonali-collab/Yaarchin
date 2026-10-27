@@ -4,7 +4,7 @@ import "server-only";
 // کلمه‌های تست (فقط برای آزمودن مسیرها؛ در پیام مشتری بنویسید):
 //   [[leak]]    ← جوابی با اسم یک کارخانه‌ی ثبت‌شده (باید محافظ جلویش را بگیرد)
 //   [[timeout]] ← مدل اصلی جواب نمی‌دهد (مسیر مدل پشتیبان)؛ [[down]] ← هر دو مدل خطا ← ارجاع
-//   [[badjson]] ← جواب غیر JSON ← ارجاع
+//   [[badjson]] ← جواب غیر JSON (حتی بعد از یادآوری قالب) ← ارجاع؛ [[badjson1]] ← فقط بار اول غیر JSON (مسیر تلاش دوباره)
 // docs/infoyaarchin.md بخش ۲۹.
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -25,12 +25,15 @@ const reply = (content: string | null, toolCalls: ToolCall[] = []): ModelReply =
 const json = (o: unknown) => reply(JSON.stringify(o));
 
 export async function fakeModel(model: "primary" | "fallback", messages: ChatMsg[], ctx: SiteContext): Promise<ModelReply> {
-  const lastUser = [...messages].reverse().find((m) => m.role === "user");
+  // پیام مشتری = آخرین پیام user که «داده‌های سایت» دارد (پیام یادآوری قالب، بعد از آن می‌آید)
+  const lastUser = [...messages].reverse().find((m) => m.role === "user" && m.content.includes("\n---\n"));
   const text = normFa(typeof lastUser?.content === "string" ? (lastUser.content.split("\n---\n").pop() ?? "") : "");
+  const retried = messages.at(-1)?.role === "user" && messages.at(-1) !== lastUser;
   const toolResult = messages.find((m) => m.role === "tool");
   if (text.includes("[[down]]")) throw new AiCallError("http", "مدل ساختگی: خطای ۵۰۰", 500);
   if (text.includes("[[timeout]]") && model === "primary") throw new AiCallError("timeout", "مدل ساختگی: timeout");
   if (text.includes("[[badjson]]")) return reply("این یک جواب غیر JSON است.");
+  if (text.includes("[[badjson1]]") && !retried) return reply("سلام! این بار JSON نیست.");
   if (text.includes("[[leak]]")) {
     const r = await db.execute<{ n: string }>(sql`select name_en as n from companies order by created_at limit 1`);
     const name = r.rows[0]?.n ?? "Sample Factory Co., Ltd";

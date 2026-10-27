@@ -5,6 +5,7 @@ import type { FormState } from "@/components/ui/ActionForm";
 import { logActivity } from "@/lib/activity";
 import { requirePermission } from "@/lib/auth/can";
 import { runConnectionTest, type TestStep } from "@/lib/ai/connection-test";
+import { CANNED_DEFAULTS } from "@/lib/ai/canned";
 import { clearBlacklistCache } from "@/lib/ai/guard-terms";
 import { type KbInput, markReviewed, saveKb } from "@/lib/ai/kb";
 import { aiReady } from "@/lib/db-ready";
@@ -79,6 +80,46 @@ export async function saveBlacklistAction(_prev: FormState, fd: FormData): Promi
   });
   revalidatePath("/admin/ai");
   return { ok: `ذخیره شد (${list.length.toLocaleString("fa-IR")} کلمه).` };
+}
+
+// جواب‌های آماده‌ی احوال‌پرسی، تشکر و خداحافظی (docs/infoyaarchin.md بخش ۳۱). خالی = متن پیش‌فرض.
+const CANNED_FORM: [keyof typeof CANNED_DEFAULTS, string][] = [
+  ["ai.reply_greeting_product", "greetingProduct"],
+  ["ai.reply_greeting_general", "greetingGeneral"],
+  ["ai.reply_thanks", "thanks"],
+  ["ai.reply_bye", "bye"],
+];
+
+export async function saveCannedAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("ai.settings");
+  const values = CANNED_FORM.map(
+    ([key, field]) =>
+      [
+        key,
+        String(fd.get(field) ?? "")
+          .trim()
+          .slice(0, 600) || CANNED_DEFAULTS[key],
+      ] as const,
+  );
+  try {
+    for (const [key, v] of values) {
+      const { before } = await setSetting(key, v, a.user.id);
+      if (before !== v)
+        await logActivity({
+          actorUserId: a.user.id,
+          actingAsUserId: a.session.impersonatingUserId,
+          action: "setting.update",
+          entityType: "setting",
+          entityId: key,
+          before: { value: before },
+          after: { value: v },
+        });
+    }
+  } catch {
+    return { error: "این تنظیم‌ها هنوز در دیتابیس نیستند؛ اول در کنسول لیارا npm run db:seed را اجرا کنید." };
+  }
+  revalidatePath("/admin/ai");
+  return { ok: "ذخیره شد." };
 }
 
 export async function connectionTestAction(): Promise<{ ok: boolean; steps: TestStep[] } | { error: string }> {

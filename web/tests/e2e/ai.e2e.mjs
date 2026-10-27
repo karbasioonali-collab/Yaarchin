@@ -127,6 +127,15 @@ if (!LIVE) {
   await ad.goto(B + `/admin/chats/${a.conv}`);
   ok(await vis(ad.getByText("حالت آزمایشی (فقط داخلی)").or(ad.getByText("ساکت (با کارشناس)"))), "test mode: assistant card on chat page");
   ok((await ad.locator("nav").getByText("در دست دستیار").count()) === 0, "test mode: no assistant tab (only live)");
+  // جواب آماده و تلاش دوباره در حالت آزمایشی (بخش ۳۱)
+  const { p: p4 } = await newCustomer();
+  const g = await say(p4, SLUGS[4], "سلام", { isNew: true });
+  ok(
+    req(g.mid).startsWith("ok|pleasantry||") && lastAi(g.conv).startsWith("[آزمایشی — مشتری نمی‌بیند] سلام") && lastAi(g.conv).endsWith("|false"),
+    "test mode: greeting → internal canned reply",
+  );
+  const r1 = await say(p4, g.conv, "[[badjson1]] رنگش چیه؟");
+  ok(req(r1.mid).startsWith("ok|") && psql(`select meta->>'retry' from ai_requests where message_id=${r1.mid}`) === "1", "test mode: bad format once → retry succeeds");
 } else {
   // ---------- زنده ----------
   // ۱. جواب عادی + نشانگر نوشتن + خارج از صف ارجاع‌نشده + تب «در دست دستیار»
@@ -291,6 +300,74 @@ if (!LIVE) {
     await ad.goto(B + "/admin/ai");
     ok(await vis(ad.getByText("آخرین درخواست‌ها")), "/admin/ai: requests table");
   }
+  // ۱۱٫۵ احوال‌پرسی (جواب آماده، بدون مدل) و قالب‌های مختلف جواب مدل (بخش ۳۱)
+  {
+    const title = psql(`select title_fa from products where slug='${SLUGS[8]}'`);
+    const Q = await newCustomer();
+    const n0 = (await mockLog()).length;
+    const g = await say(Q.p, SLUGS[8], "سلام وقت بخیر 🌹", { isNew: true });
+    ok(req(g.mid) === "ok|pleasantry||0|0.00" && lastAi(g.conv).includes(`«${title}»`) && lastAi(g.conv).endsWith("|true"), "greeting → canned reply with product name, no cost");
+    const t = await say(Q.p, g.conv, "ممنون 🙏");
+    ok(lastAi(t.conv) === "خواهش می‌کنم! اگر سؤال دیگری داشتید، همین‌جا بپرسید.|true", "thanks → canned reply");
+    await say(Q.p, g.conv, "سلام");
+    ok((await mockLog()).length === n0 && st(g.conv) === "ai||0" && flags(g.conv) === "", "pleasantries: no model call, not counted, no repeat flag, no handoff");
+    const cust = await api(Q.p, "GET", `/api/v1/chat/${g.conv}`);
+    ok(
+      cust.j.messages.filter((m) => m.from === "ai").every((m) => !m.rate),
+      "canned replies have no 👍/👎",
+    );
+    const q = await say(Q.p, g.conv, "سلام، قیمتش چنده؟");
+    ok((await mockLog()).length > n0 && req(q.mid).startsWith("ok|knowledge|mock/primary"), "greeting + question → model");
+    // متن آماده از پنل
+    await ad.goto(B + "/admin/ai");
+    await ad.locator('textarea[name="greetingProduct"]').fill("درود! درباره‌ی {product} بپرسید.");
+    await ad
+      .locator("form", { has: ad.locator('textarea[name="greetingProduct"]') })
+      .getByRole("button", { name: "ذخیره" })
+      .click();
+    ok(
+      await waitFor(() => psql("select value #>> '{}' from settings where key='ai.reply_greeting_product'") === "درود! درباره‌ی {product} بپرسید."),
+      "canned text saved from panel",
+    );
+    const Q2 = await newCustomer();
+    const g2 = await say(Q2.p, SLUGS[9], "درود", { isNew: true });
+    ok(lastAi(g2.conv) === `درود! درباره‌ی ${psql(`select title_fa from products where slug='${SLUGS[9]}'`)} بپرسید.|true`, "edited canned text used");
+    setS(
+      "ai.reply_greeting_product",
+      "سلام، وقت‌تان بخیر! من دستیار هوشمند یارچین هستم. درباره‌ی «{product}» هر سؤالی دارید بپرسید؛ مثلاً مشخصات، حداقل سفارش، زمان رسیدن یا قیمت تخمینی تا ایران برای تعداد دلخواه.",
+    );
+    // قالب‌ها
+    const F2 = await newCustomer();
+    const f0 = await say(F2.p, SLUGS[0], "[[badjson1]] رنگ‌بندی؟", { isNew: true });
+    const n1 = (await mockLog()).length;
+    ok(
+      req(f0.mid).startsWith("ok|knowledge|mock/primary") && psql(`select meta->>'retry' from ai_requests where message_id=${f0.mid}`) === "1",
+      "bad format once → format reminder → answered",
+    );
+    ok((await mockLog()).at(-1).messages.at(-1).content.includes("قالب درست نداشت"), "retry carries format reminder");
+    const f1 = await say(F2.p, f0.conv, "[[greetsrc]] سلام دوباره؟");
+    ok(req(f1.mid).startsWith("ok|general|"), "unknown source (greeting) → retry → general");
+    const f2 = await say(F2.p, f0.conv, "[[fenced]] سؤال؟");
+    ok(
+      lastAi(f2.conv) === "جواب {داخل} fence.|true" && psql(`select meta->>'retry' from ai_requests where message_id=${f2.mid}`) === "",
+      "```json fence + prose → parsed without retry",
+    );
+    const f3 = await say(F2.p, f0.conv, "[[newline]] سؤال دوم؟");
+    ok(lastAi(f3.conv) === "خط اول\nخط دوم|true", "raw newline inside JSON string → parsed");
+    const f4 = await say(F2.p, f0.conv, "[[badjson]] سؤال سوم؟");
+    ok(
+      req(f4.mid).startsWith("parse_error|parse") &&
+        psql(`select jsonb_array_length(meta->'raw') from ai_requests where message_id=${f4.mid}`) === "2" &&
+        st(f0.conv).startsWith("human|handoff:parse"),
+      "still bad after retry → handoff, both raw outputs stored",
+    );
+    ok(n1 > 0 && psql(`select (cost_toman > 400)::text from ai_requests where message_id=${f4.mid}`) === "true", "retry cost added to request");
+    await ad.goto(B + "/admin/ai");
+    const raw = ad.locator("details", { hasText: "خروجی خام مدل" }).first();
+    await raw.locator("summary").click();
+    ok(await vis(raw.getByText("سلام! این JSON نیست.")), "panel shows raw model output");
+  }
+
   // ۱۲. هیچ داده‌ی کارخانه یا HS code در پیام‌های فرستاده به مدل
   {
     const lg = (await mockLog()).filter((x) => !JSON.stringify(x).includes("[[leak"));
