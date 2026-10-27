@@ -7,11 +7,9 @@ import { db } from "@/db/client";
 import { chatMessages, products } from "@/db/schema";
 import { loadPublishedProduct } from "@/lib/catalog/public";
 import { clampQty, publicLandedCost, type LandedCost } from "@/lib/pricing/landed";
+import { contextJson, LIMITS, priceIntent, shapeKb, shapeProduct, trimHistory, type LandedCompact } from "./context-shape";
 import { searchKb, type KbHit } from "./kb";
 import { tokens } from "./normalize";
-
-export const HISTORY_MESSAGES = 10;
-export const HISTORY_CHARS = 800;
 
 export type ProductCtx = {
   slug: string;
@@ -25,7 +23,7 @@ export type ProductCtx = {
   landedAtMoq: ReturnType<typeof compactLanded>;
 };
 
-export function compactLanded(l: LandedCost) {
+export function compactLanded(l: LandedCost): LandedCompact {
   if (l.status !== "ready") return { available: false as const };
   return {
     available: true as const,
@@ -44,8 +42,8 @@ export async function productCtx(slug: string): Promise<ProductCtx | null> {
     slug: p.slug,
     title: p.titleFa,
     summary: p.summaryFa,
-    description: p.descriptionFa ? p.descriptionFa.slice(0, 1500) : null,
-    specs: p.specs.slice(0, 20),
+    description: p.descriptionFa,
+    specs: p.specs,
     moq: p.moqMin,
     leadTimeDays: p.leadTimeDays,
     landedAtMoq: compactLanded(p.landedCost),
@@ -85,38 +83,48 @@ export async function mentionedProducts(text: string, exclude: string | null): P
     .slice(0, 2);
 }
 
-// تاریخچه‌ی گفتگو برای مدل: فقط پیام‌های متنیِ دیده‌شده‌ی مشتری، آخرین ۱۰ تا، هرکدام حداکثر ۸۰۰ نویسه
+// تاریخچه‌ی گفتگو برای مدل: فقط پیام‌های متنیِ دیده‌شده‌ی مشتری؛ سقف تعداد و طول در context-shape.ts (LIMITS)
 export async function historyOf(conversationId: string, uptoId: number): Promise<{ role: "user" | "assistant"; content: string }[]> {
   const rows = await db
     .select({ id: chatMessages.id, senderType: chatMessages.senderType, body: chatMessages.body })
     .from(chatMessages)
     .where(and(eq(chatMessages.conversationId, conversationId), eq(chatMessages.kind, "text"), eq(chatMessages.visibleToCustomer, true), sql`${chatMessages.id} <= ${uptoId}`))
     .orderBy(desc(chatMessages.id))
-    .limit(HISTORY_MESSAGES);
-  return rows
-    .reverse()
-    .filter((r) => r.senderType !== "system")
-    .map((r) => ({ role: r.senderType === "customer" ? ("user" as const) : ("assistant" as const), content: r.body.slice(0, HISTORY_CHARS) }));
+    .limit(LIMITS.historyMessages + 1);
+  return trimHistory(
+    rows
+      .reverse()
+      .filter((r) => r.senderType !== "system")
+      .map((r) => ({ role: r.senderType === "customer" ? ("user" as const) : ("assistant" as const), content: r.body })),
+  );
 }
 
-export type SiteContext = { products: ProductCtx[]; kb: KbHit[] };
+// withPrice: سؤال درباره‌ی قیمت است (قیمت حداقل سفارش فرستاده می‌شود). landedForQty: تعداد در پیام بود ← قیمت تمام‌شده‌ی همان تعداد
+// از قبل در کد حساب می‌شود و در داده‌ها می‌رود (بدون دور دوم مدل با ابزار). بخش ۳۲.
+export type SiteContext = {
+  products: ProductCtx[];
+  kb: KbHit[];
+  withPrice: boolean;
+  landedForQty: { slug: string; qty: number; result: LandedCompact } | null;
+};
 
-export async function buildContext(text: string, convProductId: string | null): Promise<SiteContext> {
+export async function buildContext(text: string, convProductId: string | null, qty: number | null): Promise<SiteContext> {
   const main = await slugOf(convProductId);
   const slugs = [...(main ? [main] : []), ...(await mentionedProducts(text, main))];
-  const [prods, kb] = await Promise.all([Promise.all(slugs.map(productCtx)), searchKb(text, 5)]);
-  return { products: prods.filter((p): p is ProductCtx => !!p), kb };
+  const [prods, kb] = await Promise.all([Promise.all(slugs.map(productCtx)), searchKb(text, LIMITS.kbItems)]);
+  const products = prods.filter((p): p is ProductCtx => !!p);
+  let landedForQty: SiteContext["landedForQty"] = null;
+  if (qty && products[0]) {
+    const r = await runLandedTool({ product_slug: products[0].slug, qty });
+    if (!("error" in r)) landedForQty = { slug: products[0].slug, qty, result: r };
+  }
+  return { products, kb, withPrice: priceIntent(text) || !!landedForQty, landedForQty };
 }
 
 export function contextText(c: SiteContext): string {
-  return JSON.stringify(
-    {
-      products: c.products,
-      knowledge_base: c.kb.map((k) => ({ id: k.id, question: k.question, answer: k.answer })),
-    },
-    null,
-    0,
-  );
+  // قیمت حداقل سفارش وقتی قیمت همان تعداد از قبل حساب شده، تکراری است
+  const withMoqPrice = c.withPrice && !c.landedForQty;
+  return contextJson({ products: c.products.map((p) => shapeProduct(p, withMoqPrice)), kb: shapeKb(c.kb), landedForQty: c.landedForQty });
 }
 
 // اجرای ابزار ماشین‌حساب (فقط محصول منتشرشده)

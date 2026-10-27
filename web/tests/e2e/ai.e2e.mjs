@@ -31,7 +31,9 @@ const COMPANY = psql("select name_en from companies order by created_at limit 1"
 
 let mock;
 if (MODE === "live") {
-  mock = spawn(process.execPath, [new URL("./mock-ai.mjs", import.meta.url).pathname, "3399"], { stdio: "inherit" });
+  // stdout بسته: اگر تست وسط کار بشکند، mock خروجی run-all را باز نگه ندارد؛ با خروج تست هم بسته می‌شود
+  mock = spawn(process.execPath, [new URL("./mock-ai.mjs", import.meta.url).pathname, "3399"], { stdio: ["ignore", "ignore", "inherit"] });
+  process.on("exit", () => mock.kill());
   await sleep(500);
 }
 const mockLog = async () => await (await fetch(MOCK + "/__log")).json();
@@ -162,15 +164,38 @@ if (!LIVE) {
     "👍 replaces 👎 (one vote per message)",
   );
 
-  // ۲. ابزار ماشین‌حساب
+  // ۲. ماشین‌حساب: با تعداد ← قیمت از قبل در داده‌ها و فقط یک درخواست بدون ابزار (بخش ۳۲)
+  const n2 = (await mockLog()).length;
   const a2 = await say(A.p, a1.conv, "[[tool]] برای ۲۰۰ عدد هزینه‌ی تمام‌شده چقدر میشه؟");
-  ok(req(a2.mid).startsWith("ok|calculator|"), `live: tool path → calculator (${req(a2.mid)})`);
+  ok(req(a2.mid).startsWith("ok|calculator|"), `live: qty in message → calculator (${req(a2.mid)})`);
+  const calls2 = (await mockLog()).slice(n2);
   ok(
-    (await mockLog()).some((x) => x.messages.some((m) => m.role === "tool" && m.content.includes("methods"))),
-    "tool result sent back to model",
+    calls2.length === 1 && !calls2[0].tools && calls2[0].messages.at(-1).content.includes("landed_cost_for_requested_qty"),
+    "qty → price precomputed: one model call, no tools sent",
   );
-  ok(lastAi(a2.conv).includes("این قیمت تخمینی است"), "calculator answer shown");
+  ok(psql(`select meta->>'precomputedQty' from ai_requests where message_id=${a2.mid}`) === "200", "precomputed qty logged");
+  ok(lastAi(a2.conv).includes("این قیمت تخمینی است") && /200|۲۰۰/.test(lastAi(a2.conv)), "calculator answer shown");
   ok(st(a1.conv) === "ai||2", `replies counted (${st(a1.conv)})`);
+  // سؤال قیمت بدون تعداد ← ابزار فرستاده می‌شود و مدل صدایش می‌زند (دو درخواست)
+  {
+    const T = await newCustomer();
+    const n3 = (await mockLog()).length;
+    const t1 = await say(T.p, SLUGS[3], "[[tool]] قیمت تمام‌شده‌اش تا ایران چقدره؟", { isNew: true });
+    const calls3 = (await mockLog()).slice(n3);
+    ok(
+      req(t1.mid).startsWith("ok|calculator|") && calls3.length === 2 && !!calls3[0].tools && calls3[1].messages.some((m) => m.role === "tool"),
+      "price without qty → tool sent, tool round (2 calls)",
+    );
+    // سؤال غیرقیمتی ← بدون ابزار؛ دستورالعمل انگلیسی؛ سقف خروجی ۴۰۰؛ داده‌ی فشرده
+    const n4 = (await mockLog()).length;
+    await say(T.p, t1.conv, "[[cached:800]] این دستگاه چند واته؟");
+    const c4 = (await mockLog()).slice(n4)[0];
+    const data = c4.messages.at(-1).content;
+    ok(!c4.tools && c4.max_tokens === 400, "non-price question: no tools, max_tokens 400");
+    ok(c4.messages[0].content.startsWith("You are") && c4.messages[0].content.includes("source:"), "system prompt is English with line format");
+    ok(data.startsWith("SITE DATA") && !data.includes("landedAtMoq") && !data.includes(":null"), "site data: no price block for non-price question, no nulls");
+    ok(psql(`select meta->>'cachedTokens' from ai_requests where conversation_id='${t1.conv}' order by id desc limit 1`) === "800", "cached tokens recorded");
+  }
 
   // ۳. «جواب اشتباه» کارشناس
   await ad.goto(B + `/admin/chats/${a1.conv}`);
@@ -209,7 +234,19 @@ if (!LIVE) {
       "restricted: fixed text + handoff",
     );
   }
+  // سؤال هویت کارخانه با شکل‌های دیگر ← قاعده‌ی کد، بدون مدل (بخش ۳۲)
+  for (const [i, q] of ["سازنده‌اش کیه؟", "از کدوم کارخونه می‌خرید؟", "supplier name please"].entries()) {
+    const C = await newCustomer();
+    const r = await say(C.p, SLUGS[6 + i], q, { isNew: true });
+    ok(st(r.conv).startsWith("human|handoff:restricted"), `supplier identity by rule: ${q}`);
+  }
   ok((await mockLog()).length === before, "rule handoffs never call the model");
+  {
+    // برند خود مشتری ← نه ارجاع، به مدل می‌رود
+    const C = await newCustomer();
+    const r = await say(C.p, SLUGS[9], "میشه اسم برند خودم رو روش چاپ کنید؟", { isNew: true });
+    ok(req(r.mid).startsWith("ok|") && (await mockLog()).length === before + 1, "own-brand printing question → model, not handoff");
+  }
 
   // ۶. محافظ خروجی (اسم کارخانه‌ی ثبت‌شده)
   {
@@ -344,7 +381,7 @@ if (!LIVE) {
       req(f0.mid).startsWith("ok|knowledge|mock/primary") && psql(`select meta->>'retry' from ai_requests where message_id=${f0.mid}`) === "1",
       "bad format once → format reminder → answered",
     );
-    ok((await mockLog()).at(-1).messages.at(-1).content.includes("قالب درست نداشت"), "retry carries format reminder");
+    ok((await mockLog()).at(-1).messages.at(-1).content.includes("did not follow the output format"), "retry carries format reminder");
     const f1 = await say(F2.p, f0.conv, "[[greetsrc]] سلام دوباره؟");
     ok(req(f1.mid).startsWith("ok|general|"), "unknown source (greeting) → retry → general");
     const f2 = await say(F2.p, f0.conv, "[[fenced]] سؤال؟");

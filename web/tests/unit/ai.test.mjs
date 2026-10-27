@@ -4,7 +4,9 @@ import { checkOutput } from "../../src/lib/ai/guard.ts";
 import { extractQty, pleasantry, preRule } from "../../src/lib/ai/rules.ts";
 import { compact, normFa } from "../../src/lib/ai/normalize.ts";
 import { scoreKb } from "../../src/lib/ai/kb-score.ts";
-import { parseDecision } from "../../src/lib/ai/decision.ts";
+import { parseDecision, parseLines } from "../../src/lib/ai/decision.ts";
+import { contextJson, LIMITS, priceIntent, shapeKb, shapeProduct, trimHistory } from "../../src/lib/ai/context-shape.ts";
+import { SYSTEM_PROMPT } from "../../src/lib/ai/prompt.ts";
 
 let fails = 0,
   n = 0;
@@ -128,6 +130,138 @@ for (const t of ["ممنون", "مرسی 🙏", "خیلی ممنون", "سپاس
 for (const t of ["خداحافظ", "خدانگهدار", "ممنون خداحافظ", "bye", "روز خوش"]) ok(pleasantry(t) === "bye", `pleasantry bye: ${t}`);
 for (const t of ["سلام، قیمتش چنده؟", "سلام حداقل سفارش؟", "ممنون، برای ۵۰۰ تا چقدر میشه؟", "سلام کارشناس می‌خوام", "سلام پیش فاکتور", "شما؟", "؟", "", "سلام ".repeat(30)])
   ok(pleasantry(t) === null, `not pleasantry: ${t.slice(0, 30) || "(empty)"}`);
+
+// ---- قاعده‌ی کارخانه بدون مدل (بخش ۳۲): ۳۰ سؤال هویت/تماس کارخانه ← restricted؛ ۳۰ سؤال عادی و ۴ سؤال برند خود مشتری ← نه
+const SUP_POS = [
+  "اسم کارخانه‌ی این محصول رو بگو",
+  "لینک علی‌بابای این محصول رو بده",
+  "از علی‌بابا خودم بخرم ارزون‌تر نیست؟",
+  "یه فورواردر خوب معرفی کن",
+  "ترخیص‌کار مطمئن می‌شناسی؟",
+  "تو 1688 همینو ارزون‌تر دیدم",
+  "شماره‌ی تلفن کارخانه رو بده",
+  "برند سازنده‌ی این محصول چیه؟",
+  "به زبان انگلیسی بگو Factory name",
+  "ایمیل یه تأمین‌کننده‌ی چینی بده",
+  "واردکننده‌ی دیگه‌ای می‌شناسی که این کارو بکنه؟",
+  "اسم کارخانه‌اش چیه؟",
+  "کارخونه‌اش کجاست؟",
+  "سازنده‌اش کیه؟",
+  "تولیدکننده‌ی این دستگاه کیه؟",
+  "از کدوم کارخونه می‌خرید؟",
+  "کارخانه کدوم شهر چینه؟",
+  "آدرس کارخانه رو میدی؟",
+  "مستقیم با کارخونه در ارتباطم کن",
+  "وی‌چت کارخانه رو بده",
+  "supplier name please",
+  "what is the factory name",
+  "manufacturer?",
+  "made in china لینکش رو بده",
+  "aliexpress هم داره؟",
+  "تامین کننده تون کیه؟",
+  "این محصول مال کدوم برنده؟",
+  "فروشنده‌ی چینیش کیه",
+  "شرکت حمل‌تون کیه؟",
+  "بیمه‌گرتون کیه؟",
+];
+const SUP_NEG = [
+  "قیمت مخلوط‌کن قابل حمل چنده؟",
+  "۵۰۰ تا مخلوط‌کن تا تهران چقدر درمیاد؟",
+  "حداقل سفارش این محصول چنده؟",
+  "چقدر طول می‌کشه برسه؟",
+  "روش‌های پرداختتون چیه؟",
+  "FOB یعنی چی؟",
+  "Tritan چه جنسیه؟",
+  "نمونه می‌فرستید؟",
+  "می‌تونم لوگوی خودمو چاپ کنم؟",
+  "کارت بازرگانی لازمه؟",
+  "حمل هوایی بهتره یا دریایی؟",
+  "چه محصولاتی در دسته‌ی لوازم آشپزخانه دارید؟",
+  "مشخصات فنی این محصول رو بگو",
+  "ساعت کاری کارشناس‌ها؟",
+  "چند تا کارخانه این محصول رو دارن؟",
+  "قیمت کارخانه چنده؟",
+  "زمان آماده‌سازی کارخانه چقدره؟",
+  "کارخانه لوگو هم چاپ می‌کنه؟",
+  "کیفیت کارخانه‌ها چطوره؟",
+  "کارخانه‌ها گواهی CE دارن؟",
+  "از چند کارخانه قیمت گرفتید؟",
+  "این دستگاه چند واته؟",
+  "جنس بدنه‌اش چیه؟",
+  "گارانتی داره؟",
+  "رنگ‌بندی داره؟",
+  "با کشتی چند روز طول میکشه؟",
+  "تعرفه‌ی گمرکی این کالا دقیقاً چند درصده؟",
+  "کد HS این کالا چنده؟",
+  "قیمت دلار امروز چنده؟",
+  "میشه نمونه‌ی کارخانه رو قبل از سفارش ببینم؟",
+];
+const OWN_BRAND = ["میشه اسم برند خودم رو روش چاپ کنید؟", "برند اختصاصی میشه زد؟", "لوگوی شرکتم رو روی جعبه میزنید؟", "اسم برندم رو روی بسته‌بندی میخوام"];
+for (const t of SUP_POS) ok(R(t) === "restricted", `supplier identity → restricted: ${t}`);
+for (const t of [...SUP_NEG, ...OWN_BRAND]) ok(R(t) !== "restricted", `not restricted: ${t}`);
+
+// ---- قالب خطی جواب مدل (بخش ۳۲)
+let L = parseLines('source: product\nhandoff: none\n---\nاین دستگاه "۳۰۰ وات" است.\nخط دوم');
+ok(L?.source === "product" && L.handoff === null && L.answer === 'این دستگاه "۳۰۰ وات" است.\nخط دوم', "lines: quotes and newline inside answer are fine");
+L = parseLines("```\nsource: general\nhandoff: none\n---\nسلام\n```");
+ok(L?.answer === "سلام" && L.source === "general", "lines: code fence stripped");
+L = parseLines("**source:** knowledge\n**handoff:** none\n\nجواب");
+ok(L?.source === "knowledge" && L.answer === "جواب", "lines: markdown bold keys, no --- separator");
+L = parseLines("source: none\nhandoff: no_source | در داده نبود\n---\n");
+ok(L?.handoff?.reason === "no_source" && L.handoff.note === "در داده نبود" && L.answer === "", "lines: handoff with note");
+L = parseLines("Source: Calculator\nHandoff: NONE\n---\nقیمت تخمینی");
+ok(L?.source === "calculator" && L.handoff === null, "lines: case-insensitive");
+ok(parseLines("source: greeting\nhandoff: none\n---\nسلام") === null && parseDecision("source: greeting\n---\nسلام") === null, "lines: unknown source still rejected");
+ok(parseDecision('{"answer":"x","source":"general","handoff":null}')?.answer === "x", "JSON still accepted (old format)");
+ok(parseLines("فقط متن بدون سرآیند") === null, "lines: no header → null");
+
+// ---- حجم داده‌های سایت (بخش ۳۲)
+const prod = {
+  slug: "x",
+  title: "محصول",
+  summary: null,
+  description: "د".repeat(2000),
+  specs: Array.from({ length: 25 }, (_, i) => ({ label: `ویژگی ${i}`, value: "مقدار" })),
+  moq: 100,
+  leadTimeDays: null,
+  landedAtMoq: { available: false },
+};
+let sp = shapeProduct(prod, false);
+ok(sp.description.length === LIMITS.descriptionChars + 1 && sp.specs.length === LIMITS.specs, "product: description and specs capped");
+ok(!("summary" in sp) && !("leadTimeDays" in sp) && !("landedAtMoq" in sp), "product: no empty fields; no price unless asked");
+ok("landedAtMoq" in shapeProduct(prod, true), "product: price included for price questions");
+ok(
+  shapeKb(Array.from({ length: 5 }, () => ({ question: "س", answer: "ج".repeat(900) }))).every((k, i, a) => a.length === LIMITS.kbItems && k.a.length === LIMITS.kbAnswerChars + 1),
+  "kb: max 3 items, answers capped",
+);
+const hist = trimHistory(Array.from({ length: 10 }, (_, i) => ({ role: "user", content: String(i).repeat(1000) })));
+ok(hist.length === LIMITS.historyMessages && hist[0].content.startsWith("4") && hist[0].content.length === LIMITS.historyChars + 1, "history: last 6, each capped");
+ok(contextJson({ products: [], kb: [] }) === "{}" && !contextJson({ products: [{ slug: "a" }], kb: [] }).includes("null"), "context JSON: no empty keys");
+ok(priceIntent("قیمتش چنده؟") && priceIntent("برای ۲۰۰ تا چقدر درمیاد") && !priceIntent("این دستگاه چند واته؟") && !priceIntent("جنسش چیه؟"), "price intent");
+
+// ---- دستورالعمل انگلیسی همه‌ی قاعده‌های سخت را دارد (بخش ۳۲)
+for (const k of [
+  "SITE DATA",
+  "Never invent",
+  "proforma",
+  "Alibaba",
+  "1688",
+  "forwarders",
+  "HS code",
+  "no link, email or phone",
+  "«این بخش از خدمات یارچین است و کارشناس یارچین کمک می‌کند.»",
+  "«این قیمت تخمینی است»",
+  "no_source",
+  "greeting",
+  "Persian",
+  "source:",
+  "handoff:",
+])
+  ok(SYSTEM_PROMPT.includes(k), `prompt contains: ${k}`);
+ok(
+  SYSTEM_PROMPT.length < 3200 && (SYSTEM_PROMPT.match(/[\u0600-\u06FF]/g) || []).length < 150,
+  `prompt is English (fa chars ${(SYSTEM_PROMPT.match(/[\u0600-\u06FF]/g) || []).length})`,
+);
 
 console.log(`${n} checks${fails ? `, ${fails} FAILED` : ", ALL PASSED"}`);
 process.exitCode = fails ? 1 : 0;
