@@ -1,6 +1,7 @@
 // کمک‌های مشترک تست‌های e2e (Playwright). فقط روی Postgres محلی (TEST_DB) و سرور محلی (BASE_URL، پیش‌فرض :3300).
 // چرا در ریپو: تست‌های قبلی بیرون از ریپو (scratchpad) بودند و با ری‌استارت محیط توسعه پاک شدند؛ docs/infoyaarchin.md بخش ۲۹.
-// رمزهای حساب‌های تست فقط برای دیتابیس محلی‌اند (admin@test.local و expert@test.local، ساخته با create-admin).
+// حساب‌های تست فقط در دیتابیس محلی ساخته می‌شوند (tests/e2e/setup-db.sh). رمزها از متغیر محیطی TEST_ADMIN_PASSWORD،
+// TEST_EXPERT_PASSWORD و TEST_CUSTOMER_PASSWORD خوانده می‌شوند؛ پیش‌فرض‌ها فقط برای سندباکس محلی‌اند و هیچ‌جای دیگری کار نمی‌کنند.
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -14,6 +15,21 @@ export const argon2 = webRequire("@node-rs/argon2");
 export const B = process.env.BASE_URL ?? "http://127.0.0.1:3300";
 export const DB = process.env.TEST_DB;
 if (!DB) throw new Error("TEST_DB لازم است (مثلاً postgres://yarchin:devpass@localhost/yarchin_full)");
+// ایمنی: این تست‌ها داده را عوض و پاک می‌کنند؛ هرگز روی دیتابیس یا سایت غیرمحلی (لیارا) اجرا نشوند.
+const host = (u) => {
+  try {
+    return new URL(u).hostname;
+  } catch {
+    return "";
+  }
+};
+if (!["localhost", "127.0.0.1", "::1", ""].includes(host(DB)) || !["localhost", "127.0.0.1"].includes(host(B)))
+  throw new Error(`تست‌ها فقط روی دیتابیس و سرور محلی اجرا می‌شوند (TEST_DB=${host(DB)}، BASE_URL=${host(B)})`);
+export const PW = {
+  admin: process.env.TEST_ADMIN_PASSWORD ?? "Str0ng!Passw0rd",
+  expert: process.env.TEST_EXPERT_PASSWORD ?? "Expert-Pass-2026!",
+  customer: process.env.TEST_CUSTOMER_PASSWORD ?? "Cust-Pass-2026!",
+};
 
 export function chromePath() {
   if (process.env.CHROME_PATH) return process.env.CHROME_PATH;
@@ -25,7 +41,21 @@ export function chromePath() {
 }
 
 // بدون shell (هش رمز «$» دارد و shell آن را عوض می‌کرد)
-export const psql = (q) => execFileSync("psql", [DB, "-Atc", q]).toString().trim();
+export const psql = (q) => {
+  try {
+    return execFileSync("psql", [DB, "-v", "ON_ERROR_STOP=1", "-Atc", q], { stdio: ["ignore", "pipe", "pipe"] })
+      .toString()
+      .trim();
+  } catch (e) {
+    throw new Error(
+      `psql: ${
+        String(e.stderr ?? e.message)
+          .trim()
+          .split("\n")[0]
+      }\n  ${q.slice(0, 300)}`,
+    );
+  }
+};
 export const setS = (k, v) => psql(`update settings set value='${JSON.stringify(v).replace(/'/g, "''")}' where key='${k}'`);
 
 let fails = 0;
@@ -63,6 +93,8 @@ export async function launch() {
   const page = async (opts = {}) => {
     const p = await (await b.newContext({ viewport: { width: 1280, height: 900 }, ...opts })).newPage();
     p.on("pageerror", (e) => errs.push(e.message));
+    // پنجره‌های تأیید («گفتگو بسته شود؟» و …) پذیرفته می‌شوند؛ پیش‌فرض Playwright رد کردن است
+    p.on("dialog", (d) => d.accept().catch(() => {}));
     return p;
   };
   return { b, errs, page };
@@ -76,20 +108,20 @@ export async function staffLogin(p, id, pw) {
   await p.getByRole("button", { name: "ورود" }).click();
   await p.waitForURL(/\/admin$/);
 }
-export const admin = (p) => staffLogin(p, "admin@test.local", "Str0ng!Passw0rd");
-export const expert = (p) => staffLogin(p, "expert@test.local", "Expert-Pass-2026!");
+export const admin = (p) => staffLogin(p, "admin@test.local", PW.admin);
+export const expert = (p) => staffLogin(p, "expert@test.local", PW.expert);
 
 // مشتری تست (ساخت مستقیم در دیتابیس محلی) و ورود از /login
 export async function customer(p, email, name = "Test Customer") {
   psql(`delete from login_attempts`);
-  const hash = await argon2.hash("Cust-Pass-2026!", { memoryCost: 19456, timeCost: 2, parallelism: 1 });
+  const hash = await argon2.hash(PW.customer, { memoryCost: 19456, timeCost: 2, parallelism: 1 });
   if (psql(`select count(*) from users where email='${email}'`) === "0") {
     psql(`insert into users (full_name, email, password_hash) values ('${name}', '${email}', '${hash}')`);
     psql(`insert into user_roles (user_id, role_id) select u.id, r.id from users u, roles r where u.email='${email}' and r.key='customer'`);
   }
   await p.goto(B + "/login");
   await p.fill('input[name="identifier"]', email);
-  await p.fill('input[name="password"]', "Cust-Pass-2026!");
+  await p.fill('input[name="password"]', PW.customer);
   await p
     .locator("form", { has: p.locator('input[name="password"]') })
     .getByRole("button", { name: "ورود" })

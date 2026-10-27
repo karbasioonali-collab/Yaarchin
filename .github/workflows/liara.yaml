@@ -40,6 +40,8 @@ jobs:
       - run: npm ci --include=dev
       - run: npm run typecheck
       - run: npm run lint
+      # تست‌های واحد (چند ثانیه، بدون دیتابیس و مرورگر). e2e فقط محلی: web/tests/run-all.sh (docs/infoyaarchin.md بخش ۲۲)
+      - run: npm run test:unit
 
       - name: Deploy
         env:
