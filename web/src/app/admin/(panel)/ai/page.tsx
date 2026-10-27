@@ -234,6 +234,11 @@ export default async function AiPage() {
                   </td>
                   <td style={{ fontSize: 13 }}>
                     {fmtNum(r.promptTokens)} / {fmtNum(r.completionTokens)}
+                    {Number((r.meta as { cachedTokens?: number } | null)?.cachedTokens) > 0 && (
+                      <div className={styles.muted} style={{ fontSize: 12 }}>
+                        کش: {fmtNum(Number((r.meta as { cachedTokens?: number }).cachedTokens))}
+                      </div>
+                    )}
                   </td>
                   <td>{fmtNum(Math.round(Number(r.costToman)))}</td>
                   <td>{r.latencyMs !== null ? `${fmtNum(Math.round(r.latencyMs / 100) / 10)} ث` : "—"}</td>

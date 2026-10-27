@@ -27,7 +27,7 @@ import { type Decision, FORMAT_REMINDER, parseDecision } from "./decision";
 import { normFa } from "./normalize";
 import { LANDED_TOOL, PROMPT_VERSION, SYSTEM_PROMPT } from "./prompt";
 import { cannedReply } from "./canned";
-import { HANDOFF_FA, pleasantry, preRule } from "./rules";
+import { extractQty, HANDOFF_FA, pleasantry, preRule } from "./rules";
 import { addReply, aiStatus, ensureState, getState, resume, setThinking, silence } from "./state";
 import { aiLimits, customerMessages24h, todayUsage } from "./usage";
 
@@ -35,6 +35,8 @@ const PRIMARY_TIMEOUT = 25_000;
 const FALLBACK_TIMEOUT = 20_000;
 export const STUCK_AFTER_MS = 90_000;
 const MAX_TOOL_ROUNDS = 2;
+// جواب کوتاه است (حدود ۸۰ کلمه)؛ سقف پایین‌تر هم هزینه‌ی خروجی را محدود می‌کند و هم زمان جواب را
+const MAX_OUTPUT_TOKENS = 400;
 
 export const HANDOFF_TEXT = "پیام شما به کارشناس یارچین سپرده شد؛ به‌زودی همین‌جا پاسخ می‌دهد.";
 export const RESTRICTED_TEXT = "این بخش از خدمات یارچین است و کارشناس یارچین در همین گفتگو کمکتان می‌کند.";
@@ -133,7 +135,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
   }
 
   // مدل
-  const site = await buildContext(msg.body, conv.productId);
+  const site = await buildContext(msg.body, conv.productId, extractQty(msg.body));
   let usage: Usage = ZERO_USAGE;
   let modelUsed: string | null = null;
   let fallbackUsed = 0;
@@ -162,6 +164,9 @@ export async function runAgent(c: RunCtx): Promise<void> {
     costToman: String(usage.costToman),
     meta: {
       promptVersion: PROMPT_VERSION,
+      // توکن‌های کش‌شده (prompt caching؛ برای Haiku 4.5 معمولاً صفر، بخش ۳۲) و اینکه قیمت تعداد از قبل حساب شد
+      cachedTokens: usage.cachedTokens ?? 0,
+      ...(site.landedForQty ? { precomputedQty: site.landedForQty.qty } : {}),
       kb: site.kb.map((k) => k.id),
       products: site.products.map((p) => p.slug),
       // خروجی خام مدل وقتی قالبش نادرست بود (برای «آخرین درخواست‌ها» در پنل)؛ retry = یک بار با یادآوری قالب دوباره پرسیده شد
@@ -197,18 +202,24 @@ async function converse(mode: Mode, site: SiteContext, conversationId: string, m
   const messages: ChatMsg[] = [
     { role: "system", content: SYSTEM_PROMPT },
     ...prior,
-    { role: "user", content: `داده‌های سایت (تنها منبع مجاز):\n${contextText(site)}\n---\n${text}` },
+    { role: "user", content: `SITE DATA (the only allowed source):\n${contextText(site)}\n---\n${text}` },
   ];
   const cfg = aiConfig();
   const call = async (which: "primary" | "fallback", msgs: ChatMsg[], tools: boolean): Promise<ModelReply> => {
     if (mode === "test") return fakeModel(which, msgs, site);
     const model = which === "primary" ? cfg.model : cfg.fallbackModel!;
-    return chatCompletion(cfg, model, { messages: msgs, ...(tools ? { tools: [LANDED_TOOL] } : {}), maxTokens: 700 }, which === "primary" ? PRIMARY_TIMEOUT : FALLBACK_TIMEOUT);
+    return chatCompletion(
+      cfg,
+      model,
+      { messages: msgs, ...(tools ? { tools: [LANDED_TOOL] } : {}), maxTokens: MAX_OUTPUT_TOKENS },
+      which === "primary" ? PRIMARY_TIMEOUT : FALLBACK_TIMEOUT,
+    );
   };
   const run = async (which: "primary" | "fallback") => {
     const msgs = [...messages];
     let usage: Usage = ZERO_USAGE;
-    let useTools = true;
+    // ابزار فقط وقتی لازم است: سؤال قیمت، محصول معلوم، ولی تعداد در پیام نیست (با تعداد، قیمت از قبل در داده‌هاست)
+    let useTools = site.withPrice && !site.landedForQty && site.products.length > 0;
     let toolRounds = 0;
     const raws: string[] = [];
     for (;;) {

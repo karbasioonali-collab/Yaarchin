@@ -11,7 +11,8 @@ export type ChatMsg =
   | { role: "tool"; tool_call_id: string; content: string };
 export type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 export type ToolDef = { type: "function"; function: { name: string; description: string; parameters: Record<string, unknown> } };
-export type Usage = { promptTokens: number; completionTokens: number; costToman: number };
+// cachedTokens: توکن‌های ورودی خوانده‌شده از کش (usage.prompt_tokens_details.cached_tokens لیارا)؛ اختیاری
+export type Usage = { promptTokens: number; completionTokens: number; costToman: number; cachedTokens?: number };
 export type ModelReply = { content: string | null; toolCalls: ToolCall[]; usage: Usage; model: string; finishReason: string | null };
 
 export class AiCallError extends Error {
@@ -66,7 +67,7 @@ export async function chatCompletion(
   let j: {
     model?: string;
     choices?: { message?: { content?: string | null; tool_calls?: ToolCall[] }; finish_reason?: string }[];
-    usage?: { prompt_tokens?: number; completion_tokens?: number; total_cost_toman?: number };
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_cost_toman?: number; prompt_tokens_details?: { cached_tokens?: number } };
   };
   try {
     j = JSON.parse(text);
@@ -84,6 +85,7 @@ export async function chatCompletion(
       promptTokens: Math.max(0, Math.round(Number(j.usage?.prompt_tokens) || 0)),
       completionTokens: Math.max(0, Math.round(Number(j.usage?.completion_tokens) || 0)),
       costToman: Math.max(0, Number(j.usage?.total_cost_toman) || 0),
+      cachedTokens: Math.max(0, Math.round(Number(j.usage?.prompt_tokens_details?.cached_tokens) || 0)),
     },
   };
 }
@@ -92,5 +94,6 @@ export const addUsage = (a: Usage, b: Usage): Usage => ({
   promptTokens: a.promptTokens + b.promptTokens,
   completionTokens: a.completionTokens + b.completionTokens,
   costToman: a.costToman + b.costToman,
+  cachedTokens: (a.cachedTokens ?? 0) + (b.cachedTokens ?? 0),
 });
 export const ZERO_USAGE: Usage = { promptTokens: 0, completionTokens: 0, costToman: 0 };

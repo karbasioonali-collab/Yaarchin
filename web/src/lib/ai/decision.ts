@@ -1,4 +1,10 @@
-// خواندن جواب ساختاریافته‌ی مدل (بدون server-only تا تست واحد مستقیم اجرایش کند). docs/infoyaarchin.md بخش ۲۹ و ۳۱.
+// خواندن جواب ساختاریافته‌ی مدل (بدون server-only تا تست واحد مستقیم اجرایش کند). docs/infoyaarchin.md بخش ۲۹، ۳۱ و ۳۲.
+// قالب اصلی از نسخه‌ی 2026-10-28 «خطی» است (prompt.ts):
+//   source: product
+//   handoff: none            (یا: handoff: no_source | یادداشت برای کارشناس)
+//   ---
+//   <جواب فارسی>
+// JSON قدیمی هم هنوز پذیرفته می‌شود (پایین‌تر).
 // مقاوم در برابر قالب‌های رایج مدل‌ها، بدون شل کردن قاعده‌ها (منبع ناشناخته همچنان نامعتبر است):
 //   ```json … ``` و متن قبل یا بعد از JSON؛ چند شیء پشت هم (اولین شیء معتبر)؛ «}» داخل متن جواب؛
 //   شکستن خط یا tab خام داخل رشته (JSON.parse آن را نمی‌پذیرد)؛ اسم دیگر فیلد جواب (reply/response/text/message)؛
@@ -87,7 +93,45 @@ function toDecision(j: unknown): Decision | null {
   return { answer: answerRaw, source, handoff: h };
 }
 
+const NO_HANDOFF = /^(none|null|no|false|-|—|)$/i;
+
+// قالب خطی. منبع ناشناخته همچنان نامعتبر است (قاعده‌ها شل نمی‌شوند).
+export function parseLines(content: string): Decision | null {
+  const text = content.replace(/```[a-z]*\n?/gi, "").replace(/\r/g, "");
+  const lines = text.split("\n");
+  const si = lines.findIndex((l) => /^\s*\**\s*source\s*\**\s*[:：]/i.test(l));
+  if (si < 0) return null;
+  const source = lines[si]
+    .replace(/^[^:：]*[:：]/, "")
+    .replace(/[*`"']/g, "")
+    .trim()
+    .toLowerCase();
+  if (!(SOURCES as readonly string[]).includes(source)) return null;
+  let handoff: Decision["handoff"] = null;
+  let end = si;
+  const hi = lines.findIndex((l, i) => i > si && i <= si + 3 && /^\s*\**\s*handoff\s*\**\s*[:：]/i.test(l));
+  if (hi >= 0) {
+    end = hi;
+    const [reasonRaw, ...noteParts] = lines[hi].replace(/^[^:：]*[:：]/, "").split("|");
+    const reason = reasonRaw
+      .replace(/[*`"']/g, "")
+      .trim()
+      .toLowerCase();
+    if (!NO_HANDOFF.test(reason)) handoff = { reason, note: noteParts.join("|").trim().slice(0, 300) || undefined };
+  }
+  // متن جواب: بعد از خط --- (اگر نبود، بعد از خط‌های سرآیند)
+  const sep = lines.findIndex((l, i) => i > end && /^\s*-{3,}\s*$/.test(l));
+  const body = lines
+    .slice(sep >= 0 ? sep + 1 : end + 1)
+    .join("\n")
+    .replace(/^\s*(answer|reply)\s*[:：]\s*/i, "")
+    .trim();
+  return { answer: body, source, handoff };
+}
+
 export function parseDecision(content: string): Decision | null {
+  const lined = parseLines(content);
+  if (lined) return lined;
   const text = content.replace(/```(?:json|JSON)?/g, " ");
   for (const obj of jsonObjects(text)) {
     const d = toDecision(tryParse(obj));
@@ -96,7 +140,10 @@ export function parseDecision(content: string): Decision | null {
   return null;
 }
 
-// یادآوری قالب برای تلاش دوباره (agent.ts)
-export const FORMAT_REMINDER = `جواب قبلی قالب درست نداشت. همان جواب را فقط و فقط به‌شکل یک شیء JSON معتبر برگردان، بدون \`\`\` و بدون هیچ متن دیگر:
-{"answer": "<متن جواب>", "source": "product" | "calculator" | "knowledge" | "general" | "none", "handoff": null | {"reason": "...", "note": "..."}}
-مقدار source فقط یکی از همین پنج مقدار است (برای احوال‌پرسی یا تعریف عمومی: "general").`;
+// یادآوری قالب برای تلاش دوباره (agent.ts)؛ حالا باید بسیار نادر باشد
+export const FORMAT_REMINDER = `Your previous reply did not follow the output format. Send the same reply again in exactly this format, with no JSON and no code fences:
+source: <product|calculator|knowledge|general|none>
+handoff: <none|restricted|no_source|complaint|discount|final_price|proforma|big_order|other> | <optional note>
+---
+<reply in Persian>
+source must be one of those five values (general for a greeting or a general definition).`;

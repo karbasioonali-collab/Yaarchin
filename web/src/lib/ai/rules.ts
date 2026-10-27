@@ -52,10 +52,35 @@ export function extractQty(text: string): number | null {
   return best;
 }
 
+// سؤال درباره‌ی هویت یا تماس کارخانه (بدون مدل ← ارجاع restricted). بخش ۳۲.
+// «کارخانه/سازنده/تأمین‌کننده/فروشنده/برند…» همراه «اسم/کیه/کدوم/کجا/لینک/شماره/ایمیل/وی‌چت/معرفی/ارتباط…» در هر ترتیب.
+// سؤال درباره‌ی قیمت، زمان، کیفیت، نمونه یا چاپ (بدون کلمه‌ی هویت یا تماس) ارجاع نمی‌شود: «قیمت کارخانه چنده؟»، «چند کارخانه دارن؟».
+// «برند» وقتی درباره‌ی برند یا لوگوی خود مشتری است (چاپ، اختصاصی، برندم، بسته‌بندی) حساب نمی‌شود.
+const SUPPLIER = /(کارخانه|کارخونه|تولید ?کننده|سازنده|تامین ?کننده|فروشنده|factory|manufacturer|supplier|vendor|seller)/;
+const BRAND = /(برند|brand)/;
+const OWN_BRAND = /(خودم|خودمون|برندم|برند ?مون|اختصاصی|شخصی|لوگو|چاپ|بسته ?بندی|جعبه|شرکتم|my brand|own brand|private label|logo|print)/;
+const IDENTITY = /(اسم|نام|کیه|کیست|کی هست|کدوم|کدام|کجا|آدرس|ادرس|لینک|شماره|تلفن|ایمیل|وی ?چت|واتس ?اپ|تماس|ارتباط|معرفی|name|who|which|where|contact|link|email|wechat)/;
+const CONTACT = /(اسم|نام|name|لینک|link|شماره|تلفن|ایمیل|email|وی ?چت|wechat|واتس ?اپ|آدرس|ادرس|contact|تماس|ارتباط)/;
+const PRODUCT_Q = /(قیمت|چند|چقدر|زمان|کیفیت|گواهی|نمونه|لوگو|چاپ|حداقل|آماده ?سازی|price|quality)/;
+
+export function asksSupplierIdentity(text: string): boolean {
+  const n = normFa(text)
+    .replace(/[^\p{L}\p{N}\s?؟]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const who = SUPPLIER.test(n) || (BRAND.test(n) && !OWN_BRAND.test(n));
+  if (!who) return false;
+  const asks = IDENTITY.test(n) || /[?؟]$/.test(n) || n.split(" ").length <= 2;
+  if (!asks) return false;
+  // سؤال محصولی (قیمت، زمان، کیفیت…) فقط وقتی ارجاع می‌شود که صریحاً اسم یا راه تماس بخواهد
+  return !PRODUCT_Q.test(n) || CONTACT.test(n);
+}
+
 // دلیل ارجاع فوری بر اساس متن مشتری، یا null
 export function preRule(text: string, opts: { bigOrderQty: number }): string | null {
   const n = normFa(text);
   for (const [reason, re] of RULES) if (re.test(n)) return reason;
+  if (asksSupplierIdentity(text)) return "restricted";
   const q = extractQty(text);
   if (q !== null && q >= opts.bigOrderQty) return "big_order";
   return null;

@@ -1,7 +1,8 @@
 // سرور ساختگی سازگار با OpenAI (مثل API هوش مصنوعی لیارا) فقط برای تست e2e محلی «حالت زنده»ی دستیار.
 // اجرا: node tests/e2e/mock-ai.mjs [port]  ← سرور با AI_BASE_URL=http://127.0.0.1:<port>/v1 AI_API_KEY=test
 // رفتار با کلمه‌های داخل پیام مشتری (بخش بعد از «\n---\n» آخرین پیام user):
-//   [[tool]] ← اول ابزار landed_cost (slug از داده‌های سایت)، بعد جواب از نتیجه‌ی ابزار
+//   [[tool]] ← اگر قیمت همان تعداد در داده‌هاست از آن جواب؛ وگرنه اول ابزار landed_cost (slug از داده‌های سایت)، بعد جواب از نتیجه‌ی ابزار
+//   [[json]] ← جواب به قالب قدیمی JSON (سازگاری)
 //   [[leak:X]] ← جوابی که X را دارد (محافظ باید جلویش را بگیرد)؛ [[none]] ← ارجاع no_source؛ [[badjson]] ← جواب غیر JSON
 //   [[primary500]] ← مدل اصلی ۵۰۰ (مسیر مدل پشتیبان)؛ [[down]] ← هر دو مدل ۵۰۰؛ [[notools]] ← ۴۰۰ «tools not supported» اگر tools فرستاده شود
 //   [[badjson1]] ← بار اول غیر JSON، بعد از یادآوری قالب درست؛ [[greetsrc]] ← بار اول source = "greeting" (نامعتبر)، بعد general
@@ -22,8 +23,10 @@ const completion = (model, message, cost) => ({
   id: "mock-" + Date.now(),
   model,
   choices: [{ index: 0, message: { role: "assistant", ...message }, finish_reason: message.tool_calls ? "tool_calls" : "stop" }],
-  usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100, total_cost_toman: cost },
+  usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100, total_cost_toman: cost, prompt_tokens_details: { cached_tokens: cachedNow } },
 });
+// [[cached:N]] ← usage.prompt_tokens_details.cached_tokens = N (مثل prompt caching لیارا)
+let cachedNow = 0;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 http
@@ -40,13 +43,30 @@ http
     const sys = msgs.find((m) => m.role === "system")?.content ?? "";
     const lastUser = [...msgs].reverse().find((m) => m.role === "user")?.content ?? "";
     // پیام مشتری = آخرین user با «داده‌های سایت»؛ اگر بعدش user دیگری آمده، یادآوری قالب است (تلاش دوباره)
-    const chatUser = [...msgs].reverse().find((m) => m.role === "user" && m.content.includes("\n---\n"))?.content;
+    // (با «SITE DATA» شروع می‌شود؛ یادآوری قالب هم خط --- دارد)
+    const chatUser = [...msgs].reverse().find((m) => m.role === "user" && typeof m.content === "string" && m.content.startsWith("SITE DATA"))?.content;
     const text = (chatUser ?? lastUser).split("\n---\n").pop();
     const retried = !!chatUser && lastUser !== chatUser;
     const toolMsg = msgs.find((m) => m.role === "tool");
     const primary = body.model !== "mock/fallback";
+    cachedNow = Number(/\[\[cached:(\d+)\]\]/.exec(text ?? "")?.[1] ?? 0);
     const cost = Number(/\[\[cost:(\d+)\]\]/.exec(text)?.[1] ?? 400);
-    const json = (o) => out(res, 200, completion(body.model, { content: JSON.stringify(o) }, cost));
+    // جواب به قالب خطی (مثل دستورالعمل از 2026-10-28)؛ [[json]] ← قالب قدیمی JSON (سازگاری)
+    const json = (o) =>
+      out(
+        res,
+        200,
+        completion(
+          body.model,
+          {
+            content: text.includes("[[json]]")
+              ? JSON.stringify(o)
+              : `source: ${o.source}\nhandoff: ${o.handoff ? `${o.handoff.reason}${o.handoff.note ? ` | ${o.handoff.note}` : ""}` : "none"}\n---\n${o.answer}`,
+          },
+          cost,
+        ),
+      );
+    const totals = (t) => (t.available ? t.methods.map((m) => (m.totalToman ?? 0).toLocaleString("en-US")).join(" / ") : "ندارد");
 
     // تست اتصال پنل
     if (sys.includes('{"ok": true')) return out(res, 200, completion(body.model, { content: '{"ok": true, "lang": "fa"}' }, 50));
@@ -81,14 +101,16 @@ http
     if (leak) return json({ answer: `این محصول را ${leak} تولید می‌کند.`, source: "product", handoff: null });
     if (text.includes("[[none]]")) return json({ answer: "", source: "none", handoff: { reason: "no_source", note: "mock" } });
     if (text.includes("[[tool]]")) {
-      if (toolMsg) {
-        const t = JSON.parse(toolMsg.content);
+      if (toolMsg) return json({ answer: `قیمت تمام‌شده‌ی تخمینی: ${totals(JSON.parse(toolMsg.content))}. این قیمت تخمینی است.`, source: "calculator", handoff: null });
+      // تعداد در پیام بود ← قیمت همان تعداد از قبل در داده‌هاست (بدون ابزار؛ بخش ۳۲)
+      const data = JSON.parse((chatUser ?? "").split("\n---\n")[0].replace(/^[^{]*/, "") || "{}");
+      if (data.landed_cost_for_requested_qty)
         return json({
-          answer: `قیمت تمام‌شده‌ی تخمینی: ${t.available ? t.methods.map((m) => (m.totalToman ?? 0).toLocaleString("en-US")).join(" / ") : "ندارد"}. این قیمت تخمینی است.`,
+          answer: `قیمت تمام‌شده‌ی تخمینی برای ${data.landed_cost_for_requested_qty.qty} عدد: ${totals(data.landed_cost_for_requested_qty)}. این قیمت تخمینی است.`,
           source: "calculator",
           handoff: null,
         });
-      }
+      if (!body.tools) return json({ answer: "", source: "none", handoff: { reason: "no_source", note: "mock: no tool and no price" } });
       const slug = /"slug":"([^"]+)"/.exec(chatUser ?? lastUser)?.[1] ?? "x";
       return out(
         res,
