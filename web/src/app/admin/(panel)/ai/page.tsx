@@ -7,6 +7,7 @@ import ui from "@/components/ui/ui.module.css";
 import { db } from "@/db/client";
 import { aiRequests } from "@/db/schema";
 import { aiConfig } from "@/lib/ai/config";
+import { CANNED_DEFAULTS, cannedText } from "@/lib/ai/canned";
 import { blacklistTerms } from "@/lib/ai/guard-terms";
 import { reviewDays } from "@/lib/ai/kb";
 import { PROMPT_VERSION } from "@/lib/ai/prompt";
@@ -18,7 +19,7 @@ import { aiReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import { getSetting, isEnabled } from "@/lib/settings";
 import styles from "../panel.module.css";
-import { saveAiLimitsAction, saveBlacklistAction } from "./actions";
+import { saveAiLimitsAction, saveBlacklistAction, saveCannedAction } from "./actions";
 import { ConnectionTest } from "./ConnectionTest";
 
 export const metadata: Metadata = { title: "دستیار هوشمند" };
@@ -33,7 +34,13 @@ const STATUS_FA: Record<string, string> = {
   parse_error: "جواب نامفهوم",
   skipped: "رد شد",
 };
-const SOURCE_FA: Record<string, string> = { product: "محصول", calculator: "ماشین‌حساب", knowledge: "پایگاه دانش", general: "عمومی" };
+const SOURCE_FA: Record<string, string> = { product: "محصول", calculator: "ماشین‌حساب", knowledge: "پایگاه دانش", general: "عمومی", pleasantry: "جواب آماده (احوال‌پرسی/تشکر)" };
+const CANNED_FIELDS: [keyof typeof CANNED_DEFAULTS, string, string][] = [
+  ["ai.reply_greeting_product", "greetingProduct", "«سلام» در گفتگوی محصول ({product} = اسم محصول)"],
+  ["ai.reply_greeting_general", "greetingGeneral", "«سلام» در گفتگوی عمومی"],
+  ["ai.reply_thanks", "thanks", "تشکر («ممنون»، «مرسی»، …)"],
+  ["ai.reply_bye", "bye", "خداحافظی"],
+];
 
 // وضعیت، تست اتصال، سقف‌ها، لیست سیاه و لاگ درخواست‌های دستیار هوشمند (ai.settings). docs/infoyaarchin.md بخش ۲۹.
 export default async function AiPage() {
@@ -49,6 +56,7 @@ export default async function AiPage() {
     getSetting<string[]>("ai.blacklist").then((x) => x ?? []),
     reviewDays(),
   ]);
+  const canned = await Promise.all(CANNED_FIELDS.map(([k]) => cannedText(k)));
   const [recent, ext] = await Promise.all([
     ready ? db.select().from(aiRequests).orderBy(desc(aiRequests.id)).limit(50) : Promise.resolve([]),
     db
@@ -151,6 +159,22 @@ export default async function AiPage() {
       </div>
 
       <div className={styles.card} style={{ marginTop: 16 }}>
+        <h2 className={styles.cardTitle}>جواب‌های آماده (بدون مدل، هزینه صفر)</h2>
+        <p className={styles.muted} style={{ marginTop: 0, fontSize: 13 }}>
+          پیامی که فقط احوال‌پرسی، تشکر یا خداحافظی است («سلام»، «وقت بخیر»، «ممنون»، «خداحافظ» و …) بدون صدا زدن مدل با این متن‌ها جواب داده می‌شود و در سقف جواب هر گفتگو حساب
+          نمی‌شود. پیامی که سؤال هم دارد («سلام، قیمتش چنده؟») به مدل می‌رود.
+        </p>
+        <ActionForm action={saveCannedAction} submitLabel="ذخیره">
+          {CANNED_FIELDS.map(([, name, label], i) => (
+            <label key={name} className={ui.field}>
+              <span className={ui.label}>{label}</span>
+              <textarea name={name} className={ui.textarea} rows={3} defaultValue={canned[i]} maxLength={600} />
+            </label>
+          ))}
+        </ActionForm>
+      </div>
+
+      <div className={styles.card} style={{ marginTop: 16 }}>
         <h2 className={styles.cardTitle}>افزونه‌های دیتابیس</h2>
         <p style={{ margin: 0, fontSize: 14 }}>
           pgvector (جستجوی معنایی):{" "}
@@ -202,6 +226,7 @@ export default async function AiPage() {
                     {STATUS_FA[r.status] ?? r.status}
                     {r.outcome && <div className={styles.muted}>{SOURCE_FA[r.outcome] ?? HANDOFF_FA[r.outcome] ?? r.outcome}</div>}
                     {r.error && <div style={{ color: "#B3261E", fontSize: 12 }}>{r.error}</div>}
+                    <RawOutput meta={r.meta} />
                   </td>
                   <td className={styles.ltr} style={{ fontSize: 12 }}>
                     {r.model ?? "—"}
@@ -220,5 +245,27 @@ export default async function AiPage() {
         {!recent.length && <p className={styles.muted}>هنوز درخواستی ثبت نشده.</p>}
       </div>
     </>
+  );
+}
+
+// خروجی خام مدل برای جواب نامفهوم (meta.raw، هر تلاش جدا) و جواب ردشده‌ی محافظ (meta.blocked)
+function RawOutput({ meta }: { meta: unknown }) {
+  const m = (meta ?? {}) as { raw?: unknown; blocked?: unknown; retry?: unknown };
+  const raws = Array.isArray(m.raw) ? m.raw.filter((x): x is string => typeof x === "string") : [];
+  const blocked = typeof m.blocked === "string" ? m.blocked : null;
+  if (!raws.length && !blocked) return null;
+  return (
+    <details style={{ fontSize: 12, marginTop: 4 }}>
+      <summary>{blocked ? "جواب ردشده" : m.retry ? "خروجی خام مدل (با تلاش دوباره)" : "خروجی خام مدل"}</summary>
+      {blocked && <pre style={{ whiteSpace: "pre-wrap", direction: "rtl", margin: "4px 0" }}>{blocked}</pre>}
+      {raws.map((x, i) => (
+        <div key={i}>
+          {raws.length > 1 && <div className={styles.muted}>{i === 0 ? "تلاش اول" : "بعد از یادآوری قالب"}</div>}
+          <pre dir="auto" style={{ whiteSpace: "pre-wrap", margin: "4px 0", maxHeight: 240, overflow: "auto" }}>
+            {x || "(خالی)"}
+          </pre>
+        </div>
+      ))}
+    </details>
   );
 }

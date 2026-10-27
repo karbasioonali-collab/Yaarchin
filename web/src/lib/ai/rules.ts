@@ -60,3 +60,70 @@ export function preRule(text: string, opts: { bigOrderQty: number }): string | n
   if (q !== null && q >= opts.bigOrderQty) return "big_order";
   return null;
 }
+
+// ---------- احوال‌پرسی، تشکر، خداحافظی (جواب آماده، بدون مدل) ----------
+// پیامی که بعد از حذف علامت‌ها و ایموجی فقط از این کلمه‌ها ساخته شده باشد. اگر حتی یک کلمه‌ی دیگر داشته باشد
+// («سلام، قیمتش چنده؟») null ← به مدل می‌رود. docs/infoyaarchin.md بخش ۳۱.
+export type Pleasantry = "greeting" | "thanks" | "bye";
+
+// عبارت‌های چندکلمه‌ای (روی متن یکسان‌شده؛ «بخیر» و «به خیر» هر دو)
+const PL_PHRASES: [Pleasantry, RegExp][] = [
+  ["bye", /خدا ?(نگهدار|حافظ)|روز (خوش|خوبی داشته باشید)|شب (خوش|خوبی داشته باشید)|good ?bye|see you/g],
+  ["thanks", /دست(تون| شما)? درد نکنه|thank you|thanks a lot|خیلی ممنون|لطف (کردید|کردین|دارید|دارین)/g],
+  ["greeting", /(وقت|روز|صبح|ظهر|عصر|شب)(تون| شما|تان)? (به ?|ب)خیر|خسته نباشی(د|ن)?|خدا قوت|سلام علیکم|good (morning|evening|afternoon)|حال(تون|تان| شما)? (خوبه|چطوره)/g],
+];
+const PL_WORDS: Record<string, Pleasantry> = Object.fromEntries([
+  ...["سلام", "درود", "علیکم", "علیک", "hi", "hello", "hey", "salam", "slm", "خوبی", "خوبین", "خوبید", "چطوری", "چطورید", "چطورین", "احوال", "صبح", "بخیر"].map((w) => [
+    w,
+    "greeting",
+  ]),
+  ...[
+    "ممنون",
+    "ممنونم",
+    "مرسی",
+    "متشکرم",
+    "متشکر",
+    "تشکر",
+    "سپاس",
+    "سپاسگزارم",
+    "thanks",
+    "thank",
+    "thx",
+    "merci",
+    "mamnoon",
+    "mersi",
+    "باشه",
+    "اوکی",
+    "ok",
+    "okay",
+    "حله",
+    "عالی",
+    "مچکرم",
+  ].map((w) => [w, "thanks"]),
+  ...["خداحافظ", "خدانگهدار", "بای", "bye", "فعلا", "فعلن"].map((w) => [w, "bye"]),
+]);
+// کلمه‌های همراه که معنای سؤال ندارند
+const PL_FILLER = new Set("جان جون عزیز عزیزم خیلی زیاد دوست دوستان من شما هم و با ها اقا خانم دیگه you very much so a lot good و ممنونم از لطفتون لطفا".split(" "));
+
+export function pleasantry(text: string): Pleasantry | null {
+  if (text.length > 80) return null;
+  let n = normFa(text)
+    .replace(/(.)\1{2,}/gu, "$1")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!n) return null;
+  const kinds = new Set<Pleasantry>();
+  for (const [k, re] of PL_PHRASES)
+    n = n.replace(re, () => {
+      kinds.add(k);
+      return " ";
+    });
+  for (const w of n.split(" ").filter(Boolean)) {
+    if (PL_WORDS[w]) kinds.add(PL_WORDS[w]);
+    else if (!PL_FILLER.has(w)) return null;
+  }
+  if (kinds.has("bye")) return "bye";
+  if (kinds.has("thanks")) return "thanks";
+  return kinds.has("greeting") ? "greeting" : null;
+}

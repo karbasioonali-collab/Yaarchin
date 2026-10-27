@@ -4,6 +4,8 @@
 //   [[tool]] ← اول ابزار landed_cost (slug از داده‌های سایت)، بعد جواب از نتیجه‌ی ابزار
 //   [[leak:X]] ← جوابی که X را دارد (محافظ باید جلویش را بگیرد)؛ [[none]] ← ارجاع no_source؛ [[badjson]] ← جواب غیر JSON
 //   [[primary500]] ← مدل اصلی ۵۰۰ (مسیر مدل پشتیبان)؛ [[down]] ← هر دو مدل ۵۰۰؛ [[notools]] ← ۴۰۰ «tools not supported» اگر tools فرستاده شود
+//   [[badjson1]] ← بار اول غیر JSON، بعد از یادآوری قالب درست؛ [[greetsrc]] ← بار اول source = "greeting" (نامعتبر)، بعد general
+//   [[fenced]] ← JSON داخل ```json با متن قبل و بعد؛ [[newline]] ← شکستن خط خام داخل رشته‌ی JSON
 //   [[slow]] ← ۴ ثانیه مکث (برای دیدن «در حال نوشتن…»)
 //   [[cost:N]] ← total_cost_toman = N (پیش‌فرض ۴۰۰)
 // GET /__log ← بدنه‌ی همه‌ی درخواست‌ها؛ POST /__reset ← پاک کردن لاگ.
@@ -37,7 +39,10 @@ http
     const msgs = body.messages ?? [];
     const sys = msgs.find((m) => m.role === "system")?.content ?? "";
     const lastUser = [...msgs].reverse().find((m) => m.role === "user")?.content ?? "";
-    const text = lastUser.split("\n---\n").pop();
+    // پیام مشتری = آخرین user با «داده‌های سایت»؛ اگر بعدش user دیگری آمده، یادآوری قالب است (تلاش دوباره)
+    const chatUser = [...msgs].reverse().find((m) => m.role === "user" && m.content.includes("\n---\n"))?.content;
+    const text = (chatUser ?? lastUser).split("\n---\n").pop();
+    const retried = !!chatUser && lastUser !== chatUser;
     const toolMsg = msgs.find((m) => m.role === "tool");
     const primary = body.model !== "mock/fallback";
     const cost = Number(/\[\[cost:(\d+)\]\]/.exec(text)?.[1] ?? 400);
@@ -63,6 +68,15 @@ http
     if (text.includes("[[down]]") || (primary && text.includes("[[primary500]]"))) return out(res, 500, { error: "mock down" });
     if (text.includes("[[notools]]") && body.tools) return out(res, 400, { error: { message: "tools are not supported for this model" } });
     if (text.includes("[[badjson]]")) return out(res, 200, completion(body.model, { content: "سلام! این JSON نیست." }, cost));
+    if (text.includes("[[badjson1]]") && !retried) return out(res, 200, completion(body.model, { content: "سلام! خوش آمدید. چطور کمکتان کنم؟" }, cost));
+    if (text.includes("[[greetsrc]]")) return json({ answer: "سلام! خوش آمدید.", source: retried ? "general" : "greeting", handoff: null });
+    if (text.includes("[[fenced]]"))
+      return out(
+        res,
+        200,
+        completion(body.model, { content: 'حتماً!\n```json\n{"answer": "جواب {داخل} fence.", "source": "general", "handoff": null}\n```\nامیدوارم کمک کند {}' }, cost),
+      );
+    if (text.includes("[[newline]]")) return out(res, 200, completion(body.model, { content: '{"answer": "خط اول\nخط دوم", "source": "general", "handoff": null}' }, cost));
     const leak = /\[\[leak:([^\]]+)\]\]/.exec(text)?.[1];
     if (leak) return json({ answer: `این محصول را ${leak} تولید می‌کند.`, source: "product", handoff: null });
     if (text.includes("[[none]]")) return json({ answer: "", source: "none", handoff: { reason: "no_source", note: "mock" } });
@@ -75,7 +89,7 @@ http
           handoff: null,
         });
       }
-      const slug = /"slug":"([^"]+)"/.exec(lastUser)?.[1] ?? "x";
+      const slug = /"slug":"([^"]+)"/.exec(chatUser ?? lastUser)?.[1] ?? "x";
       return out(
         res,
         200,

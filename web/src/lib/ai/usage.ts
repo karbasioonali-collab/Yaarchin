@@ -56,10 +56,10 @@ export async function costWarning(): Promise<{ pct: number; cost: number; cap: n
   return pct >= 80 ? { pct, cost: u.costToman, cap: l.dailyCostToman } : null;
 }
 
-// پیام‌های مشتری به دستیار در ۲۴ ساعت اخیر (درخواست‌های گفتگو، زنده یا آزمایشی)
+// پیام‌های مشتری به دستیار در ۲۴ ساعت اخیر (درخواست‌های گفتگو، زنده یا آزمایشی؛ جواب‌های آماده‌ی احوال‌پرسی حساب نمی‌شوند)
 export async function customerMessages24h(customerId: string): Promise<number> {
   const r = await db.execute<{ n: string }>(sql`
     select count(*) as n from ai_requests r join conversations c on c.id = r.conversation_id
-    where r.purpose = 'chat' and c.customer_id = ${customerId} and r.created_at > now() - interval '24 hours'`);
+    where r.purpose = 'chat' and r.outcome is distinct from 'pleasantry' and c.customer_id = ${customerId} and r.created_at > now() - interval '24 hours'`);
   return Number(r.rows[0]?.n ?? 0);
 }
