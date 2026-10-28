@@ -13,9 +13,9 @@ import { reviewDays } from "@/lib/ai/kb";
 import { PROMPT_VERSION } from "@/lib/ai/prompt";
 import { HANDOFF_FA } from "@/lib/ai/rules";
 import { aiStatus } from "@/lib/ai/state";
-import { aiLimits, todayUsage } from "@/lib/ai/usage";
+import { aiLimits, testLimits, todayUsage } from "@/lib/ai/usage";
 import { requirePermission } from "@/lib/auth/can";
-import { aiReady } from "@/lib/db-ready";
+import { aiReady, aiTestsReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import { getSetting, isEnabled } from "@/lib/settings";
 import styles from "../panel.module.css";
@@ -47,14 +47,18 @@ export default async function AiPage() {
   await requirePermission("ai.settings");
   const ready = await aiReady();
   const cfg = aiConfig();
-  const [status, switchOn, limits, usage, terms, manual, days] = await Promise.all([
+  const zero = { requests: 0, costToman: 0, promptTokens: 0, completionTokens: 0 };
+  const [status, switchOn, limits, usage, terms, manual, days, tl, testUsage, testsOn] = await Promise.all([
     aiStatus(),
     isEnabled("ai_agent"),
     aiLimits(),
-    ready ? todayUsage() : Promise.resolve({ requests: 0, costToman: 0, promptTokens: 0, completionTokens: 0 }),
+    ready ? todayUsage("chat") : Promise.resolve(zero),
     ready ? blacklistTerms() : Promise.resolve([]),
     getSetting<string[]>("ai.blacklist").then((x) => x ?? []),
     reviewDays(),
+    testLimits(),
+    ready ? todayUsage("test") : Promise.resolve(zero),
+    aiTestsReady(),
   ]);
   const canned = await Promise.all(CANNED_FIELDS.map(([k]) => cannedText(k)));
   const [recent, ext] = await Promise.all([
@@ -75,7 +79,14 @@ export default async function AiPage() {
         <div>
           <h1 className={styles.pageTitle}>دستیار هوشمند یارچین</h1>
           <p className={styles.pageSub}>
-            <Link href="/admin/ai/knowledge">پایگاه دانش</Link> · سوئیچ در <Link href="/admin/settings">تنظیمات و سوئیچ‌ها</Link> · دستورالعمل نسخه‌ی {PROMPT_VERSION}
+            <Link href="/admin/ai/knowledge">پایگاه دانش</Link>
+            {testsOn && (
+              <>
+                {" "}
+                · <Link href="/admin/ai/tests">آزمون دستیار</Link> · <Link href="/admin/ai/suggestions">پیشنهاد سؤال تازه</Link>
+              </>
+            )}{" "}
+            · سوئیچ در <Link href="/admin/settings">تنظیمات و سوئیچ‌ها</Link> · دستورالعمل نسخه‌ی {PROMPT_VERSION}
           </p>
         </div>
       </div>
@@ -100,7 +111,7 @@ export default async function AiPage() {
           </p>
         </div>
         <div className={styles.card}>
-          <h2 className={styles.cardTitle}>مصرف امروز (روز تهران)</h2>
+          <h2 className={styles.cardTitle}>مصرف امروز چت مشتری (روز تهران)</h2>
           <p style={{ margin: "0 0 6px" }}>
             {fmtNum(usage.requests)} درخواست از سقف {fmtNum(limits.dailyRequests)} · {fmtNum(Math.round(usage.costToman))} تومان از سقف {fmtNum(limits.dailyCostToman)} (
             {fmtNum(costPct)}٪)
@@ -108,6 +119,9 @@ export default async function AiPage() {
           {costPct >= 80 && <p className={styles.notice}>⚠ بیش از ۸۰٪ سقف هزینه‌ی امروز مصرف شده؛ با رسیدن به سقف، دستیار تا فردا جواب نمی‌دهد و چت‌ها به کارشناس می‌روند.</p>}
           <p className={styles.muted} style={{ fontSize: 13, margin: 0 }}>
             توکن ورودی {fmtNum(usage.promptTokens)} · خروجی {fmtNum(usage.completionTokens)}. هزینه همان «total_cost_toman» لیارا است.
+          </p>
+          <p className={styles.muted} style={{ fontSize: 13, margin: "6px 0 0" }}>
+            آزمون دستیار و پیشنهاد AI امروز: {fmtNum(Math.round(testUsage.costToman))} تومان از سقف جدای {fmtNum(tl.dailyCostToman)} (در سقف چت حساب نمی‌شود).
           </p>
         </div>
       </div>
@@ -130,8 +144,8 @@ export default async function AiPage() {
               <Field label="سقف پیام هر مشتری در ۲۴ ساعت" name="customerDaily" defaultValue={String(limits.customerDailyMessages)} inputMode="numeric" ltr />
             </div>
             <div className={styles.row}>
-              <Field label="سقف درخواست روزانه‌ی کل" name="dailyRequests" defaultValue={String(limits.dailyRequests)} inputMode="numeric" ltr />
-              <Field label="سقف هزینه‌ی روزانه‌ی کل (تومان)" name="dailyCost" defaultValue={String(limits.dailyCostToman)} inputMode="numeric" ltr hint="هشدار در ۸۰٪" />
+              <Field label="سقف درخواست روزانه‌ی چت" name="dailyRequests" defaultValue={String(limits.dailyRequests)} inputMode="numeric" ltr />
+              <Field label="سقف هزینه‌ی روزانه‌ی چت (تومان)" name="dailyCost" defaultValue={String(limits.dailyCostToman)} inputMode="numeric" ltr hint="هشدار در ۸۰٪" />
             </div>
             <div className={styles.row}>
               <Field label="آستانه‌ی سفارش بزرگ (تعداد)" name="bigOrder" defaultValue={String(limits.bigOrderQty)} inputMode="numeric" ltr />
@@ -140,6 +154,17 @@ export default async function AiPage() {
             <div className={styles.row}>
               <Field label="برگشت دستیار به گفتگوی بازشده بعد از (ساعت)" name="resumeHours" defaultValue={String(limits.resumeAfterHours)} inputMode="numeric" ltr />
               <Field label="بازه‌ی بررسی مجدد پایگاه دانش (روز)" name="reviewDays" defaultValue={String(days)} inputMode="numeric" ltr />
+            </div>
+            <div className={styles.row}>
+              <Field
+                label="سقف هزینه‌ی روزانه‌ی آزمون (تومان)"
+                name="testDailyCost"
+                defaultValue={String(tl.dailyCostToman)}
+                inputMode="numeric"
+                ltr
+                hint="جدا از سقف چت؛ آزمون جلوی جواب به مشتری را نمی‌گیرد"
+              />
+              <Field label="هشدار «آزمون کامل اجرا نشده» بعد از (روز)" name="testStaleDays" defaultValue={String(tl.staleDays)} inputMode="numeric" ltr />
             </div>
           </ActionForm>
         </div>

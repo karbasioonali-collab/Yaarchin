@@ -9,7 +9,8 @@ import { CHAT_PERMS, chatAccess } from "@/lib/chat/access";
 import { chatCounters } from "@/lib/chat/admin";
 import { chatReady } from "@/lib/db-ready";
 import { isEnabled } from "@/lib/settings";
-import { aiReady } from "@/lib/db-ready";
+import { aiReady, aiTestsReady } from "@/lib/db-ready";
+import { staleWarning } from "@/lib/ai/tests";
 import { overdueCount } from "@/lib/ai/kb";
 import { costWarning } from "@/lib/ai/usage";
 import { PanelPulse } from "./PanelPulse";
@@ -29,6 +30,8 @@ const NAV: (NavItem & { permission: string | string[]; feature?: string })[] = [
   { href: "/admin/reports", label: "گزارش‌ها", permission: "reports.view", feature: "reports" },
   { href: "/admin/ai", label: "دستیار هوشمند", permission: "ai.settings" },
   { href: "/admin/ai/knowledge", label: "پایگاه دانش دستیار", permission: "ai.knowledge" },
+  { href: "/admin/ai/tests", label: "آزمون دستیار", permission: "ai.tests" },
+  { href: "/admin/ai/suggestions", label: "پیشنهاد سؤال تازه", permission: ["ai.knowledge", "ai.tests"] },
   { href: "/admin/roles", label: "نقش‌ها و دسترسی", permission: "roles.manage" },
   { href: "/admin/products", label: "محصولات", permission: ["products.manage", "products.rate"] },
   { href: "/admin/categories", label: "دسته‌بندی‌ها", permission: "categories.manage" },
@@ -57,6 +60,8 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
   const aiOn = await aiReady();
   const aiCostWarn = aiOn && (await canAny(a.user, ["ai.settings"])) ? await costWarning() : null;
   const kbOverdue = aiOn && (await canAny(a.user, ["ai.knowledge"])) ? await overdueCount() : 0;
+  // آزمون دستیار (ai.tests): آزمون کامل بیش از ai.test_stale_days روز اجرا نشده، یا مدل/دستورالعمل بعد از آن عوض شده
+  const testWarn = (await aiTestsReady()) && (await canAny(a.user, ["ai.tests"])) ? await staleWarning() : null;
 
   return (
     <div className={styles.shell}>
@@ -78,7 +83,9 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
           <div className={styles.userActions}>
             <Link href="/admin/account">حساب من</Link>
             <form action={logoutAction}>
-              <button type="submit" className={styles.linkButton}>خروج</button>
+              <button type="submit" className={styles.linkButton}>
+                خروج
+              </button>
             </form>
           </div>
         </div>
@@ -90,15 +97,17 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
               در حال دیدن سایت به‌جای <strong>{a.impersonating.fullName}</strong>
             </span>
             <form action={stopImpersonationAction}>
-              <button type="submit" className={styles.btnGhost}>پایان</button>
+              <button type="submit" className={styles.btnGhost}>
+                پایان
+              </button>
             </form>
           </div>
         )}
         {missingRates.length > 0 && (
           <div className={styles.rateWarn} role="status">
             <span>
-              نرخ امروز {missingRates.map((m) => `${m.nameFa}${m.lastDate ? ` (آخرین: ${fmtDate(m.lastDate)})` : " (هنوز هیچ نرخی)"}`).join("، ")} ثبت نشده؛ سایت با آخرین نرخ ثبت‌شده
-              حساب می‌کند.
+              نرخ امروز {missingRates.map((m) => `${m.nameFa}${m.lastDate ? ` (آخرین: ${fmtDate(m.lastDate)})` : " (هنوز هیچ نرخی)"}`).join("، ")} ثبت نشده؛ سایت با آخرین نرخ
+              ثبت‌شده حساب می‌کند.
             </span>
             <Link href="/admin/rates" className={styles.btnGhost}>
               ثبت نرخ
@@ -108,8 +117,8 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
         {aiCostWarn && (
           <div className={styles.rateWarn} role="status">
             <span>
-              دستیار هوشمند امروز {fmtNum(aiCostWarn.pct)}٪ سقف هزینه‌ی روزانه را مصرف کرده ({fmtNum(Math.round(aiCostWarn.cost))} از {fmtNum(aiCostWarn.cap)} تومان). با رسیدن به سقف، تا فردا
-              چت‌ها مستقیم به کارشناس می‌روند.
+              دستیار هوشمند امروز {fmtNum(aiCostWarn.pct)}٪ سقف هزینه‌ی روزانه را مصرف کرده ({fmtNum(Math.round(aiCostWarn.cost))} از {fmtNum(aiCostWarn.cap)} تومان). با رسیدن به
+              سقف، تا فردا چت‌ها مستقیم به کارشناس می‌روند.
             </span>
             <Link href="/admin/ai" className={styles.btnGhost}>
               دستیار هوشمند
@@ -121,6 +130,20 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
             <span>{fmtNum(kbOverdue)} مورد پایگاه دانش دستیار بیش از بازه‌ی تنظیم‌شده بررسی نشده‌اند.</span>
             <Link href="/admin/ai/knowledge?filter=overdue" className={styles.btnGhost}>
               فهرست موردها
+            </Link>
+          </div>
+        )}
+        {testWarn && (
+          <div className={styles.rateWarn} role="status">
+            <span>
+              {testWarn.kind === "never"
+                ? "آزمون کامل دستیار هنوز اجرا نشده."
+                : testWarn.kind === "changed"
+                  ? "مدل یا دستورالعمل دستیار بعد از آخرین آزمون کامل عوض شده؛ آزمون را دوباره اجرا کنید."
+                  : `آزمون کامل دستیار بیش از ${fmtNum(testWarn.days)} روز است اجرا نشده.`}
+            </span>
+            <Link href="/admin/ai/tests" className={styles.btnGhost}>
+              آزمون دستیار
             </Link>
           </div>
         )}

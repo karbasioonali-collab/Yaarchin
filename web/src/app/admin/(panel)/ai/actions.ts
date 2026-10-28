@@ -8,6 +8,7 @@ import { runConnectionTest, type TestStep } from "@/lib/ai/connection-test";
 import { CANNED_DEFAULTS } from "@/lib/ai/canned";
 import { clearBlacklistCache } from "@/lib/ai/guard-terms";
 import { type KbInput, markReviewed, saveKb } from "@/lib/ai/kb";
+import { CURRENCY_ERROR, hasCurrencyAmount } from "@/lib/ai/learn";
 import { aiReady } from "@/lib/db-ready";
 import { getSetting, setSetting } from "@/lib/settings";
 import { toLatinDigits } from "@/lib/validation";
@@ -25,6 +26,9 @@ const LIMITS: [string, string, number, number][] = [
   ["ai.lead_score_handoff", "leadScore", 1, 100000],
   ["ai.resume_after_hours", "resumeHours", 0, 24 * 365],
   ["ai.kb_review_days", "reviewDays", 1, 3650],
+  // آزمون دستیار (بخش ۳۳)؛ جدا از سقف چت مشتری
+  ["ai.test_daily_cost_toman", "testDailyCost", 0, 1_000_000_000],
+  ["ai.test_stale_days", "testStaleDays", 1, 3650],
 ];
 
 export async function saveAiLimitsAction(_prev: FormState, fd: FormData): Promise<FormState> {
@@ -39,8 +43,15 @@ export async function saveAiLimitsAction(_prev: FormState, fd: FormData): Promis
     if (!Number.isInteger(n) || n < min || n > max) return { error: `مقدار «${field}» باید عدد صحیح بین ${min.toLocaleString("fa-IR")} و ${max.toLocaleString("fa-IR")} باشد.` };
     values.push([key, n]);
   }
+  // تنظیمی که seed هنوز نساخته (مثلاً سقف آزمون قبل از npm run db:seed) رد می‌شود و بقیه ذخیره می‌شوند
+  const missing: string[] = [];
   for (const [key, n] of values) {
-    const { before } = await setSetting(key, n, a.user.id);
+    const r = await setSetting(key, n, a.user.id).catch(() => null);
+    if (!r) {
+      missing.push(key);
+      continue;
+    }
+    const before = r.before;
     if (before !== n)
       await logActivity({
         actorUserId: a.user.id,
@@ -53,6 +64,7 @@ export async function saveAiLimitsAction(_prev: FormState, fd: FormData): Promis
       });
   }
   revalidatePath("/admin", "layout");
+  if (missing.length) return { error: `بقیه ذخیره شد، ولی ${missing.join("، ")} هنوز در دیتابیس نیست؛ اول در کنسول لیارا npm run db:seed را اجرا کنید.` };
   return { ok: "ذخیره شد." };
 }
 
@@ -157,6 +169,8 @@ function readKb(fd: FormData): { v: KbInput } | { error: string } {
   if (question.length < 3) return { error: "سؤال را بنویسید." };
   if (answer.length < 2) return { error: "جواب را بنویسید." };
   if (status === "active" && /\[تکمیل شود/.test(answer)) return { error: "جواب هنوز «[تکمیل شود]» دارد؛ اول کاملش کنید یا وضعیت را «پیش‌نویس» بگذارید." };
+  // مبلغ در جواب پایگاه دانش ممنوع (قیمت از داده‌های سایت و ماشین‌حساب؛ بخش ۳۳)
+  if (hasCurrencyAmount(answer)) return { error: CURRENCY_ERROR };
   return { v: { question, answer, variants, category, status } };
 }
 

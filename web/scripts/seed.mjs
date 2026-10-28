@@ -42,10 +42,7 @@ try {
     const list = perms === "*" ? seed.permissions.map((p) => p.key) : perms;
     if (perms !== "*" && rows[0].n > 0) continue;
     for (const k of list) {
-      await client.query(
-        `insert into role_permissions (role_id, permission_key) values ($1,$2) on conflict do nothing`,
-        [rows[0].id, k],
-      );
+      await client.query(`insert into role_permissions (role_id, permission_key) values ($1,$2) on conflict do nothing`, [rows[0].id, k]);
     }
   }
 
@@ -62,10 +59,12 @@ try {
   const has0005 = (await client.query(`select to_regclass('public.tax_versions') is not null as ok`)).rows[0].ok;
   if (has0005) {
     for (const c of seed.rates.currencies) {
-      await client.query(
-        `insert into currencies (code, name_fa, is_base, sort_order) values ($1,$2,$3,$4) on conflict (code) do nothing`,
-        [c.code, c.nameFa, c.isBase, c.sortOrder],
-      );
+      await client.query(`insert into currencies (code, name_fa, is_base, sort_order) values ($1,$2,$3,$4) on conflict (code) do nothing`, [
+        c.code,
+        c.nameFa,
+        c.isBase,
+        c.sortOrder,
+      ]);
     }
     for (const m of seed.rates.shippingMethods) {
       await client.query(
@@ -117,6 +116,26 @@ try {
         ]);
       }
       console.log(`${drafts.length} پیش‌نویس پایگاه دانش وارد شد (وضعیت «پیش‌نویس»؛ تا فعال نشوند دستیار از آن‌ها استفاده نمی‌کند).`);
+    }
+  }
+
+  // آزمون دستیار (migration ۰۰۱۱؛ docs/infoyaarchin.md بخش ۳۳): سؤال‌های آزمون docs/ai-drafts.md بخش ب (test-drafts.json)
+  // فقط اگر جدول آزمون خالی باشد، با وضعیت «فعال» وارد می‌شوند (آزمون به مشتری کاری ندارد).
+  const has0011 = (await client.query(`select to_regclass('public.ai_test_cases') is not null as ok`)).rows[0].ok;
+  if (has0011) {
+    const { rows: tc } = await client.query(`select count(*)::int as n from ai_test_cases`);
+    if (tc[0].n === 0) {
+      const cases = JSON.parse(readFileSync(new URL("../src/db/test-drafts.json", import.meta.url), "utf8"));
+      for (const c of cases) {
+        await client.query(`insert into ai_test_cases (question, expected_answer, category, product_slug, expect, status, source) values ($1, $2, $3, $4, $5, 'active', 'seed')`, [
+          c.question,
+          c.expectedAnswer,
+          c.category,
+          c.productSlug ?? null,
+          JSON.stringify(c.expect),
+        ]);
+      }
+      console.log(`${cases.length} سؤال آزمون دستیار وارد شد.`);
     }
   }
 

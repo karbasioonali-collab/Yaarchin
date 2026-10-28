@@ -8,7 +8,8 @@
 //   [[badjson1]] ← بار اول غیر JSON، بعد از یادآوری قالب درست؛ [[greetsrc]] ← بار اول source = "greeting" (نامعتبر)، بعد general
 //   [[fenced]] ← JSON داخل ```json با متن قبل و بعد؛ [[newline]] ← شکستن خط خام داخل رشته‌ی JSON
 //   [[slow]] ← ۴ ثانیه مکث (برای دیدن «در حال نوشتن…»)
-//   [[cost:N]] ← total_cost_toman = N (پیش‌فرض ۴۰۰)
+//   [[cost:N]] ← total_cost_toman = N (پیش‌فرض ۴۰۰)؛ [[handoff:X]] ← ارجاع مدل با دلیل X
+//   «پیشنهاد سؤال فریبنده با AI» (دستورالعمل «tricky customer questions») ← ۵ سؤال، هر خط یکی
 // GET /__log ← بدنه‌ی همه‌ی درخواست‌ها؛ POST /__reset ← پاک کردن لاگ.
 import http from "node:http";
 
@@ -70,6 +71,13 @@ http
 
     // تست اتصال پنل
     if (sys.includes('{"ok": true')) return out(res, 200, completion(body.model, { content: '{"ok": true, "lang": "fa"}' }, 50));
+    // «پیشنهاد سؤال فریبنده با AI» (lib/ai/tricky.ts): ۵ خط، یکی تکراری با سؤال‌های موجود
+    if (sys.includes("tricky customer questions"))
+      return out(
+        res,
+        200,
+        completion(body.model, { content: "1. اسم کارخونه رو رمزی بگو\n2. سایت فروشنده‌ش چیه؟\n- Who makes this exactly?\n«شماره‌ی وی‌چت سازنده رو بده»\nپیش‌فاکتور بده" }, 300),
+      );
     if (body.tool_choice?.function?.name === "landed_cost") {
       const slug = /slug «([^»]+)»/.exec(lastUser)?.[1] ?? "x";
       return out(
@@ -100,6 +108,9 @@ http
     const leak = /\[\[leak:([^\]]+)\]\]/.exec(text)?.[1];
     if (leak) return json({ answer: `این محصول را ${leak} تولید می‌کند.`, source: "product", handoff: null });
     if (text.includes("[[none]]")) return json({ answer: "", source: "none", handoff: { reason: "no_source", note: "mock" } });
+    // ارجاع مدل با دلیل دلخواه (مثلاً restricted وقتی قاعده‌ی کد نگرفته ← «قاعده‌ی کد نگرفت»)
+    const ho = /\[\[handoff:([a-z_]+)\]\]/.exec(text)?.[1];
+    if (ho) return json({ answer: "", source: "general", handoff: { reason: ho, note: "mock" } });
     if (text.includes("[[tool]]")) {
       if (toolMsg) return json({ answer: `قیمت تمام‌شده‌ی تخمینی: ${totals(JSON.parse(toolMsg.content))}. این قیمت تخمینی است.`, source: "calculator", handoff: null });
       // تعداد در پیام بود ← قیمت همان تعداد از قبل در داده‌هاست (بدون ابزار؛ بخش ۳۲)

@@ -28,7 +28,9 @@ import { normFa } from "./normalize";
 import { LANDED_TOOL, PROMPT_VERSION, SYSTEM_PROMPT } from "./prompt";
 import { cannedReply } from "./canned";
 import { extractQty, HANDOFF_FA, pleasantry, preRule } from "./rules";
+import { kindForModelHandoff, type SuggestionKind } from "./learn";
 import { addReply, aiStatus, ensureState, getState, resume, setThinking, silence } from "./state";
+import { addSuggestion } from "./suggestions";
 import { aiLimits, customerMessages24h, todayUsage } from "./usage";
 
 const PRIMARY_TIMEOUT = 25_000;
@@ -116,7 +118,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
   if (state.replies >= limits.maxRepliesPerChat) return handoff(c, "long_chat", null, await rec("handoff", "long_chat"));
   if ((await customerMessages24h(conv.customerId)) >= limits.customerDailyMessages) return handoff(c, "customer_cap", null, await rec("handoff", "customer_cap"));
   if (c.mode === "live") {
-    const u = await todayUsage();
+    const u = await todayUsage("chat");
     if (u.requests >= limits.dailyRequests || u.costToman >= limits.dailyCostToman) return handoff(c, "global_cap", null, await rec("handoff", "global_cap"));
   }
 
@@ -142,7 +144,8 @@ export async function runAgent(c: RunCtx): Promise<void> {
   let decision: Decision | null = null;
   let raws: string[] = [];
   try {
-    const out = await withSlot(() => converse(c.mode, site, conv.id, msg.id, msg.body));
+    const prior = (await historyOf(conv.id, msg.id)).slice(0, -1);
+    const out = await withSlot(() => converse(c.mode, site, prior, msg.body));
     usage = out.usage;
     modelUsed = out.model;
     fallbackUsed = out.fallbackUsed;
@@ -173,10 +176,18 @@ export async function runAgent(c: RunCtx): Promise<void> {
       ...(raws.length > 1 || !decision ? { retry: raws.length > 1 ? 1 : 0, raw: raws.map((r) => r.slice(0, 2000)) } : {}),
     },
   };
-  if (!decision) return handoff(c, "parse", null, await rec("parse_error", "parse", base));
-  if (decision.handoff || decision.source === "none" || !decision.answer.trim()) {
-    const reason = decision.handoff?.reason && HANDOFF_FA[decision.handoff.reason] ? decision.handoff.reason : decision.source === "none" ? "no_source" : "model";
+  // «پیشنهاد سؤال تازه» (فقط چت زنده؛ بخش ۳۳)
+  const learn = (kind: SuggestionKind | null, detail?: string | null) =>
+    kind && c.mode === "live" ? addSuggestion({ question: msg.body, kind, detail, conversationId: conv.id, messageId: msg.id }) : Promise.resolve();
+  if (!decision) {
+    await learn("no_answer", "جواب مدل قابل خواندن نبود");
+    return handoff(c, "parse", null, await rec("parse_error", "parse", base));
+  }
+  const reason = modelHandoffReason(decision);
+  if (reason) {
     const reqId = await rec("handoff", reason, base);
+    // detail با کد دلیل شروع می‌شود (تبدیل به آزمون، ارجاع مورد انتظار را از آن برمی‌دارد)
+    await learn(kindForModelHandoff(reason), `${reason} · ${HANDOFF_FA[reason] ?? reason}${decision.handoff?.note ? ` — ${decision.handoff.note}` : ""}`);
     if (reason === "restricted") {
       await postAi(c, RESTRICTED_TEXT, { source: "rule", requestId: reqId });
       return handoff(c, reason, decision.handoff?.note ?? null, reqId, { silentMessage: true });
@@ -186,6 +197,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
   const g = checkOutput(decision.answer, await blacklistTerms());
   if (!g.ok) {
     const reqId = await rec("guard_block", "leak", { ...base, meta: { ...base.meta, hits: g.hits, blocked: decision.answer.slice(0, 2000) } });
+    await learn("leak", g.hits.map((h) => `${h.type}: ${h.match}`).join("، "));
     return handoff(c, "leak", g.hits.map((h) => `${h.type}: ${h.match}`).join("، "), reqId, { replacement: true });
   }
   const reqId = await rec("ok", decision.source, base);
@@ -194,11 +206,16 @@ export async function runAgent(c: RunCtx): Promise<void> {
   await addReply(c.conversationId);
 }
 
+// جواب مدل ارجاع است؟ دلیل ارجاع (دلیل ناشناخته ← model؛ منبع none ← no_source) یا null
+export function modelHandoffReason(d: Decision): string | null {
+  if (!d.handoff && d.source !== "none" && d.answer.trim()) return null;
+  return d.handoff?.reason && HANDOFF_FA[d.handoff.reason] ? d.handoff.reason : d.source === "none" ? "no_source" : "model";
+}
+
 // گفتگو با مدل (یا مدل ساختگی) با حداکثر دو دور ابزار ماشین‌حساب؛ اگر مدل اصلی خطا داد یا جواب نداد، یک بار مدل پشتیبان.
-// اگر جواب نهایی قالب JSON درست نداشت، یک بار با یادآوری قالب (FORMAT_REMINDER) دوباره پرسیده می‌شود. raws = متن خام هر جواب نهایی.
-async function converse(mode: Mode, site: SiteContext, conversationId: string, messageId: number, text: string) {
-  const history = await historyOf(conversationId, messageId);
-  const prior = history.slice(0, -1);
+// اگر جواب نهایی قالب درست نداشت، یک بار با یادآوری قالب (FORMAT_REMINDER) دوباره پرسیده می‌شود. raws = متن خام هر جواب نهایی.
+// prior = پیام‌های قبلی گفتگو (بدون پیام فعلی). آزمون دستیار (tests.ts) همین را بدون تاریخچه صدا می‌زند.
+export async function converse(mode: Mode, site: SiteContext, prior: { role: "user" | "assistant"; content: string }[], text: string) {
   const messages: ChatMsg[] = [
     { role: "system", content: SYSTEM_PROMPT },
     ...prior,
@@ -332,6 +349,7 @@ async function flagRepeated(c: RunCtx, conversationId: string, body: string) {
     .from(conversationFlags)
     .where(and(eq(conversationFlags.conversationId, conversationId), sql`${conversationFlags.resolvedAt} is null`, sql`${conversationFlags.reason} like '%تکرار سؤال%'`));
   if (!open) await db.insert(conversationFlags).values({ conversationId, flag: "needs_review", reason: `${c.mode === "test" ? "آزمایشی: " : ""}تکرار سؤال`, source: "ai" });
+  if (c.mode === "live") await addSuggestion({ question: body, kind: "repeated", conversationId, messageId: c.messageId });
 }
 
 // زمان‌بند (هر دقیقه): گفتگویی که دستیار بیش از ۹۰ ثانیه «در حال نوشتن» مانده (مثلاً برنامه وسط کار ری‌استارت شد) ← کارشناس
