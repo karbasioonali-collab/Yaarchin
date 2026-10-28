@@ -212,6 +212,7 @@ export async function evaluateQuestion(
     costToman: String(out.usage.costToman),
     meta: {
       cachedTokens: out.usage.cachedTokens ?? 0,
+      products: site.products.map((p) => p.slug),
       ...(out.raws.length > 1 || !decision ? { retry: out.raws.length > 1 ? 1 : 0, raw: out.raws.map((r) => r.slice(0, 2000)) } : {}),
     },
   };

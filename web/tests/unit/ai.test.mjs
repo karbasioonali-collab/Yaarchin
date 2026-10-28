@@ -1,11 +1,11 @@
 // تست واحد دستیار هوشمند (محافظ خروجی، قاعده‌های ارجاع، تعداد، جستجوی پایگاه دانش، خواندن جواب مدل).
 // اجرا (از پوشه‌ی web): node --experimental-strip-types tests/unit/ai.test.mjs   — docs/infoyaarchin.md بخش ۲۹.
 import { checkOutput } from "../../src/lib/ai/guard.ts";
-import { extractQty, pleasantry, preRule } from "../../src/lib/ai/rules.ts";
+import { extractQty, pleasantry, preRule, wantsHuman } from "../../src/lib/ai/rules.ts";
 import { compact, normFa } from "../../src/lib/ai/normalize.ts";
 import { scoreKb } from "../../src/lib/ai/kb-score.ts";
 import { parseDecision, parseLines } from "../../src/lib/ai/decision.ts";
-import { contextJson, LIMITS, priceIntent, shapeKb, shapeProduct, trimHistory } from "../../src/lib/ai/context-shape.ts";
+import { contextJson, DEFAULT_GENERIC_WORDS, LIMITS, priceIntent, shapeKb, shapeProduct, titleMention, titleTerms, trimHistory } from "../../src/lib/ai/context-shape.ts";
 import { SYSTEM_PROMPT } from "../../src/lib/ai/prompt.ts";
 
 let fails = 0,
@@ -262,6 +262,58 @@ ok(
   SYSTEM_PROMPT.length < 3200 && (SYSTEM_PROMPT.match(/[\u0600-\u06FF]/g) || []).length < 150,
   `prompt is English (fa chars ${(SYSTEM_PROMPT.match(/[\u0600-\u06FF]/g) || []).length})`,
 );
+
+// ---- «مشتری کارشناس خواست» فقط با درخواست واقعی (بخش ۳۴)
+for (const t of [
+  "می‌خوام با کارشناس صحبت کنم",
+  "با کارشناس صحبت کنم",
+  "کارشناس",
+  "کارشناس!",
+  "کارشناس لطفا",
+  "اپراتور",
+  "با یه آدم واقعی حرف بزنم",
+  "یه آدم واقعی میخوام",
+  "وصلم کن به کارشناس",
+  "یه کارشناس جواب بده",
+  "مدیرتون رو میخوام",
+  "میخوام با مدیر صحبت کنم",
+  "کارشناس بیاد جواب بده",
+  "با یک نفر صحبت کنم",
+])
+  ok(preRule(t, { bigOrderQty: 5000 }) === "human" && wantsHuman(t), `wants human: ${t}`);
+for (const t of ["ساعت کاری کارشناس‌ها؟", "کارشناس‌ها کی جواب میدن؟", "کارشناس‌ها چند نفرن؟", "کارشناس‌ها", "مدیریت سفارش چطوریه؟", "پشتیبانی بعد از خرید دارید؟"])
+  ok(preRule(t, { bigOrderQty: 5000 }) === null, `not a human request: ${t}`);
+
+// ---- محصولی که مشتری اسمش را آورده (بخش ۳۴)
+const TITLES = {
+  blender: "مخلوط‌کن قابل‌حمل شارژی ۳۸۰ میلی‌لیتر",
+  juicer: "آبمیوه‌گیری تک‌کاره ۳۰۰ وات",
+  pot: "سرویس قابلمه‌ی استیل ۱۰ پارچه",
+  pb1: "پاوربانک ۱۰۰۰۰ میلی‌آمپر فست‌شارژ PD 20W",
+  pb2: "پاوربانک مگنتی بی‌سیم ۵۰۰۰ میلی‌آمپر",
+  bag: "کیسه‌ی کاغذی کرافت دسته‌دار با چاپ اختصاصی",
+  juicer2: "دستگاه آبمیوه‌گیری صنعتی",
+  lamp: "لامپ LED حبابی ۱۲ وات E27",
+};
+const hits = (q, gen = DEFAULT_GENERIC_WORDS) =>
+  Object.entries(TITLES)
+    .filter(([, t]) => titleMention(q, t, gen) > 0)
+    .map(([k]) => k)
+    .sort()
+    .join(",");
+ok(hits("می‌تونم لوگوی خودمو چاپ کنم؟") === "", "logo/print question → no product (one attribute word)");
+ok(hits("این دستگاه چند واته؟") === "", "«این دستگاه چند واته؟» → no product");
+ok(hits("آبمیوه‌گیری دارید؟") === "juicer,juicer2" && hits("آبمیوه گیری دارید") === "juicer,juicer2", "«آبمیوه‌گیری دارید؟» → juicers (ZWNJ or space)");
+ok(hits("پاوربانکتون چنده؟") === "pb1,pb2", "head word with suffix");
+ok(hits("چاپ اختصاصی لوگو دارید؟") === "", "two attribute words of a 6-word title → no product");
+ok(hits("کیسه کاغذی دارید") === "bag", "head word «کیسه» (ezafe stripped)");
+ok(hits("مخلوط کن قابل حمل شارژی") === "blender", "blender by name");
+ok(hits("سرویس پس از فروش دارید؟") === "", "generic «سرویس» is not a head word");
+ok(hits("قابلمه استیل") === "pot", "head after generic word");
+ok(titleTerms("دستگاه آبمیوه‌گیری صنعتی", DEFAULT_GENERIC_WORDS).head === "ابمیوهگیری", "generic first word skipped → next word is the head");
+ok(titleTerms("دستگاه آبمیوه‌گیری صنعتی", ["صنعتی"]).head === "دستگاه", "generic list is configurable");
+ok(hits("این دستگاه چنده", ["صنعتی"]) === "juicer2", "without «دستگاه» in the list it becomes a head word");
+ok(hits("لامپ حبابی") === "lamp" && hits("۱۲ وات") === "", "numbers alone never match");
 
 console.log(`${n} checks${fails ? `, ${fails} FAILED` : ", ALL PASSED"}`);
 process.exitCode = fails ? 1 : 0;

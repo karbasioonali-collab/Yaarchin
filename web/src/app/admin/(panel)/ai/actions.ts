@@ -6,6 +6,7 @@ import { logActivity } from "@/lib/activity";
 import { requirePermission } from "@/lib/auth/can";
 import { runConnectionTest, type TestStep } from "@/lib/ai/connection-test";
 import { CANNED_DEFAULTS } from "@/lib/ai/canned";
+import { DEFAULT_GENERIC_WORDS } from "@/lib/ai/context-shape";
 import { clearBlacklistCache } from "@/lib/ai/guard-terms";
 import { type KbInput, markReviewed, saveKb } from "@/lib/ai/kb";
 import { CURRENCY_ERROR, hasCurrencyAmount } from "@/lib/ai/learn";
@@ -92,6 +93,33 @@ export async function saveBlacklistAction(_prev: FormState, fd: FormData): Promi
   });
   revalidatePath("/admin/ai");
   return { ok: `ذخیره شد (${list.length.toLocaleString("fa-IR")} کلمه).` };
+}
+
+// «کلمه‌های کلی» عنوان محصول (بخش ۳۴): اسم اصلی کالا حساب نمی‌شوند. خالی = پیش‌فرض.
+export async function saveGenericWordsAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("ai.settings");
+  const list = [
+    ...new Set(
+      String(fd.get("words") ?? "")
+        .split(/[\n،,]/)
+        .map((s) => s.trim())
+        .filter((s) => s.length >= 2 && s.length <= 40),
+    ),
+  ].slice(0, 200);
+  const value = list.length ? list : DEFAULT_GENERIC_WORDS;
+  const r = await setSetting("ai.product_generic_words", value, a.user.id).catch(() => null);
+  if (!r) return { error: "این تنظیم هنوز در دیتابیس نیست؛ اول در کنسول لیارا npm run db:seed را اجرا کنید." };
+  await logActivity({
+    actorUserId: a.user.id,
+    actingAsUserId: a.session.impersonatingUserId,
+    action: "setting.update",
+    entityType: "setting",
+    entityId: "ai.product_generic_words",
+    before: { value: r.before },
+    after: { value },
+  });
+  revalidatePath("/admin/ai");
+  return { ok: `ذخیره شد (${value.length.toLocaleString("fa-IR")} کلمه).` };
 }
 
 // جواب‌های آماده‌ی احوال‌پرسی، تشکر و خداحافظی (docs/infoyaarchin.md بخش ۳۱). خالی = متن پیش‌فرض.

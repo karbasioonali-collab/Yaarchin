@@ -2,14 +2,14 @@ import "server-only";
 // «داده‌های سایت» که همراه سؤال به مدل داده می‌شود. فقط داده‌ی عمومی (همان API عمومی سایت، src/lib/catalog/public.ts):
 // هیچ اسم یا اطلاعات کارخانه، هیچ HS code، و قیمت دلاری کارخانه‌ها هم فرستاده نمی‌شود (فقط قیمت تمام‌شده‌ی کارت سایت).
 // docs/infoyaarchin.md بخش ۲۹.
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { chatMessages, products } from "@/db/schema";
 import { loadPublishedProduct } from "@/lib/catalog/public";
+import { getSetting } from "@/lib/settings";
 import { clampQty, publicLandedCost, type LandedCost } from "@/lib/pricing/landed";
-import { contextJson, LIMITS, priceIntent, shapeKb, shapeProduct, trimHistory, type LandedCompact } from "./context-shape";
+import { contextJson, DEFAULT_GENERIC_WORDS, LIMITS, priceIntent, shapeKb, shapeProduct, titleMention, trimHistory, type LandedCompact } from "./context-shape";
 import { searchKb, type KbHit } from "./kb";
-import { tokens } from "./normalize";
 
 export type ProductCtx = {
   slug: string;
@@ -59,28 +59,27 @@ export async function slugOf(productId: string | null): Promise<string | null> {
   return p?.slug ?? null;
 }
 
-// محصولات منتشرشده‌ای که اسمشان در پیام مشتری آمده (حداکثر ۲)
+// محصولات منتشرشده‌ای که مشتری واقعاً اسمشان را آورده (حداکثر ۲؛ قاعده در context-shape.ts ← titleMention، بخش ۳۴).
+// هم در گفتگوی عمومی و هم کنار محصول اصلی گفتگوی محصول. یک کلمه‌ی ویژگی («چاپ»، «وات») محصولی نمی‌آورد.
+// همه‌ی عنوان‌های منتشرشده خوانده می‌شوند (چند صد ردیف کوتاه) و تطبیق در برنامه انجام می‌شود.
 export async function mentionedProducts(text: string, exclude: string | null): Promise<string[]> {
-  const ts = tokens(text)
-    .filter((t) => t.length >= 3)
-    .slice(0, 8);
-  if (!ts.length) return [];
-  const rows = await db
-    .select({
-      slug: products.slug,
-      n: sql<number>`(${sql.join(
-        ts.map((t) => sql`(case when ${products.titleFa} ilike ${`%${t}%`} then 1 else 0 end)`),
-        sql` + `,
-      )})::int`,
-    })
-    .from(products)
-    .where(and(eq(products.status, "published"), or(...ts.map((t) => ilike(products.titleFa, `%${t}%`)))))
-    .orderBy(desc(sql`2`))
-    .limit(3);
+  const [rows, generic] = await Promise.all([
+    db.select({ slug: products.slug, title: products.titleFa }).from(products).where(eq(products.status, "published")).limit(5000),
+    genericWords(),
+  ]);
   return rows
-    .filter((r) => r.slug !== exclude && r.n >= 1)
-    .map((r) => r.slug)
-    .slice(0, 2);
+    .filter((r) => r.slug !== exclude)
+    .map((r) => ({ slug: r.slug, score: titleMention(text, r.title, generic) }))
+    .filter((r) => r.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map((r) => r.slug);
+}
+
+// «کلمه‌های کلی» عنوان محصول (پنل دستیار؛ تنظیم ai.product_generic_words). تا seed نشده، پیش‌فرض.
+export async function genericWords(): Promise<string[]> {
+  const v = await getSetting<string[]>("ai.product_generic_words").catch(() => null);
+  return Array.isArray(v) && v.length ? v.filter((x) => typeof x === "string") : DEFAULT_GENERIC_WORDS;
 }
 
 // تاریخچه‌ی گفتگو برای مدل: فقط پیام‌های متنیِ دیده‌شده‌ی مشتری؛ سقف تعداد و طول در context-shape.ts (LIMITS)

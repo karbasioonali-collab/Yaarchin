@@ -8,6 +8,7 @@ import { db } from "@/db/client";
 import { aiRequests } from "@/db/schema";
 import { aiConfig } from "@/lib/ai/config";
 import { CANNED_DEFAULTS, cannedText } from "@/lib/ai/canned";
+import { genericWords } from "@/lib/ai/context";
 import { blacklistTerms } from "@/lib/ai/guard-terms";
 import { reviewDays } from "@/lib/ai/kb";
 import { PROMPT_VERSION } from "@/lib/ai/prompt";
@@ -19,7 +20,7 @@ import { aiReady, aiTestsReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import { getSetting, isEnabled } from "@/lib/settings";
 import styles from "../panel.module.css";
-import { saveAiLimitsAction, saveBlacklistAction, saveCannedAction } from "./actions";
+import { saveAiLimitsAction, saveBlacklistAction, saveCannedAction, saveGenericWordsAction } from "./actions";
 import { ConnectionTest } from "./ConnectionTest";
 
 export const metadata: Metadata = { title: "دستیار هوشمند" };
@@ -60,7 +61,7 @@ export default async function AiPage() {
     ready ? todayUsage("test") : Promise.resolve(zero),
     aiTestsReady(),
   ]);
-  const canned = await Promise.all(CANNED_FIELDS.map(([k]) => cannedText(k)));
+  const [canned, generic] = await Promise.all([Promise.all(CANNED_FIELDS.map(([k]) => cannedText(k))), genericWords()]);
   const [recent, ext] = await Promise.all([
     ready ? db.select().from(aiRequests).orderBy(desc(aiRequests.id)).limit(50) : Promise.resolve([]),
     db
@@ -181,6 +182,20 @@ export default async function AiPage() {
             </label>
           </ActionForm>
         </div>
+      </div>
+
+      <div className={styles.card} style={{ marginTop: 16 }}>
+        <h2 className={styles.cardTitle}>کلمه‌های کلی عنوان محصول</h2>
+        <p className={styles.muted} style={{ marginTop: 0, fontSize: 13 }}>
+          دستیار محصولی را فقط وقتی همراه سؤال می‌فرستد که مشتری واقعاً اسمش را آورده باشد: «اسم اصلی کالا» (اولین کلمه‌ی عنوان که در این فهرست نیست؛ در «دستگاه آبمیوه‌گیری» ←
+          «آبمیوه‌گیری») یا دست‌کم نیمی از کلمه‌های عنوان. یک کلمه‌ی ویژگی مثل «چاپ» یا «وات» به‌تنهایی محصولی نمی‌آورد.
+        </p>
+        <ActionForm action={saveGenericWordsAction} submitLabel="ذخیره">
+          <label className={ui.field}>
+            <span className={ui.label}>هر خط یک کلمه (خالی = فهرست پیش‌فرض)</span>
+            <textarea name="words" className={ui.textarea} rows={4} defaultValue={generic.join("\n")} />
+          </label>
+        </ActionForm>
       </div>
 
       <div className={styles.card} style={{ marginTop: 16 }}>
