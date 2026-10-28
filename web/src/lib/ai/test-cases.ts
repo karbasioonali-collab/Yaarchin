@@ -3,7 +3,6 @@ import "server-only";
 import { and, desc, eq, lt, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { aiTestCases, aiTestCaseVersions, aiTestResults } from "@/db/schema";
-import { addSuggestion } from "./suggestions";
 import type { TestExpect } from "./test-checks";
 
 // jsonb ترتیب کلیدها را عوض می‌کند؛ مقایسه‌ی فیلدبه‌فیلد
@@ -61,14 +60,12 @@ export async function caseVersions(id: string) {
 // سؤال‌هایی که بیش از بازه‌ی بررسی پایگاه دانش (ai.kb_review_days) بررسی نشده‌اند ← فیلتر «نیاز به بررسی مجدد»
 export const caseOverdueSql = (days: number) => lt(aiTestCases.lastReviewedAt, sql`now() - make_interval(days => ${days})`);
 
-// قضاوت انسان: «درست» / «اشتباه». «اشتباه» ← سؤال به «پیشنهاد سؤال تازه» (test_wrong) می‌رود.
-export async function setVerdict(resultId: number, verdict: "correct" | "wrong", by: string): Promise<{ runId: string } | null> {
+// قضاوت انسان: «درست» / «اشتباه». فقط ثبت؛ «اشتباه» ← پیشنهاد test_wrong را صدازننده بعد از جواب می‌سازد (actions.ts).
+export async function setVerdict(resultId: number, verdict: "correct" | "wrong", by: string): Promise<{ runId: string; question: string; answer: string } | null> {
   const [r] = await db
     .update(aiTestResults)
     .set({ verdict, verdictBy: by, verdictAt: new Date() })
     .where(and(eq(aiTestResults.id, resultId), eq(aiTestResults.status, "done")))
     .returning({ runId: aiTestResults.runId, question: aiTestResults.question, answer: aiTestResults.answer });
-  if (!r) return null;
-  if (verdict === "wrong") await addSuggestion({ question: r.question, kind: "test_wrong", detail: (r.answer ?? "").slice(0, 300) });
-  return { runId: r.runId };
+  return r ? { runId: r.runId, question: r.question, answer: r.answer ?? "" } : null;
 }

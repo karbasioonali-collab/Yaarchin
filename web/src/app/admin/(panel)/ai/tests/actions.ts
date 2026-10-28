@@ -9,6 +9,7 @@ import { requirePermission } from "@/lib/auth/can";
 import { HANDOFF_FA } from "@/lib/ai/rules";
 import { type CaseInput, markCaseReviewed, saveCase, setVerdict } from "@/lib/ai/test-cases";
 import { SOURCES } from "@/lib/ai/decision";
+import { addSuggestion } from "@/lib/ai/suggestions";
 import { createRun, executeRun, requestStop, type Scope, type ScopeKind, SCOPE_FA } from "@/lib/ai/tests";
 import { aiTestsReady } from "@/lib/db-ready";
 
@@ -119,14 +120,15 @@ export async function stopRunAction(fd: FormData): Promise<void> {
   revalidatePath(`/admin/ai/tests/runs/${id}`);
 }
 
-export async function verdictAction(fd: FormData): Promise<void> {
+// قضاوت «درست/اشتباه» از دکمه‌های سمت مرورگر (VerdictButtons): بدون بازسازی صفحه؛ پیشنهاد «آزمون: اشتباه» و لاگ بعد از جواب (after)
+export async function verdictAction(resultId: number, verdict: "correct" | "wrong"): Promise<{ ok: true } | { error: string }> {
   const a = await requirePermission("ai.tests");
-  const id = Number(fd.get("resultId"));
-  const verdict = fd.get("verdict") === "wrong" ? "wrong" : fd.get("verdict") === "correct" ? "correct" : null;
-  if (!Number.isInteger(id) || !verdict || !(await aiTestsReady())) return;
-  const r = await setVerdict(id, verdict, a.user.id);
-  if (r) {
-    await logActivity({ actorUserId: a.user.id, action: "ai_test.verdict", entityType: "ai_test_result", entityId: String(id), after: { verdict } });
-    revalidatePath(`/admin/ai/tests/runs/${r.runId}`);
-  }
+  if (!Number.isInteger(resultId) || (verdict !== "correct" && verdict !== "wrong") || !(await aiTestsReady())) return { error: "درخواست نامعتبر است." };
+  const r = await setVerdict(resultId, verdict, a.user.id);
+  if (!r) return { error: "نتیجه پیدا نشد." };
+  after(async () => {
+    if (verdict === "wrong") await addSuggestion({ question: r.question, kind: "test_wrong", detail: r.answer.slice(0, 300) });
+    await logActivity({ actorUserId: a.user.id, action: "ai_test.verdict", entityType: "ai_test_result", entityId: String(resultId), after: { verdict } });
+  });
+  return { ok: true };
 }

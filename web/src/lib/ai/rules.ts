@@ -28,7 +28,6 @@ const RULES: [string, RegExp][] = [
   ["discount", /تخفیف|ارزان ?تر (حساب|بده|میدی|بدید)|کمتر حساب|آف بده/],
   ["final_price", /قیمت (قطعی|نهایی|دقیق)|قطعی (بگو|بگید|بدید|کنید)|نهایی (بگو|کنید)|قیمت فیکس/],
   ["complaint", /شکایت|شاکی|کلاهبردار|خراب (رسید|بود|اومد|امد)|معیوب|مرجوع|پس (بدم|بفرستم|میدم)|پول(م)? رو? (پس|برگردون)|ناراضی|اعتراض/],
-  ["human", /کارشناس|اپراتور|پشتیبان انسانی|آدم واقعی|ادم واقعی|انسان واقعی|با یه آدم|با یک نفر|مدیر(تون)?/],
   [
     "restricted",
     /(اسم|نام|آدرس|ادرس|لینک|شماره|تلفن|ایمیل|مشخصات) ?(ی )?(کارخانه|کارخونه|تولید ?کننده|تامین ?کننده|فروشنده|سازنده|برند سازنده)|علی ?بابا|alibaba|1688|made ?in ?china|aliexpress|علی ?اکسپرس|فورواردر|forwarder|ترخیص ?کار|کارگزار گمرک|شرکت حمل|بیمه ?گر|واردکننده (ی )?(دیگه|دیگر)|رقبا|رقیب/,
@@ -76,10 +75,28 @@ export function asksSupplierIdentity(text: string): boolean {
   return !PRODUCT_Q.test(n) || CONTACT.test(n);
 }
 
+// مشتری می‌خواهد با انسان صحبت کند؟ (بخش ۳۴) فقط کلمه‌ی «کارشناس» کافی نیست («ساعت کاری کارشناس‌ها؟» سؤال است، نه درخواست):
+// کلمه‌ی کارشناس/اپراتور/پشتیبان/آدم واقعی/مدیر همراه یک درخواست (می‌خوام، بده، وصل کن، صحبت، حرف، تماس، زنگ، جواب بده، …)،
+// یا پیامی که فقط همان کلمه است («کارشناس!»، «اپراتور لطفا»). «مدیریت» مدیر حساب نمی‌شود.
+const HUMAN_WHO = /(کارشناس|اپراتور|پشتیبان|ادم واقعی|انسان واقعی|ادم حسابی|یه ادم|یک ادم|یه نفر|یک نفر|مدیر(?!یت))/;
+const HUMAN_ASK = /(می ?خوام|می ?خواهم|میخام|بده|بدید|بدین|وصل|صحبت|حرف|تماس|زنگ|جواب (بده|بدید|بدین|بدهد)|پاسخ (بده|بدید|بدهد)|بیاد|بیاید|کمکم کنه|رسیدگی کنه)/;
+const HUMAN_ONLY = new Set(["کارشناس", "اپراتور", "پشتیبان", "پشتیبانی", "لطفا", "لطفاً", "یه", "یک", "با", "رو", "را", "هست", "هستین", "هستید", "کجایی", "کجاست"]);
+
+export function wantsHuman(text: string): boolean {
+  const n = normFa(text)
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!HUMAN_WHO.test(n)) return false;
+  if (HUMAN_ASK.test(n)) return true;
+  return n.split(" ").every((w) => HUMAN_ONLY.has(w));
+}
+
 // دلیل ارجاع فوری بر اساس متن مشتری، یا null
 export function preRule(text: string, opts: { bigOrderQty: number }): string | null {
   const n = normFa(text);
   for (const [reason, re] of RULES) if (re.test(n)) return reason;
+  if (wantsHuman(text)) return "human";
   if (asksSupplierIdentity(text)) return "restricted";
   const q = extractQty(text);
   if (q !== null && q >= opts.bigOrderQty) return "big_order";

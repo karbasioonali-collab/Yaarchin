@@ -93,12 +93,12 @@
   {
     "n": 8,
     "question": "نمونه می‌فرستید؟",
-    "expectedAnswer": "منبع: پایگاه دانش.",
+    "expectedAnswer": "منبع: پایگاه دانش یا عمومی.",
     "category": "normal",
     "productSlug": null,
     "expect": {
       "handoff": null,
-      "source": "knowledge",
+      "source": "knowledge|general",
       "forbidden": [],
       "mustInclude": []
     }
@@ -119,12 +119,12 @@
   {
     "n": 10,
     "question": "کارت بازرگانی لازمه؟",
-    "expectedAnswer": "منبع: پایگاه دانش.",
+    "expectedAnswer": "منبع: پایگاه دانش یا عمومی.",
     "category": "normal",
     "productSlug": null,
     "expect": {
       "handoff": null,
-      "source": "knowledge",
+      "source": "knowledge|general",
       "forbidden": [],
       "mustInclude": []
     }

@@ -127,6 +127,10 @@ let FREE;
       `select path || '|' || coalesce(answer_source,'') || '|' || coalesce(handoff_reason,'') || '|' || auto_pass from ai_test_results where run_id='${FULL}' and question=${q(question)}`,
     );
   ok(res("سلام") === "canned|canned||true", `«سلام» canned and passes (${res("سلام")})`);
+  const logoReq = psql(
+    `select meta->>'products' from ai_requests where meta->>'testRunId'='${FULL}' and meta->>'caseId'=(select id::text from ai_test_cases where question='می‌تونم لوگوی خودمو چاپ کنم؟')`,
+  );
+  ok(logoReq === "[]", `test without product: no product data sent (${logoReq})`);
   ok(res("اسم کارخانه‌ی این محصول رو بگو") === "rule||restricted|true", "factory name → rule restricted, passes");
   ok(res("اگه ۱۰۰۰ تا بخرم تخفیف می‌دی؟") === "rule||discount|true", "discount rule passes");
   ok(res("می‌خوام ۲۰٬۰۰۰ تا سفارش بدم") === "rule||big_order|true", "big order rule passes");
@@ -149,7 +153,16 @@ let FREE;
 {
   await ad.goto(B + `/admin/ai/tests/runs/${FULL}`);
   const row = (text) => ad.getByTestId("result-row").filter({ hasText: text });
+  // دکمه‌ها فوری: انتخاب همان لحظه دیده می‌شود، بدون بازسازی صفحه (بخش ۳۴)
+  const posts = [];
+  const onReq = (r) => r.method() === "POST" && posts.push(r.url());
+  ad.on("request", onReq);
+  await ad.evaluate(() => (window.__noReload = 1));
   await row("لپ‌تاپ گیمینگ دارید؟").getByRole("button", { name: "اشتباه" }).click();
+  ok(await vis(row("لپ‌تاپ گیمینگ دارید؟").getByTestId("verdict").getByText("اشتباه", { exact: true }).first(), 500), "verdict shown immediately");
+  ok(await waitFor(() => psql(`select verdict from ai_test_results where run_id='${FULL}' and question='لپ‌تاپ گیمینگ دارید؟'`) === "wrong"), "verdict wrong saved in background");
+  ok((await ad.evaluate(() => window.__noReload)) === 1 && posts.length === 1, `one background request, no page reload (${posts.length})`);
+  ad.off("request", onReq);
   ok(await waitFor(() => sug("test_wrong") === "لپ‌تاپ گیمینگ دارید؟#1"), "verdict wrong → suggestion test_wrong");
   await row("کارت بازرگانی لازمه؟").getByRole("button", { name: "درست" }).click();
   ok(await waitFor(() => psql(`select verdict from ai_test_results where run_id='${FULL}' and question='کارت بازرگانی لازمه؟'`) === "correct"), "verdict correct saved");
@@ -297,6 +310,31 @@ if (!LIVE) {
   const p = await newCustomer();
   await say(p, SLUGS[0], "لپ تاپ گیمینگ دارید", true);
   ok(psql("select count(*) from ai_suggestions where conversation_id is not null") === "0", "test-mode chats create no suggestions");
+
+  // ---------- داده‌ی محصول فقط وقتی مشتری اسمش را آورده (بخش ۳۴) ----------
+  const prods = (mid) => psql(`select coalesce(meta->>'products','') from ai_requests where message_id=${mid}`);
+  const general = async (text) => {
+    const c = await newCustomer();
+    const r = await api(c, "POST", "/api/v1/chat", { subject: "سؤال عمومی", message: text });
+    const mid = r.j.messages.filter((m) => m.from === "me").at(-1).id;
+    await waitFor(() => psql(`select count(*) from ai_requests where message_id=${mid}`) !== "0", 20000);
+    return mid;
+  };
+  const JUICER = psql("select slug from products where status='published' and title_fa like 'آبمیوه%' limit 1");
+  const BLENDER = psql("select slug from products where status='published' and title_fa like 'مخلوط%' limit 1");
+  ok(prods(await general("این دستگاه چند واته؟")) === "[]", "general chat «این دستگاه چند واته؟» → no product");
+  ok(prods(await general("می‌تونم لوگوی خودمو چاپ کنم؟")) === "[]", "general chat «چاپ لوگو» → no product (was the bag)");
+  ok(prods(await general("آبمیوه‌گیری دارید؟")) === `["${JUICER}"]`, `general chat «آبمیوه‌گیری دارید؟» → juicer (${JUICER})`);
+  const pc = await newCustomer();
+  const inBlender = await say(pc, BLENDER, "می‌تونم لوگوی خودمو چاپ کنم؟", true);
+  ok(prods(inBlender.mid) === `["${BLENDER}"]`, "product chat: only the main product (no bag)");
+  const both = await say(await newCustomer(), BLENDER, "با آبمیوه‌گیری فرقش چیه؟", true);
+  ok(prods(both.mid) === `["${BLENDER}", "${JUICER}"]`, `product chat: other product only when named (${prods(both.mid)})`);
+  // «ساعت کاری کارشناس‌ها؟» دیگر ارجاع نمی‌شود
+  const hm = await general("ساعت کاری کارشناس‌ها؟");
+  ok(psql(`select outcome from ai_requests where message_id=${hm}`) !== "human", "«ساعت کاری کارشناس‌ها؟» → not a human handoff");
+  const hm2 = await general("می‌خوام با کارشناس صحبت کنم");
+  ok(psql(`select outcome from ai_requests where message_id=${hm2}`) === "human", "explicit request → human handoff");
 } else {
   psql("delete from ai_requests where purpose='chat' and mode='live'");
   const p = await newCustomer();

@@ -11,8 +11,9 @@ import { requirePermission } from "@/lib/auth/can";
 import { aiTestsReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import styles from "../../../../panel.module.css";
-import { stopRunAction, verdictAction } from "../../actions";
+import { stopRunAction } from "../../actions";
 import { AutoRefresh } from "../../AutoRefresh";
+import { VerdictButtons } from "../../VerdictButtons";
 import { CHECK_FA, PATH_FA, RUN_STATUS_FA, SOURCE_FA } from "../../labels";
 
 export const metadata: Metadata = { title: "اجرای آزمون" };
@@ -131,18 +132,12 @@ export default async function RunPage({ params }: PageProps<"/admin/ai/tests/run
                     </td>
                     <td style={{ fontSize: 13 }}>
                       {r.status === "done" && (
-                        <>
-                          {r.verdict && <div style={{ fontWeight: 700 }}>{r.verdict === "correct" ? "درست" : "اشتباه"}</div>}
-                          <form action={verdictAction} className={styles.inlineForm}>
-                            <input type="hidden" name="resultId" value={r.id} />
-                            <button type="submit" name="verdict" value="correct" className={styles.btnGhost}>
-                              درست
-                            </button>
-                            <button type="submit" name="verdict" value="wrong" className={styles.btnGhost}>
-                              اشتباه
-                            </button>
-                          </form>
-                        </>
+                        <VerdictButtons
+                          resultId={r.id}
+                          initial={r.verdict === "correct" || r.verdict === "wrong" ? r.verdict : null}
+                          className={styles.inlineForm}
+                          buttonClass={styles.btnGhost}
+                        />
                       )}
                     </td>
                   </tr>
