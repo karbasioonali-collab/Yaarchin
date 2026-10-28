@@ -4,10 +4,11 @@ import { aiFeedback, chatMessages, conversationFlags } from "@/db/schema";
 import { apiError, apiJson } from "@/lib/api";
 import { chatCustomerGuard } from "@/lib/chat/customer-api";
 import { getConversation } from "@/lib/chat/service";
+import { suggestFromAiMessage } from "@/lib/ai/suggestions";
 import { aiReady } from "@/lib/db-ready";
 
 // 👍/👎 مشتری برای یک جواب دستیار هوشمند در گفتگوی خودش. {messageId, value: "up" | "down"}. docs/infoyaarchin.md بخش ۲۹.
-// 👎 ← برچسب «نیاز به بررسی» روی گفتگو (یک بار برای هر پیام).
+// 👎 ← برچسب «نیاز به بررسی» روی گفتگو و «پیشنهاد سؤال تازه» (یک بار برای هر پیام).
 export async function POST(req: Request, ctx: RouteContext<"/api/v1/chat/[id]/feedback">) {
   const g = await chatCustomerGuard(req, { json: true });
   if ("res" in g) return g.res;
@@ -33,6 +34,8 @@ export async function POST(req: Request, ctx: RouteContext<"/api/v1/chat/[id]/fe
       .from(conversationFlags)
       .where(and(eq(conversationFlags.conversationId, conv.id), eq(conversationFlags.messageId, messageId), sql`${conversationFlags.resolvedAt} is null`));
     if (!open) await db.insert(conversationFlags).values({ conversationId: conv.id, messageId, flag: "needs_review", reason: "👎 مشتری", source: "system" });
+    // «پیشنهاد سؤال تازه» (یک بار برای هر پیام؛ بخش ۳۳)
+    if (!open) await suggestFromAiMessage(conv.id, messageId, "thumbs_down");
   }
   return apiJson({ ok: true });
 }

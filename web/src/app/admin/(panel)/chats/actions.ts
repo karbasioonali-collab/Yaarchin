@@ -3,6 +3,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
+import { suggestFromAiMessage } from "@/lib/ai/suggestions";
 import { alertAssigned } from "@/lib/chat/alerts";
 import { absoluteUrl } from "@/lib/site/url";
 import type { FormState } from "@/components/ui/ActionForm";
@@ -80,7 +81,11 @@ export async function assignAction(_prev: FormState, fd: FormData): Promise<Form
     const link = await absoluteUrl(`/admin/chats/${r.conv.id}`);
     const [cust] = await db.select({ fullName: users.fullName }).from(users).where(eq(users.id, r.conv.customerId));
     const expertId = to.id;
-    after(() => alertAssigned({ conversationId: r.conv.id, expertId, byId: r.a.user.id, customerName: cust?.fullName ?? "مشتری", link }).catch((e) => console.error("assign alert failed", e)));
+    after(() =>
+      alertAssigned({ conversationId: r.conv.id, expertId, byId: r.a.user.id, customerName: cust?.fullName ?? "مشتری", link }).catch((e) =>
+        console.error("assign alert failed", e),
+      ),
+    );
   }
   await logActivity({
     actorUserId: r.a.user.id,
@@ -148,7 +153,13 @@ export async function saveSmsRulesAction(_prev: FormState, fd: FormData): Promis
   const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
   if (!HHMM.test(start) || !HHMM.test(end) || start === end) return { error: "ساعت شروع و پایان کار را درست وارد کنید (و با هم فرق داشته باشند)." };
   if (!days.length) return { error: "دست‌کم یک روز کاری انتخاب کنید." };
-  const next: Record<string, unknown> = { "sms.chat_cooldown_minutes": cooldown, "sms.reminder_minutes": reminder, "sms.work_start": start, "sms.work_end": end, "sms.work_days": days };
+  const next: Record<string, unknown> = {
+    "sms.chat_cooldown_minutes": cooldown,
+    "sms.reminder_minutes": reminder,
+    "sms.work_start": start,
+    "sms.work_end": end,
+    "sms.work_days": days,
+  };
   const before: Record<string, unknown> = {};
   try {
     for (const [k, v] of Object.entries(next)) before[k] = (await setSetting(k, v, a.user.id)).before;
@@ -175,8 +186,19 @@ export async function markAiWrongAction(conversationId: string, messageId: numbe
     .insert(aiFeedback)
     .values({ messageId, userId: r.a.user.id, source: "staff", value: "wrong" })
     .onConflictDoUpdate({ target: [aiFeedback.messageId, aiFeedback.userId, aiFeedback.source], set: { value: "wrong", updatedAt: new Date() } });
-  await db.insert(conversationFlags).values({ conversationId: r.conv.id, messageId, flag: "needs_review", reason: `جواب اشتباه (علامت ${r.a.user.fullName})`, source: "staff", createdBy: r.a.user.id });
-  await logActivity({ actorUserId: r.a.user.id, actingAsUserId: r.a.session.impersonatingUserId, action: "ai.mark_wrong", entityType: "conversation", entityId: r.conv.id, after: { messageId } });
+  await db
+    .insert(conversationFlags)
+    .values({ conversationId: r.conv.id, messageId, flag: "needs_review", reason: `جواب اشتباه (علامت ${r.a.user.fullName})`, source: "staff", createdBy: r.a.user.id });
+  await logActivity({
+    actorUserId: r.a.user.id,
+    actingAsUserId: r.a.session.impersonatingUserId,
+    action: "ai.mark_wrong",
+    entityType: "conversation",
+    entityId: r.conv.id,
+    after: { messageId },
+  });
+  // «پیشنهاد سؤال تازه» (docs/infoyaarchin.md بخش ۳۳)
+  await suggestFromAiMessage(r.conv.id, messageId, "wrong", `علامت ${r.a.user.fullName}`);
   revalidatePath(`/admin/chats/${r.conv.id}`);
   return { ok: true };
 }
@@ -192,7 +214,8 @@ export async function resolveFlagAction(fd: FormData): Promise<void> {
     .set({ resolvedAt: new Date(), resolvedBy: r.a.user.id })
     .where(and(eq(conversationFlags.id, id), eq(conversationFlags.conversationId, r.conv.id), isNull(conversationFlags.resolvedAt)))
     .returning({ reason: conversationFlags.reason });
-  if (done.length) await logActivity({ actorUserId: r.a.user.id, action: "chat.flag_resolve", entityType: "conversation", entityId: r.conv.id, after: { flagId: id, reason: done[0].reason } });
+  if (done.length)
+    await logActivity({ actorUserId: r.a.user.id, action: "chat.flag_resolve", entityType: "conversation", entityId: r.conv.id, after: { flagId: id, reason: done[0].reason } });
   revalidatePath(`/admin/chats/${r.conv.id}`);
 }
 

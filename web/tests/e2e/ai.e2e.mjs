@@ -325,7 +325,8 @@ if (!LIVE) {
   }
   // ۱۱. سقف هزینه‌ی روزانه + هشدار ۸۰٪
   {
-    const cost = Number(psql("select coalesce(sum(cost_toman),0) from ai_requests where mode='live'"));
+    // سقف چت فقط درخواست‌های چت را می‌شمارد (تست اتصال و آزمون جدا؛ بخش ۳۳)
+    const cost = Number(psql("select coalesce(sum(cost_toman),0) from ai_requests where mode='live' and purpose='chat'"));
     setS("ai.daily_cost_toman", Math.ceil(cost / 0.9));
     await ad.goto(B + "/admin");
     ok(await vis(ad.getByText(/سقف هزینه‌ی روزانه را مصرف کرده/)), "80% cost warning banner");

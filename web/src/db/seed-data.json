@@ -168,13 +168,16 @@
       "key": "ai.knowledge",
       "groupKey": "ai",
       "nameFa": "مدیریت پایگاه دانش دستیار هوشمند"
+    },
+    {
+      "key": "ai.tests",
+      "groupKey": "ai",
+      "nameFa": "آزمون دستیار هوشمند: سؤال‌های آزمون، اجرا، قضاوت نتیجه‌ها و پیشنهاد سؤال تازه"
     }
   ],
   "rolePermissions": {
     "admin": "*",
-    "expert": [
-      "dashboard.view"
-    ]
+    "expert": ["dashboard.view"]
   },
   "settings": [
     {
@@ -300,14 +303,7 @@
     {
       "key": "sms.work_days",
       "groupKey": "sms",
-      "value": [
-        6,
-        0,
-        1,
-        2,
-        3,
-        4
-      ],
+      "value": [6, 0, 1, 2, 3, 4],
       "labelFa": "روزهای کاری پیامک",
       "description": "۰ یکشنبه … ۵ جمعه، ۶ شنبه (پیش‌فرض: شنبه تا پنجشنبه)."
     },
@@ -425,6 +421,19 @@
       "groupKey": "ai",
       "value": "خواهش می‌کنم، خدانگهدار! هر وقت سؤالی داشتید، همین‌جا در خدمتیم.",
       "labelFa": "جواب آماده‌ی دستیار به خداحافظی"
+    },
+    {
+      "key": "ai.test_daily_cost_toman",
+      "groupKey": "ai",
+      "value": 50000,
+      "labelFa": "سقف هزینه‌ی روزانه‌ی آزمون دستیار (تومان)",
+      "description": "جدا از سقف چت مشتری: آزمون‌ها و «پیشنهاد سؤال فریبنده با AI» هیچ‌وقت جواب دادن به مشتری را متوقف نمی‌کنند."
+    },
+    {
+      "key": "ai.test_stale_days",
+      "groupKey": "ai",
+      "value": 14,
+      "labelFa": "هشدار «آزمون کامل اجرا نشده» بعد از (روز)"
     }
   ],
   "rates": {
@@ -472,14 +481,8 @@
     ],
     "tax": {
       "vatPercent": 10,
-      "vatBase": [
-        "goods",
-        "shipping"
-      ],
-      "customsRateFor": [
-        "duty",
-        "vat"
-      ],
+      "vatBase": ["goods", "shipping"],
+      "customsRateFor": ["duty", "vat"],
       "note": "مقدار اولیه (seed)"
     }
   },

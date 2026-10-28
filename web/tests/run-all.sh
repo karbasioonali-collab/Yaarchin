@@ -3,7 +3,7 @@
 #   bash tests/run-all.sh              ← دیتابیس‌های تازه + build + همه‌ی تست‌ها (حدود ۹ دقیقه)
 #   bash tests/run-all.sh --no-setup   ← همان دیتابیس‌های قبلی (فقط seed-demo پیش از هر تست)
 #   bash tests/run-all.sh --no-build   ← همان build قبلی
-#   bash tests/run-all.sh --only chat  ← فقط یک تست (اسم فایل بدون .e2e.mjs؛ ai-test و ai-live هم)
+#   bash tests/run-all.sh --only chat  ← فقط یک تست (اسم فایل بدون .e2e.mjs؛ ai-test، ai-live، ai-tests-test و ai-tests-live هم)
 # متغیرها: PG_URL (پیش‌فرض postgres://yarchin:devpass@localhost)، E2E_DB (yarchin_e2e)، E2E_PRE_DB (yarchin_e2e_pre)
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -11,8 +11,8 @@ PG_URL=${PG_URL:-postgres://yarchin:devpass@localhost}
 DB=${E2E_DB:-yarchin_e2e}
 PRE_DB=${E2E_PRE_DB:-yarchin_e2e_pre}
 # تست «قبل از migrate» فقط برای آخرین migration نگه داشته می‌شود: با migration تازه این دو عوض می‌شوند (بخش ۲۲)
-PRE_UPTO=0009
-PRE_TEST=ai-pre
+PRE_UPTO=0010
+PRE_TEST=ai-tests-pre
 SETUP=1 BUILD=1 ONLY=""
 while [ $# -gt 0 ]; do
   case "$1" in --no-setup) SETUP=0 ;; --no-build) BUILD=0 ;; --only) ONLY=$2; shift ;; *) echo "گزینه‌ی ناشناخته: $1"; exit 2 ;; esac
@@ -23,7 +23,7 @@ export TEST_DB="$PG_URL/$DB"
 psql "$PG_URL/postgres" -qAtc "select 1" >/dev/null 2>&1 || { echo "Postgres محلی در دسترس نیست؛ اول: service postgresql start" >&2; exit 1; }
 MOCK_ENV=(AI_BASE_URL=http://127.0.0.1:3399/v1 AI_API_KEY=test AI_MODEL=mock/primary AI_FALLBACK_MODEL=mock/fallback)
 # ترتیب لازم: سایت ← محتوای سایت ← امتیاز …؛ کاتالوگ همیشه آخر
-ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live "$PRE_TEST" catalog)
+ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live "$PRE_TEST" catalog)
 
 if [ "$SETUP" = 1 ]; then
   bash tests/e2e/setup-db.sh "$DB" || exit 1
@@ -55,6 +55,8 @@ for t in "${ORDER[@]}"; do
   case "$t" in
     ai-test) file=tests/e2e/ai.e2e.mjs; env=(AI_E2E=test); serve normal ;;
     ai-live) file=tests/e2e/ai.e2e.mjs; env=(AI_E2E=live); serve live ;;
+    ai-tests-test) file=tests/e2e/ai-tests.e2e.mjs; env=(AI_E2E=test); serve normal ;;
+    ai-tests-live) file=tests/e2e/ai-tests.e2e.mjs; env=(AI_E2E=live); serve live ;;
     "$PRE_TEST") db="$PG_URL/$PRE_DB"; serve pre ;;
     *) serve normal; reset_data ;;
   esac

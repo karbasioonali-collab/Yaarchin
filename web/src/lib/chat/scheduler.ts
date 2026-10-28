@@ -7,7 +7,8 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { siteUrl } from "@/lib/site/url";
 import { sweepStuck } from "@/lib/ai/agent";
-import { aiReady } from "@/lib/db-ready";
+import { sweepRuns } from "@/lib/ai/tests";
+import { aiReady, aiTestsReady } from "@/lib/db-ready";
 import { runReminders } from "./alerts";
 
 const EVERY_MS = 60_000;
@@ -23,6 +24,8 @@ async function tick() {
       await runReminders((id) => (base ? `${base}/admin/chats/${id}` : null));
       // دستیار هوشمند: گفتگوهای «در حال نوشتن» گیرکرده ← کارشناس (lib/ai/agent.ts)
       if (await aiReady()) await sweepStuck();
+      // آزمون دستیار: اجرای بی‌ضربان (سرور وسط آزمون ری‌استارت شد) ← «قطع‌شده» (lib/ai/tests.ts)
+      if (await aiTestsReady()) await sweepRuns();
     });
   } catch (e) {
     // قبل از migrate یا قطعی کوتاه دیتابیس: فقط لاگ، دور بعد دوباره
