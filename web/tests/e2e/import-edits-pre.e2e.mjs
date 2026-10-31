@@ -32,7 +32,7 @@ ok((await ad.getByText("اصلاح و ثبت بعد از اجرای migration ۰
 ok((await ad.getByTestId("register").count()) === 0 && (await ad.getByText("اصلاح مقدارها").count()) === 0, "no edit/register forms");
 ok((await ad.getByTestId("highlights").locator("li").count()) === 5, "parser v2 works without 0013");
 ok((await ad.goto(B + "/admin/import")).status() === 200, "list page 200");
-ok((await ad.goto(B + "/media-db/999999999")).status() === 404, "/media-db before 0013: unknown id 404, no crash");
+ok((await ad.evaluate(async () => (await fetch("/media-db/999999999")).status)) === 404, "/media-db before 0013: unknown id 404, no crash");
 for (const u of ["/admin", "/admin/products", "/admin/companies"]) ok((await ad.goto(B + u)).status() === 200, `${u} 200`);
 psql("delete from raw_pages");
 ok(errs.length === 0, `no page errors (${errs.slice(0, 3).join(" | ")})`);

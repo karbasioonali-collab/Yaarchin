@@ -19,6 +19,7 @@ import { duplicatesOf, RAW_STATUS_FA } from "@/lib/import/service";
 import styles from "../../panel.module.css";
 import { registerAction, rejectAction, reparseAction, restoreAction, reviewedAction, saveEditsAction } from "../actions";
 import { AllPublicButton } from "../AllPublicButton";
+import { OpenOnce } from "../OpenOnce";
 
 export const metadata: Metadata = { title: "بررسی صفحه‌ی علی‌بابا" };
 
@@ -418,7 +419,7 @@ export default async function ImportReviewPage({ params }: PageProps<"/admin/imp
       </div>
 
       {canEdit && (
-        <details className={styles.detailsBox} style={{ marginTop: 16 }} open={v.ambiguousQty !== null && !edits.qtyChoice}>
+        <OpenOnce className={styles.detailsBox} style={{ marginTop: 16 }} initialOpen={v.ambiguousQty !== null && !edits.qtyChoice}>
           <summary>اصلاح مقدارها</summary>
           <ActionForm action={saveEditsAction} submitLabel="ذخیره‌ی اصلاح‌ها">
             <input type="hidden" name="id" value={page.id} />
@@ -534,7 +535,7 @@ export default async function ImportReviewPage({ params }: PageProps<"/admin/imp
               </p>
             )}
           </ActionForm>
-        </details>
+        </OpenOnce>
       )}
 
       <div className={styles.card} style={{ marginTop: 16 }}>
