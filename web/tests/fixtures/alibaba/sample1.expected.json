@@ -1,5 +1,5 @@
 {
- "parserVersion": 1,
+ "parserVersion": 2,
  "productUrl": "https://www.alibaba.com/product-detail/Wholesale-Disposable-Portable-Smokeless-Ashtray-With_9216766571035.html",
  "productId": "9216766571035",
  "title": "Wholesale Disposable Portable Smokeless Ashtray With Gel",
@@ -275,6 +275,13 @@
  ],
  "hasVideo": true,
  "highlights": [
+  "Disposable Foam Ashtray Ensures Fast Cigarette Extinguishing Ash Absorption And Odor Control For Safe And Clean Use",
+  "Built In Gel Component Extinguishes Cigarettes Instantly And Improves Safety in Daily Use",
+  "Special Gel Powder Locks Ash And Smoke Residue Firmly Preventing Ash From Scattering Around",
+  "Effective Deodorizing Function Absorbs Smoke Smell And Keeps Surrounding Air Fresh",
+  "Simple Operation With Just Adding Water Enables Fast Expansion And Ready To Use in Seconds"
+ ],
+ "promoPhrases": [
   "Modern Design Ashtray Eco Friendly Biodegradable Base Fireproof Lining For Outdoor Golf Clubhouse Smoker Gift",
   "Ashtray Foam Scented Ointment Sand Pocket Size Compact One Use Paper Cup For RV Glamping Camper Van Accessory",
   "Ashtray One Use Disposable Fire Retardant Pouch Self Foaming Sand For Music Festival VIP Lounge Sanitation",
@@ -289,12 +296,7 @@
   "Ashtray One Use Disposable Paper Cup Scented Extinguishing Balm",
   "Household Chemical Ashtray Self Foaming Scented Sand Eco Friendly Solution For Ski Chalet Lodge Smoking Area",
   "Resin Ashtray Customized Shape Modern Design Durable Cigar Rest Tray For Backyard Barbecue Family Reunion Use",
-  "Stocked Ashtray One Use Portable Cardboard Box With Ash Absorbing Foam For Car Rental Fleet Cabin Cleanness",
-  "Disposable Foam Ashtray Ensures Fast Cigarette Extinguishing Ash Absorption And Odor Control For Safe And Clean Use",
-  "Built In Gel Component Extinguishes Cigarettes Instantly And Improves Safety in Daily Use",
-  "Special Gel Powder Locks Ash And Smoke Residue Firmly Preventing Ash From Scattering Around",
-  "Effective Deodorizing Function Absorbs Smoke Smell And Keeps Surrounding Air Fresh",
-  "Simple Operation With Just Adding Water Enables Fast Expansion And Ready To Use in Seconds"
+  "Stocked Ashtray One Use Portable Cardboard Box With Ash Absorbing Foam For Car Rental Fleet Cabin Cleanness"
  ],
  "supplier": {
   "name": "Sample Supplier A Technology Co., Ltd.",
@@ -302,6 +304,8 @@
   "typeRaw": "Trading Company",
   "country": "CN",
   "years": 1,
+  "yearsText": "1 yr",
+  "foundedYear": 2016,
   "rating": 5,
   "revenue": "$5K — $10K",
   "responseTime": "≤2h",

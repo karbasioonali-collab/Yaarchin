@@ -180,11 +180,13 @@ export type Duplicates = {
   samePage: { id: string; status: string; createdAt: Date }[];
   listing: { listingId: string; productId: string | null; productTitle: string | null } | null;
   company: { id: string; name: string } | null;
+  // همین فروشنده (شناسه‌ی فروشگاه) در صفحه‌های آپلودشده‌ی دیگر، حتی پیش از ثبت فروشنده
+  sameStore: { id: string; status: string; title: string | null }[];
 };
 
 // همین شناسه‌ی محصول در صفحه‌های دیگر یا لیستینگ‌ها، و همین فروشنده (شناسه‌ی فروشگاه)
 export async function duplicatesOf(p: Pick<RawPage, "id" | "platform" | "externalProductId" | "storeId">): Promise<Duplicates> {
-  const [samePage, listing, company] = await Promise.all([
+  const [samePage, listing, company, sameStore] = await Promise.all([
     p.externalProductId
       ? db
           .select({ id: rawPages.id, status: rawPages.status, createdAt: rawPages.createdAt })
@@ -209,8 +211,16 @@ export async function duplicatesOf(p: Pick<RawPage, "id" | "platform" | "externa
           .where(and(eq(companyExternalIds.platform, p.platform), eq(companyExternalIds.externalId, p.storeId)))
           .then((r) => r[0] ?? null)
       : Promise.resolve(null),
+    p.storeId
+      ? db
+          .select({ id: rawPages.id, status: rawPages.status, title: rawPages.title })
+          .from(rawPages)
+          .where(and(eq(rawPages.platform, p.platform), eq(rawPages.storeId, p.storeId), ne(rawPages.id, p.id)))
+          .orderBy(rawPages.createdAt)
+          .limit(20)
+      : Promise.resolve([]),
   ]);
-  return { samePage, listing, company };
+  return { samePage, listing, company, sameStore };
 }
 
 // حجم کل عکس‌های داخل دیتابیس (برای هشدار ۱ گیگابایت)

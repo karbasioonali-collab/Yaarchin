@@ -20,6 +20,7 @@ const schemaState = cache(
     ai: boolean;
     aiTests: boolean;
     import: boolean;
+    importEdits: boolean;
   }> => {
     const r = await db.execute<{
       catalog: boolean;
@@ -34,6 +35,7 @@ const schemaState = cache(
       ai: boolean;
       ai_tests: boolean;
       import_ready: boolean;
+      import_edits: boolean;
     }>(sql`
     select
       (to_regclass('public.site_blocks') is not null and to_regclass('public.price_observations') is not null
@@ -60,7 +62,8 @@ const schemaState = cache(
       (to_regclass('public.ai_test_cases') is not null and to_regclass('public.ai_test_case_versions') is not null and to_regclass('public.ai_test_runs') is not null
         and to_regclass('public.ai_test_results') is not null and to_regclass('public.ai_suggestions') is not null) as ai_tests,
       (to_regclass('public.raw_pages') is not null and to_regclass('public.raw_page_images') is not null
-        and to_regclass('public.listing_external_ids') is not null) as import_ready`);
+        and to_regclass('public.listing_external_ids') is not null) as import_ready,
+      to_regclass('public.raw_page_edits') is not null as import_edits`);
     return {
       catalog: r.rows[0]?.catalog === true,
       importScore: r.rows[0]?.import_score === true,
@@ -74,6 +77,7 @@ const schemaState = cache(
       ai: r.rows[0]?.ai === true,
       aiTests: r.rows[0]?.ai_tests === true,
       import: r.rows[0]?.import_ready === true,
+      importEdits: r.rows[0]?.import_edits === true,
     };
   },
 );
@@ -113,3 +117,6 @@ export const aiTestsReady = cache(async () => (await schemaState()).aiTests);
 
 // migration ۰۰۱۲: ورود از صفحه‌ی ذخیره‌شده‌ی علی‌بابا (raw_pages، عکس‌ها، شناسه‌ی لیستینگ). قبل از آن صفحه‌های «ورود از علی‌بابا» پیام «بعد از migration» می‌دهند.
 export const importReady = cache(async () => (await schemaState()).import);
+
+// migration ۰۰۱۳: اصلاح‌های انسان روی صفحه‌ی واردشده (raw_page_edits). قبل از آن صفحه‌ی بررسی فقط خواندنی است و ثبت غیرفعال.
+export const importEditsReady = cache(async () => (await schemaState()).importEdits);

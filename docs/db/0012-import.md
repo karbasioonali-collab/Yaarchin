@@ -16,7 +16,7 @@
 - **کلیدهای خارجی:** عکس‌ها با حذف صفحه CASCADE؛ `listing_external_ids` با حذف لیستینگ CASCADE؛ پیوندهای `raw_pages` به لیستینگ، فروشنده، محصول و کاربرها SET NULL.
 - **ایندکس‌ها:** `raw_pages (sha256)` یکتا، `(status, created_at)`، `(platform, external_product_id)`، `(platform, store_id)`؛ `listing_external_ids (listing_id)`.
 - **Seed** (داده، نه ساختار): دسترسی‌های `catalog.import`، `companies.links` و `products.publish`.
-- **قبل از migrate** هیچ صفحه‌ای خطا نمی‌دهد (`importReady()`). تست: `web/tests/e2e/import-pre.e2e.mjs`.
+- **قبل از migrate** هیچ صفحه‌ای خطا نمی‌دهد (`importReady()`). تست آن زمان: `import-pre.e2e.mjs` (با migration ۰۰۱۳ حذف شد؛ قاعده‌ی «فقط آخرین migration»).
 - **حجم:** هر صفحه حدود ۰٫۲۵ مگابایت (HTML فشرده + عکس‌های اصلی). هشدار پنل در ۱ گیگابایت عکس. راه انتقال عکس‌ها به S3: بخش ۳۶.
 
 ## اجرا روی لیارا (به همین ترتیب)

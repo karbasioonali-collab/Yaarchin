@@ -1,5 +1,5 @@
 {
- "parserVersion": 1,
+ "parserVersion": 2,
  "productUrl": "https://www.alibaba.com/product-detail/Biodegradable-Disposable-Gel-Coated-Paper-Ashtray_9274764411741.html",
  "productId": "9274764411741",
  "title": "Biodegradable Disposable Gel Coated Paper Ashtray for Extinguish Cigarette",
@@ -262,7 +262,8 @@
   }
  ],
  "hasVideo": true,
- "highlights": [
+ "highlights": [],
+ "promoPhrases": [
   "Biodegradable Disposable Smoke Sand Gel Paper Ashtray Fast Soot Solidification Cigarette Extinguish Portable RV Beach Picnic Windproof Wash Free Eco Smoking Supply",
   "Degradable Single Use Gel Ashtray Built In Odor Absorb Sand Anti Fly Ash Cigarette Holder Mini Pocket Travel Hotel KTV Disposable Smoking Accessory Custom Print",
   "Wholesale Recyclable Disposable Cigarette Ashtrays Gel Coated Thick Paper Rapid Butt Extinguish Design Spill Proof Household Bar Event Outdoor Party Ash Storage Tray",
@@ -282,6 +283,8 @@
   "typeRaw": "Trading Company",
   "country": "CN",
   "years": 1,
+  "yearsText": "1 yr",
+  "foundedYear": 2016,
   "rating": 5,
   "revenue": "$5K — $10K",
   "responseTime": "≤2h",
@@ -309,7 +312,7 @@
   "cartonDims": "missing",
   "images": "found",
   "descriptionImages": "found",
-  "highlights": "found",
+  "highlights": "missing",
   "supplierName": "found",
   "supplierType": "found",
   "supplierYears": "found",
