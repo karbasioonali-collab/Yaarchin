@@ -20,7 +20,19 @@ type V = {
 
 // فیلدهای اصلی محصول (ساخت و ویرایش)
 // hs: وضعیت HS code فعلی در لیست HS (ready = migration ۰۰۰۵ اجرا شده)
-export function ProductFields({ tree, value, hs }: { tree: AdminCategory[]; value?: V; hs: { ready: boolean; current: { code: string; titleFa: string | null; duty: string } | null } }) {
+// canPublish = دسترسی products.publish: بدون آن «منتشرشده» قابل انتخاب نیست و محصول منتشرشده از انتشار برداشته نمی‌شود
+export function ProductFields({
+  tree,
+  value,
+  hs,
+  canPublish = true,
+}: {
+  tree: AdminCategory[];
+  value?: V;
+  hs: { ready: boolean; current: { code: string; titleFa: string | null; duty: string } | null };
+  canPublish?: boolean;
+}) {
+  const current = value?.status ?? "draft";
   return (
     <>
       <Field label="نام فارسی" name="titleFa" defaultValue={value?.titleFa ?? ""} required maxLength={200} />
@@ -41,13 +53,14 @@ export function ProductFields({ tree, value, hs }: { tree: AdminCategory[]; valu
         </label>
         <label className={ui.field} style={{ flex: "1 1 160px" }}>
           <span className={ui.label}>وضعیت انتشار</span>
-          <select name="status" defaultValue={value?.status ?? "draft"} className={ui.select}>
+          <select name="status" defaultValue={current} className={ui.select}>
             {Object.entries(PRODUCT_STATUS_FA).map(([k, v]) => (
-              <option key={k} value={k}>
+              <option key={k} value={k} disabled={!canPublish && k !== current && (k === "published" || current === "published")}>
                 {v}
               </option>
             ))}
           </select>
+          {!canPublish && <span className={ui.hint}>انتشار یا برداشتن از انتشار دسترسی «انتشار محصول» می‌خواهد.</span>}
         </label>
         <label className={ui.field} style={{ flex: "1 1 140px" }}>
           <span className={ui.label}>واحد قیمت</span>

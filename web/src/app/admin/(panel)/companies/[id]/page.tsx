@@ -63,7 +63,13 @@ export default async function CompanyPage({ params }: PageProps<"/admin/companie
     .where(eq(companies.id, id));
   if (!c) notFound();
 
-  const [canManage, canWrite, canProducts] = await Promise.all([can(a.user, "companies.manage"), can(a.user, "correspondence.create"), can(a.user, "products.manage")]);
+  // canLinks: لینک‌های علی‌بابا (پروفایل و صفحه‌ی محصول) فقط با companies.links (docs/infoyaarchin.md بخش ۳۶)
+  const [canManage, canWrite, canProducts, canLinks] = await Promise.all([
+    can(a.user, "companies.manage"),
+    can(a.user, "correspondence.create"),
+    can(a.user, "products.manage"),
+    can(a.user, "companies.links"),
+  ]);
   const [exts, cats, tree, listings, contacts, history] = await Promise.all([
     db.select().from(companyExternalIds).where(eq(companyExternalIds.companyId, id)).orderBy(asc(companyExternalIds.createdAt)),
     db.select({ id: companyCategories.categoryId }).from(companyCategories).where(eq(companyCategories.companyId, id)),
@@ -150,7 +156,7 @@ export default async function CompanyPage({ params }: PageProps<"/admin/companie
                 <tr key={e.id}>
                   <td className={`${styles.mono} ${styles.ltr}`}>{e.externalId}</td>
                   <td>
-                    {e.url ? (
+                    {e.url && canLinks ? (
                       <a href={e.url} target="_blank" rel="noreferrer noopener">
                         لینک ↗
                       </a>
@@ -181,7 +187,7 @@ export default async function CompanyPage({ params }: PageProps<"/admin/companie
             <ActionForm action={addExternalIdAction} submitLabel="افزودن شناسه" submitVariant="secondary">
               <input type="hidden" name="companyId" value={c.id} />
               <Field label="شناسه‌ی فروشنده در علی‌بابا" name="externalId" ltr required maxLength={120} />
-              <Field label="لینک" name="url" ltr maxLength={1000} hint="https://…" />
+              {canLinks && <Field label="لینک" name="url" ltr maxLength={1000} hint="https://…" />}
             </ActionForm>
           )}
 
@@ -287,7 +293,7 @@ export default async function CompanyPage({ params }: PageProps<"/admin/companie
                       <tr key={l.id}>
                         <td>
                           {l.productId && canProducts ? <Link href={`/admin/products/${l.productId}/listings/${l.id}`}>{l.productTitle}</Link> : (l.productTitle ?? "بدون محصول")}
-                          {l.externalUrl && (
+                          {l.externalUrl && canLinks && (
                             <>
                               {" "}
                               <a href={l.externalUrl} target="_blank" rel="noreferrer noopener" className={styles.muted}>

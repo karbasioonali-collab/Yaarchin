@@ -46,6 +46,7 @@ export default async function ListingPage({ params }: PageProps<"/admin/products
     .where(and(eq(productListings.id, listingId), eq(productListings.productId, id)));
   if (!l) notFound();
   const seeCompanies = await can(a.user, "companies.view");
+  const canLinks = await can(a.user, "companies.links");
   const [prices, leads, msgs] = await Promise.all([
     priceHistory([l.id]),
     leadTimeHistory([l.id]),
@@ -78,7 +79,7 @@ export default async function ListingPage({ params }: PageProps<"/admin/products
                 · <Link href={`/admin/companies/${l.companyId}`}>صفحه‌ی کارخانه</Link> · <Link href={`/admin/companies/${l.companyId}#correspondence`}>سابقه‌ی مکاتبه</Link>
               </>
             )}
-            {l.externalUrl && (
+            {l.externalUrl && canLinks && (
               <>
                 {" "}
                 ·{" "}
@@ -150,7 +151,7 @@ export default async function ListingPage({ params }: PageProps<"/admin/products
           </h2>
           <ActionForm action={updateListingAction} submitLabel="ذخیره" submitVariant="secondary">
             <input type="hidden" name="id" value={l.id} />
-            <Field label="لینک محصول در علی‌بابا" name="externalUrl" defaultValue={l.externalUrl ?? ""} ltr maxLength={1000} />
+            {canLinks && <Field label="لینک محصول در علی‌بابا" name="externalUrl" defaultValue={l.externalUrl ?? ""} ltr maxLength={1000} />}
             <Field label="عنوان انگلیسی در علی‌بابا" name="titleEn" defaultValue={l.titleEn ?? ""} ltr maxLength={300} />
             <div className={styles.row}>
               <Field label="حداقل سفارش" name="moq" defaultValue={l.moq ? String(l.moq) : ""} ltr inputMode="numeric" />

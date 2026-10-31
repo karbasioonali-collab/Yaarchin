@@ -11,8 +11,8 @@ PG_URL=${PG_URL:-postgres://yarchin:devpass@localhost}
 DB=${E2E_DB:-yarchin_e2e}
 PRE_DB=${E2E_PRE_DB:-yarchin_e2e_pre}
 # تست «قبل از migrate» فقط برای آخرین migration نگه داشته می‌شود: با migration تازه این دو عوض می‌شوند (بخش ۲۲)
-PRE_UPTO=0010
-PRE_TEST=ai-tests-pre
+PRE_UPTO=0011
+PRE_TEST=import-pre
 SETUP=1 BUILD=1 ONLY=""
 while [ $# -gt 0 ]; do
   case "$1" in --no-setup) SETUP=0 ;; --no-build) BUILD=0 ;; --only) ONLY=$2; shift ;; *) echo "گزینه‌ی ناشناخته: $1"; exit 2 ;; esac
@@ -23,7 +23,7 @@ export TEST_DB="$PG_URL/$DB"
 psql "$PG_URL/postgres" -qAtc "select 1" >/dev/null 2>&1 || { echo "Postgres محلی در دسترس نیست؛ اول: service postgresql start" >&2; exit 1; }
 MOCK_ENV=(AI_BASE_URL=http://127.0.0.1:3399/v1 AI_API_KEY=test AI_MODEL=mock/primary AI_FALLBACK_MODEL=mock/fallback)
 # ترتیب لازم: سایت ← محتوای سایت ← امتیاز …؛ کاتالوگ همیشه آخر
-ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live "$PRE_TEST" catalog)
+ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live alibaba-import "$PRE_TEST" catalog)
 
 if [ "$SETUP" = 1 ]; then
   bash tests/e2e/setup-db.sh "$DB" || exit 1

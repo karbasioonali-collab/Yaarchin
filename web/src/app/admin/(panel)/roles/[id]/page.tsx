@@ -25,6 +25,7 @@ const GROUP_FA: Record<string, string> = {
   categories: "دسته‌بندی‌ها",
   companies: "کارخانه‌ها",
   correspondence: "مکاتبه با کارخانه‌ها",
+  catalog: "ورود از علی‌بابا",
 };
 
 export default async function RolePage({ params }: PageProps<"/admin/roles/[id]">) {
@@ -34,9 +35,7 @@ export default async function RolePage({ params }: PageProps<"/admin/roles/[id]"
   const [role] = await db.select().from(roles).where(eq(roles.id, id));
   if (!role) notFound();
   const all = await db.select().from(permissions).orderBy(permissions.groupKey, permissions.key);
-  const mine = new Set(
-    (await db.select({ k: rolePermissions.permissionKey }).from(rolePermissions).where(eq(rolePermissions.roleId, id))).map((r) => r.k),
-  );
+  const mine = new Set((await db.select({ k: rolePermissions.permissionKey }).from(rolePermissions).where(eq(rolePermissions.roleId, id))).map((r) => r.k));
   const groups = [...new Set(all.map((p) => p.groupKey))];
   const isAdmin = role.key === "admin";
 

@@ -69,7 +69,8 @@ export async function createCompanyAction(_prev: FormState, fd: FormData): Promi
   const r = readCompany(fd);
   if ("error" in r) return { error: r.error };
   const ext = normExt(str(fd, "alibabaId", 120));
-  const urlRaw = str(fd, "alibabaUrl", 1000);
+  // لینک علی‌بابا فقط با companies.links (فیلدش برای بقیه نمایش داده نمی‌شود)
+  const urlRaw = (await can(a.user, "companies.links")) ? str(fd, "alibabaUrl", 1000) : "";
   if (urlRaw && !httpsUrl(urlRaw)) return { error: "لینک علی‌بابا باید با https:// شروع شود." };
   if (ext) {
     const dup = await companyByExternal("alibaba", ext);
@@ -121,7 +122,7 @@ export async function addExternalIdAction(_prev: FormState, fd: FormData): Promi
   const a = await requirePermission("companies.manage");
   const companyId = str(fd, "companyId", 40);
   const ext = normExt(str(fd, "externalId", 120));
-  const urlRaw = str(fd, "url", 1000);
+  const urlRaw = (await can(a.user, "companies.links")) ? str(fd, "url", 1000) : "";
   if (!UUID.test(companyId) || !ext) return { error: "شناسه‌ی علی‌بابا را وارد کنید." };
   if (urlRaw && !httpsUrl(urlRaw)) return { error: "لینک باید با https:// شروع شود." };
   const dup = await companyByExternal("alibaba", ext);
