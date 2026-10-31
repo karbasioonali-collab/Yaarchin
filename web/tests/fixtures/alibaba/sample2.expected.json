@@ -1,0 +1,322 @@
+{
+ "parserVersion": 1,
+ "productUrl": "https://www.alibaba.com/product-detail/Biodegradable-Disposable-Gel-Coated-Paper-Ashtray_9274764411741.html",
+ "productId": "9274764411741",
+ "title": "Biodegradable Disposable Gel Coated Paper Ashtray for Extinguish Cigarette",
+ "categoryPath": [
+  "Home & Garden",
+  "Lighters & Smoking Accessories",
+  "Ashtrays"
+ ],
+ "currency": "USD",
+ "priceTiers": [
+  {
+   "minQty": 5000,
+   "maxQty": 29999,
+   "price": 0.05,
+   "priceMax": null
+  },
+  {
+   "minQty": 30000,
+   "maxQty": 59999,
+   "price": 0.04,
+   "priceMax": null
+  },
+  {
+   "minQty": 60000,
+   "maxQty": null,
+   "price": 0.02,
+   "priceMax": null
+  }
+ ],
+ "moq": 5000,
+ "unit": "piece",
+ "attributes": [
+  {
+   "name": "Application",
+   "value": "Home, Car, Restaurant, Hotel"
+  },
+  {
+   "name": "Type",
+   "value": "desktop ashtray"
+  },
+  {
+   "name": "Material",
+   "value": "Other"
+  },
+  {
+   "name": "Design Style",
+   "value": "Modern"
+  },
+  {
+   "name": "Shape",
+   "value": "Round"
+  },
+  {
+   "name": "Place of Origin",
+   "value": "Guangdong, China"
+  },
+  {
+   "name": "Brand Name",
+   "value": "Customized"
+  },
+  {
+   "name": "Product name",
+   "value": "Disposable Gel Coated Paper Ashtray"
+  },
+  {
+   "name": "Material",
+   "value": "Paper Cup+SAP"
+  },
+  {
+   "name": "Occasion",
+   "value": "Car/Home/Office/Hotel/Restaurant/Bar"
+  },
+  {
+   "name": "Function",
+   "value": "Ash Removal/Remove smoke odor"
+  },
+  {
+   "name": "OEM/ODM",
+   "value": "Highly Welcomed Customized"
+  },
+  {
+   "name": "Quantity",
+   "value": "25 pieces"
+  },
+  {
+   "name": "Fragrance",
+   "value": "Lemon,ocean ,jasmine, rose,original,lavender"
+  },
+  {
+   "name": "Selling Units",
+   "value": "Single item"
+  }
+ ],
+ "placeOfOrigin": "Guangdong, China",
+ "options": [
+  {
+   "name": "Color",
+   "values": [
+    "Blue"
+   ],
+   "customizable": false
+  }
+ ],
+ "customization": [
+  {
+   "name": "Color",
+   "moq": 5000
+  }
+ ],
+ "leadTimes": [
+  {
+   "minQty": 1,
+   "maxQty": 5000,
+   "days": 10
+  },
+  {
+   "minQty": 5001,
+   "maxQty": 30000,
+   "days": 15
+  },
+  {
+   "minQty": 30001,
+   "maxQty": 60000,
+   "days": 25
+  }
+ ],
+ "packing": {
+  "unitWeightKg": null,
+  "unitDimsCm": null,
+  "unitsPerCarton": null,
+  "cartonDimsCm": null,
+  "cartonWeightKg": null,
+  "estimated": {
+   "cartonWeightKg": false,
+   "cartonDimsCm": false
+  }
+ },
+ "images": [
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/Hcb56dc9ede9c25665ffc20bda1f80594Z.jpg_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/Hcb56dc9ede9c25665ffc20bda1f80594Z.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 15324
+  },
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/H6071d1d447b31f7e014f10e15ed0f0a3R.jpg_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/H6071d1d447b31f7e014f10e15ed0f0a3R.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 19669
+  },
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/Hb54be367e26b9e4cda6e3a8bef9f16ffo.jpg_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/Hb54be367e26b9e4cda6e3a8bef9f16ffo.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 13354
+  },
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/H3b0d8d95d8f4395c818ebb3b5b2fab76F.jpg_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/H3b0d8d95d8f4395c818ebb3b5b2fab76F.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 30469
+  },
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/H6c5e12f841f7a8986ff923365c2f055aP.jpg_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/H6c5e12f841f7a8986ff923365c2f055aP.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 30322
+  },
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/H6b7ac52b15a524d280cc32ea25541575M.jpg_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/H6b7ac52b15a524d280cc32ea25541575M.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 39414
+  }
+ ],
+ "galleryCount": 7,
+ "descriptionImages": [
+  {
+   "url": "https://sc04.alicdn.com/kf/H0f450a84abed113a020849c49240fec1a.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/H0f450a84abed113a020849c49240fec1a.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 28708
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H7a1f1aabd46dee42e4ef062b66bf63c4N.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/H7a1f1aabd46dee42e4ef062b66bf63c4N.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 48636
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H9af27f6ef9350372a164d8ddda93a918y.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/H9af27f6ef9350372a164d8ddda93a918y.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 43348
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H23187d680a6bce3059dc3705ac3ce3f5r.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/H23187d680a6bce3059dc3705ac3ce3f5r.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 82171
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/He1841bf3e4ce28523f59009cbf50460a8.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/He1841bf3e4ce28523f59009cbf50460a8.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 23761
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H73cde8a55aac6e38bdeac877c963d27fe.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/H73cde8a55aac6e38bdeac877c963d27fe.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 47986
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H7c45189dc9e2b39e814b88fc980867a0D.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/H7c45189dc9e2b39e814b88fc980867a0D.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 50076
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H5875a06084068433a823eded39e358280.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/H5875a06084068433a823eded39e358280.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 75517
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/He1a2c448cc1d51626ea20e8c9b0c11dar.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/He1a2c448cc1d51626ea20e8c9b0c11dar.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 62457
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H59ec376b5aee8b1752f0f264f521ff3eT.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/H59ec376b5aee8b1752f0f264f521ff3eT.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 25759
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H8eaa0cb10e11cbf66e0ab30107661b4d0.jpg",
+   "originalUrl": "https://sc04.alicdn.com/kf/H8eaa0cb10e11cbf66e0ab30107661b4d0.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 47583
+  }
+ ],
+ "hasVideo": true,
+ "highlights": [
+  "Biodegradable Disposable Smoke Sand Gel Paper Ashtray Fast Soot Solidification Cigarette Extinguish Portable RV Beach Picnic Windproof Wash Free Eco Smoking Supply",
+  "Degradable Single Use Gel Ashtray Built In Odor Absorb Sand Anti Fly Ash Cigarette Holder Mini Pocket Travel Hotel KTV Disposable Smoking Accessory Custom Print",
+  "Wholesale Recyclable Disposable Cigarette Ashtrays Gel Coated Thick Paper Rapid Butt Extinguish Design Spill Proof Household Bar Event Outdoor Party Ash Storage Tray",
+  "Factory Supply Disposable Paper Ashtray Machine Supporting Gel Infused Smoke Sand Mold Eco Degradable Cigarette Ash Tray Production Equipment For Mass Custom Order",
+  "Smokeless Cigarette Ashtray Anti Smell Gel Disposable Biodegradable Paper Structure Quick Smoke Eliminate Home Office Car Camping One Time Use Ash Storage Cup",
+  "Biodegradable Disposable Car Ashtray Gel Quick Fire Extinguish Ash Container Pocket Size For RV Road Trip Wind Proof Anti Fly Ash One Time Smoking Storage Cup",
+  "Eco Friendly Portable Gel Ashtray Built In Smoke Solid Sand Odor Block Design Mini Handheld For Travel Hotel KTV Outdoor Single Use Ash Holder Tray",
+  "Smokeless Ashtray Cigarette Disposable Gel Coated Paper Frame Fast Smoke Eliminate Anti Spill Household Bar Party Wash Free Eco Smoking Supply",
+  "Degradable Single Use Portable Gel Ash Tray Absorb Soot Sand Structure Lightweight Camping Beach Picnic Office Custom Print Disposable Cigarette Accessory",
+  "Wholesale Foam Disposable Ash Tray Infused Extinguishing Gel Thick Shockproof Disposable For Event Banquet Outdoor Wind Resistant Ash Storage Container",
+  "Recyclable Disposable Smoke Extinguishing Cup Gel Infused Quick Butt Fire Block Pullout Paper Structure Portable Home Car Travel One Time Use Ash Bin",
+  "Pullout Paper Ashtray With Quick Fire Gel Biodegradable Foldable Design Anti Odor Anti Scatter Ash Mini Pocket Hotel Outdoor Disposable Smoking Cup"
+ ],
+ "supplier": {
+  "name": "Sample Supplier A Technology Co., Ltd.",
+  "type": "trading",
+  "typeRaw": "Trading Company",
+  "country": "CN",
+  "years": 1,
+  "rating": 5,
+  "revenue": "$5K — $10K",
+  "responseTime": "≤2h",
+  "onTimeRate": "77.8%",
+  "topBuyers": 13,
+  "avgDispatchDays": 6,
+  "storeId": "supplier-a",
+  "storeUrl": "https://supplier-a.en.alibaba.com/",
+  "profileUrl": "https://supplier-a.en.alibaba.com/company_profile.html",
+  "about": "Sample Supplier A Technology & Sample Partner A Technology Are integrated Companies Specializing in R&D,Production,And Sales of Household Daily Chemical Products. We Offer Over 70 Products Across Four Main Categories:Dehumidifiers/Desiccants,Solidifiers,Household Cleaners,And Hydrogen/Oxygen Agents.Founded in 2016,We Have~30 Employees And a 2400+m2 Factory Equipped With 40+ Machines. We Are An OEM/ODM Expert Serving Global Brands Like Brand X And Brand Y.We Hold ISO9001 Certification,Own Patents,And Have Comprehensive Product Test Reports.We Excel in Tailored,innovative Product Solutions. Vision:Pioneer The Household Cleaning Daily Necessities industry. Mission:Enhance Harmony and Happiness for Every Employee And Family. Core Values:Gratitude:To Customers,Colleagues,Society,And Family. Integrity:Commitment to Promises,Rules,And Partners. Practicality:Down-to-Earth Style,Products,And Development. Nnovation: In Thinking,Technology, And Management. Welcome to Visit our Factory For Discussion.We Look Forward to Cooperating With You! Company overview Competitive advantages Factory profile Trade show participation Packaging & shipping specifications"
+ },
+ "fields": {
+  "productUrl": "found",
+  "title": "found",
+  "price": "found",
+  "moq": "found",
+  "attributes": "found",
+  "options": "found",
+  "customization": "found",
+  "leadTime": "found",
+  "unitWeight": "missing",
+  "unitDims": "missing",
+  "unitsPerCarton": "missing",
+  "cartonWeight": "missing",
+  "cartonDims": "missing",
+  "images": "found",
+  "descriptionImages": "found",
+  "highlights": "found",
+  "supplierName": "found",
+  "supplierType": "found",
+  "supplierYears": "found",
+  "supplierCountry": "found",
+  "supplierProfileUrl": "found"
+ },
+ "warnings": [
+  "مشخصات «Quantity: 25 pieces» دارد؛ معلوم نیست تعداد در بسته است یا در کارتن. در صفحه‌ی بررسی روشن کنید."
+ ]
+}
