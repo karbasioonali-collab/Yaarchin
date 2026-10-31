@@ -1,0 +1,283 @@
+{
+ "parserVersion": 1,
+ "productUrl": "https://www.alibaba.com/product-detail/Disposable-Paper-Ashtray-with-Self-Extinguishing_9406360732090.html",
+ "productId": "9406360732090",
+ "title": "Disposable Paper Ashtray with Self-Extinguishing Sand, No Ash Flying Easy Clean for Cafe Pub Lounge Club Bistro",
+ "categoryPath": [
+  "Home & Garden",
+  "Lighters & Smoking Accessories",
+  "Ashtrays"
+ ],
+ "currency": "USD",
+ "priceTiers": [
+  {
+   "minQty": 2500,
+   "maxQty": null,
+   "price": 0.02,
+   "priceMax": null
+  }
+ ],
+ "moq": 2500,
+ "unit": "piece",
+ "attributes": [
+  {
+   "name": "Application",
+   "value": "Restaurant, Hotel, Car, Home"
+  },
+  {
+   "name": "Type",
+   "value": "Smokeless"
+  },
+  {
+   "name": "Material",
+   "value": "paper"
+  },
+  {
+   "name": "Design Style",
+   "value": "Contemporary"
+  },
+  {
+   "name": "Shape",
+   "value": "Round"
+  },
+  {
+   "name": "Place of Origin",
+   "value": "Anhui, China"
+  },
+  {
+   "name": "Brand Name",
+   "value": "BrandB"
+  },
+  {
+   "name": "Model Number",
+   "value": "MODEL-B01"
+  },
+  {
+   "name": "Selling Units",
+   "value": "Single item"
+  },
+  {
+   "name": "Single package size",
+   "value": "9X9X3.1 cm"
+  },
+  {
+   "name": "Single gross weight",
+   "value": "0.005 kg"
+  }
+ ],
+ "placeOfOrigin": "Anhui, China",
+ "options": [
+  {
+   "name": "Color",
+   "values": [
+    "White"
+   ],
+   "customizable": true
+  }
+ ],
+ "customization": [],
+ "leadTimes": [
+  {
+   "minQty": 1,
+   "maxQty": 2500,
+   "days": 31
+  }
+ ],
+ "packing": {
+  "unitWeightKg": 0.005,
+  "unitDimsCm": {
+   "l": 9,
+   "w": 9,
+   "h": 3.1
+  },
+  "unitsPerCarton": null,
+  "cartonDimsCm": null,
+  "cartonWeightKg": null,
+  "estimated": {
+   "cartonWeightKg": false,
+   "cartonDimsCm": false
+  }
+ },
+ "images": [
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/H0c79d3adbba6f18923db1787ed6d5819u.png_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/H0c79d3adbba6f18923db1787ed6d5819u.png",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 21138
+  },
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/Hc9feb20e89b127d84e33210d492e3a0aa.png_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/Hc9feb20e89b127d84e33210d492e3a0aa.png",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 19485
+  },
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/H7ad17b0dd3841104461ad7cc16bd6dd1T.png_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/H7ad17b0dd3841104461ad7cc16bd6dd1T.png",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 11199
+  },
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/Ha4d2f384571632fcac9ac54b26a78c90p.png_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/Ha4d2f384571632fcac9ac54b26a78c90p.png",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 25713
+  },
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/Hb5bde445bd81cff0d5dfa25903ff4b95R.png_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/Hb5bde445bd81cff0d5dfa25903ff4b95R.png",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 36910
+  },
+  {
+   "url": "https://s.alicdn.com/@sc04/kf/H4ed86e7a6f8cf37ce45df7381351c8b9a.png_960x960q80.jpg",
+   "originalUrl": "https://s.alicdn.com/@sc04/kf/H4ed86e7a6f8cf37ce45df7381351c8b9a.png",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 49230
+  }
+ ],
+ "galleryCount": 6,
+ "descriptionImages": [
+  {
+   "url": "https://sc01.alicdn.com/kf/Hb338e6e0e7ec253c2ee9a9f5ea861677r.jpg",
+   "originalUrl": "https://sc01.alicdn.com/kf/Hb338e6e0e7ec253c2ee9a9f5ea861677r.jpg",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 42973
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/Ha909c49478d524e2fa81056413e203c1X.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/Ha909c49478d524e2fa81056413e203c1X.png",
+   "embedded": false,
+   "type": null,
+   "size": null
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H8261223e4614386024917ef9e17c943aF.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/H8261223e4614386024917ef9e17c943aF.png",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 22101
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H796e0ad730b01a5003bab4a2674182f7j.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/H796e0ad730b01a5003bab4a2674182f7j.png",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 49017
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/Hee7042b0f62853e67d8178b10f0aa3db3.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/Hee7042b0f62853e67d8178b10f0aa3db3.png",
+   "embedded": false,
+   "type": null,
+   "size": null
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H080555a120edfc2d9508ae78b21a6de8s.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/H080555a120edfc2d9508ae78b21a6de8s.png",
+   "embedded": false,
+   "type": null,
+   "size": null
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H812aca3c853f05c71c4f05b323d6298ea.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/H812aca3c853f05c71c4f05b323d6298ea.png",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 42798
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/Hedb588803e2fb38f853a1f217073c0e3M.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/Hedb588803e2fb38f853a1f217073c0e3M.png",
+   "embedded": false,
+   "type": null,
+   "size": null
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/H30014443e769104aac7ba0ce74c30b136.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/H30014443e769104aac7ba0ce74c30b136.png",
+   "embedded": false,
+   "type": null,
+   "size": null
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/Hfe95fe24eb1a946d6fad40a90bab5767Q.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/Hfe95fe24eb1a946d6fad40a90bab5767Q.png",
+   "embedded": false,
+   "type": null,
+   "size": null
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/Hb50ddd1891541f5856c8747988207262j.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/Hb50ddd1891541f5856c8747988207262j.png",
+   "embedded": false,
+   "type": null,
+   "size": null
+  },
+  {
+   "url": "https://sc04.alicdn.com/kf/Hde92c582ccd24a4248deb771964bce8f9.png",
+   "originalUrl": "https://sc04.alicdn.com/kf/Hde92c582ccd24a4248deb771964bce8f9.png",
+   "embedded": true,
+   "type": "image/avif",
+   "size": 59880
+  }
+ ],
+ "hasVideo": false,
+ "highlights": [
+  "Self-Extinguishing Sand: Safely holds cigarette butts without spreading fire.",
+  "No Ash Flying: Prevents ash from scattering during use.",
+  "Easy Clean: Quick and hassle-free cleaning after each use.",
+  "Restaurant-Approved: Perfect for cafes, pubs, lounges, and bistros.",
+  "Stylish Design: Modern aesthetic adds elegance to any setting."
+ ],
+ "supplier": {
+  "name": "Sample Supplier B Trading Co., Ltd.",
+  "type": "trading",
+  "typeRaw": "Trading Company",
+  "country": "CN",
+  "years": 1,
+  "rating": 4.3,
+  "revenue": "$10K — $20K",
+  "responseTime": "≤2h",
+  "onTimeRate": "68.8%",
+  "topBuyers": 9,
+  "avgDispatchDays": 4,
+  "storeId": "supplier-b",
+  "storeUrl": "https://supplier-b.en.alibaba.com/",
+  "profileUrl": "https://supplier-b.en.alibaba.com/company_profile.html",
+  "about": "We are a professional manufacturer and trading company specializing in paper and plastic packaging products, integrating production, sales and foreign trade services. We focus on the production, customization and wholesale of various paper packaging and plastic packaging items, with rich experience in product design, production and quality control. At present, we have nearly 100 types of products in stock, with more than 10,000 pieces in stock for each model, ensuring fast delivery and stable supply for global customers. We adhere to strict production standards to provide reliable, safe and practical packaging solutions, with stable quality and cost-effective prices that are widely recognized by overseas buyers. We warmly welcome customers from all over the world to contact us for inquiries, customization and long-term business cooperation. Company overview Factory profile Packaging & shipping specifications Competitive advantages Production workflow Customization capabilities"
+ },
+ "fields": {
+  "productUrl": "found",
+  "title": "found",
+  "price": "found",
+  "moq": "found",
+  "attributes": "found",
+  "options": "found",
+  "customization": "missing",
+  "leadTime": "found",
+  "unitWeight": "found",
+  "unitDims": "found",
+  "unitsPerCarton": "missing",
+  "cartonWeight": "missing",
+  "cartonDims": "missing",
+  "images": "found",
+  "descriptionImages": "found",
+  "highlights": "found",
+  "supplierName": "found",
+  "supplierType": "found",
+  "supplierYears": "found",
+  "supplierCountry": "found",
+  "supplierProfileUrl": "found"
+ },
+ "warnings": [
+  "7 عکس توضیحات داخل فایل نیست (فقط لینک)؛ دفعه‌ی بعد قبل از ذخیره صفحه را آرام تا پایین اسکرول کنید."
+ ]
+}
