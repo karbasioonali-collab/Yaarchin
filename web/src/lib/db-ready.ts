@@ -19,6 +19,7 @@ const schemaState = cache(
     reports: boolean;
     ai: boolean;
     aiTests: boolean;
+    import: boolean;
   }> => {
     const r = await db.execute<{
       catalog: boolean;
@@ -32,6 +33,7 @@ const schemaState = cache(
       reports: boolean;
       ai: boolean;
       ai_tests: boolean;
+      import_ready: boolean;
     }>(sql`
     select
       (to_regclass('public.site_blocks') is not null and to_regclass('public.price_observations') is not null
@@ -56,7 +58,9 @@ const schemaState = cache(
       (to_regclass('public.ai_conversation_state') is not null and to_regclass('public.ai_requests') is not null and to_regclass('public.ai_feedback') is not null
         and to_regclass('public.kb_items') is not null and to_regclass('public.kb_item_versions') is not null) as ai,
       (to_regclass('public.ai_test_cases') is not null and to_regclass('public.ai_test_case_versions') is not null and to_regclass('public.ai_test_runs') is not null
-        and to_regclass('public.ai_test_results') is not null and to_regclass('public.ai_suggestions') is not null) as ai_tests`);
+        and to_regclass('public.ai_test_results') is not null and to_regclass('public.ai_suggestions') is not null) as ai_tests,
+      (to_regclass('public.raw_pages') is not null and to_regclass('public.raw_page_images') is not null
+        and to_regclass('public.listing_external_ids') is not null) as import_ready`);
     return {
       catalog: r.rows[0]?.catalog === true,
       importScore: r.rows[0]?.import_score === true,
@@ -69,6 +73,7 @@ const schemaState = cache(
       reports: r.rows[0]?.reports === true,
       ai: r.rows[0]?.ai === true,
       aiTests: r.rows[0]?.ai_tests === true,
+      import: r.rows[0]?.import_ready === true,
     };
   },
 );
@@ -105,3 +110,6 @@ export const aiReady = cache(async () => (await schemaState()).ai);
 
 // migration ۰۰۱۱: آزمون دستیار و «پیشنهاد سؤال تازه». قبل از آن این صفحه‌ها پیام «بعد از migration» نشان می‌دهند و چیزی ثبت نمی‌شود.
 export const aiTestsReady = cache(async () => (await schemaState()).aiTests);
+
+// migration ۰۰۱۲: ورود از صفحه‌ی ذخیره‌شده‌ی علی‌بابا (raw_pages، عکس‌ها، شناسه‌ی لیستینگ). قبل از آن صفحه‌های «ورود از علی‌بابا» پیام «بعد از migration» می‌دهند.
+export const importReady = cache(async () => (await schemaState()).import);

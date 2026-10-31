@@ -149,7 +149,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         <h2 className={styles.cardTitle}>مشخصات محصول</h2>
         <ActionForm action={updateProductAction} submitLabel="ذخیره‌ی محصول">
           <input type="hidden" name="id" value={p.id} />
-          <ProductFields tree={tree} value={p} hs={{ ready: await ratesReady(), current: await hsLookup(p.hsCode) }} />
+          <ProductFields tree={tree} value={p} hs={{ ready: await ratesReady(), current: await hsLookup(p.hsCode) }} canPublish={await can(a.user, "products.publish")} />
           <div className={ui.field}>
             <span className={ui.label}>مشخصات مشترک (در صفحه‌ی محصول نمایش داده می‌شود)</span>
             <RowsEditor
@@ -216,7 +216,13 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
                 {i === 0 && <span className={styles.badge}>عکس اصلی</span>}
                 {m.kind === "video" && <span className={styles.badge}>ویدیو</span>}
                 {imported.has(m.storageKey) && (
-                  <a className={styles.badge} href={imported.get(m.storageKey)?.sourceUrl ?? undefined} target="_blank" rel="noreferrer noopener" title={imported.get(m.storageKey)?.sourceUrl ?? ""}>
+                  <a
+                    className={styles.badge}
+                    href={imported.get(m.storageKey)?.sourceUrl ?? undefined}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    title={imported.get(m.storageKey)?.sourceUrl ?? ""}
+                  >
                     {imported.get(m.storageKey)?.source === "extension" ? "از اکستنشن" : "از لینک"}
                   </a>
                 )}
@@ -305,8 +311,8 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
       <div className={styles.card} style={{ marginTop: 16 }}>
         <h2 className={styles.cardTitle}>کارخانه‌های این محصول ({fmtNum(listings.length)})</h2>
         <p className={styles.muted} style={{ marginTop: 0 }}>
-          سایت میانگین و بازه‌ی قیمت، حداقل سفارش و زمان آماده‌سازی را خودکار از آخرین قیمت‌های لیستینگ‌های فعالِ کارخانه‌های فعال حساب می‌کند. قیمت یوانی با نسبت
-          نرخ روز یوان به دلار تبدیل می‌شود (تا هر دو نرخ ثبت نشده باشند، در میانگین نمی‌آید). <Link href={`/admin/rates/calculator?product=${p.id}`}>ماشین‌حساب قیمت تمام‌شده</Link>
+          سایت میانگین و بازه‌ی قیمت، حداقل سفارش و زمان آماده‌سازی را خودکار از آخرین قیمت‌های لیستینگ‌های فعالِ کارخانه‌های فعال حساب می‌کند. قیمت یوانی با نسبت نرخ روز یوان به
+          دلار تبدیل می‌شود (تا هر دو نرخ ثبت نشده باشند، در میانگین نمی‌آید). <Link href={`/admin/rates/calculator?product=${p.id}`}>ماشین‌حساب قیمت تمام‌شده</Link>
         </p>
         {listings.length ? (
           <div className={styles.tableWrap}>
@@ -412,7 +418,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
                   کارخانه در فهرست نیست؟ اول در <Link href="/admin/companies/new">کارخانه‌ها</Link> ثبتش کنید.
                 </span>
               </label>
-              <Field label="لینک محصول در علی‌بابا" name="externalUrl" ltr maxLength={1000} hint="https://…" />
+              {(await can(a.user, "companies.links")) && <Field label="لینک محصول در علی‌بابا" name="externalUrl" ltr maxLength={1000} hint="https://…" />}
               <Field label="عنوان انگلیسی در علی‌بابا" name="titleEn" ltr maxLength={300} />
               <div className={styles.row}>
                 <Field label="حداقل سفارش" name="moq" ltr inputMode="numeric" />

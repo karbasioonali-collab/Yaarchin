@@ -37,7 +37,10 @@ export async function setImportScoreAction(_prev: FormState, fd: FormData): Prom
   const before = toImportScore(p.importScore);
   if (before === score) return { ok: "بدون تغییر." };
 
-  await db.update(products).set({ importScore: score === null ? null : String(score) }).where(eq(products.id, id));
+  await db
+    .update(products)
+    .set({ importScore: score === null ? null : String(score) })
+    .where(eq(products.id, id));
   await logActivity({
     actorUserId: a.user.id,
     actingAsUserId: a.session.impersonatingUserId,
@@ -82,7 +85,10 @@ async function readProduct(fd: FormData, selfId?: string, prevHs?: string | null
   if (!UNITS[unit]) return { error: "واحد قیمت نامعتبر است." };
   if (!["draft", "published", "archived"].includes(status)) return { error: "وضعیت نامعتبر است." };
   if (cat && !(UUID.test(cat) && (await categoryExists(cat)))) return { error: "دسته پیدا نشد." };
-  const [dup] = await db.select({ id: products.id }).from(products).where(selfId ? and(eq(products.slug, slug), ne(products.id, selfId)) : eq(products.slug, slug));
+  const [dup] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(selfId ? and(eq(products.slug, slug), ne(products.id, selfId)) : eq(products.slug, slug));
   if (dup) return { error: "این slug قبلاً برای محصول دیگری استفاده شده است." };
   let hsCode = optStr(fd, "hsCode", 30);
   if (hsCode && hsCode !== prevHs && (await ratesReady())) {
@@ -105,10 +111,14 @@ async function readProduct(fd: FormData, selfId?: string, prevHs?: string | null
   };
 }
 
+// انتشار برای مشتری‌ها (و برداشتن از انتشار) دسترسی جدای products.publish می‌خواهد (docs/infoyaarchin.md بخش ۳۶)
+const PUBLISH_DENIED = "انتشار یا برداشتن از انتشار دسترسی «انتشار محصول برای مشتری‌ها» (products.publish) می‌خواهد. محصول را با همان وضعیت قبلی ذخیره کنید.";
+
 export async function createProductAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("products.manage");
   const r = await readProduct(fd);
   if ("error" in r) return r;
+  if (r.v.status === "published" && !(await can(a.user, "products.publish"))) return { error: PUBLISH_DENIED };
   const [row] = await db
     .insert(products)
     .values({ ...r.v, createdBy: a.user.id, publishedAt: r.v.status === "published" ? new Date() : null })
@@ -144,11 +154,14 @@ export async function updateProductAction(_prev: FormState, fd: FormData): Promi
   if (!before) return { error: "محصول پیدا نشد." };
   const r = await readProduct(fd, id, before.hsCode);
   if ("error" in r) return r;
+  if (r.v.status !== before.status && (r.v.status === "published" || before.status === "published") && !(await can(a.user, "products.publish"))) return { error: PUBLISH_DENIED };
 
   // مشخصات مشترک: ردیف‌های «عنوان | مقدار | واحد»
   const specRows = rows(fd, ["specLabel", "specValue", "specUnit"]);
   if (specRows.some((s) => !s.specLabel || !s.specValue)) return { error: "در مشخصات، هر ردیف هم عنوان و هم مقدار لازم دارد." };
-  const specs = specRows.slice(0, 60).map((s) => ({ labelFa: s.specLabel.slice(0, 80), valueFa: s.specValue.slice(0, 200), ...(s.specUnit ? { unit: s.specUnit.slice(0, 40) } : {}) }));
+  const specs = specRows
+    .slice(0, 60)
+    .map((s) => ({ labelFa: s.specLabel.slice(0, 80), valueFa: s.specValue.slice(0, 200), ...(s.specUnit ? { unit: s.specUnit.slice(0, 40) } : {}) }));
 
   // وزن و بسته‌بندی (ماشین‌حساب مرحله‌ی نرخ‌ها)
   let packing: Record<string, string | number | null> = {};
@@ -167,7 +180,10 @@ export async function updateProductAction(_prev: FormState, fd: FormData): Promi
   }
 
   const publishedAt = r.v.status === "published" && !before.publishedAt ? new Date() : before.publishedAt;
-  await db.update(products).set({ ...r.v, ...packing, specs, publishedAt }).where(eq(products.id, id));
+  await db
+    .update(products)
+    .set({ ...r.v, ...packing, specs, publishedAt })
+    .where(eq(products.id, id));
   await logActivity({ actorUserId: a.user.id, action: "product.update", entityType: "product", entityId: id, before, after: { ...r.v, ...packing, specs } });
   revalidatePath("/", "layout");
   return { ok: "ذخیره شد." };
@@ -195,13 +211,25 @@ export async function addMediaAction(_prev: FormState, fd: FormData): Promise<Fo
   if (!url) return { error: "آدرس فایل باید با https:// شروع شود." };
   if (posterRaw && !httpsUrl(posterRaw)) return { error: "آدرس عکس پیش‌نمایش باید با https:// شروع شود." };
   if (listingId) {
-    const [l] = await db.select({ id: productListings.id }).from(productListings).where(and(eq(productListings.id, listingId), eq(productListings.productId, productId)));
+    const [l] = await db
+      .select({ id: productListings.id })
+      .from(productListings)
+      .where(and(eq(productListings.id, listingId), eq(productListings.productId, productId)));
     if (!l) return { error: "لیستینگ انتخاب‌شده مال این محصول نیست." };
   }
   const [{ n }] = await db.select({ n: count() }).from(productMedia).where(eq(productMedia.productId, productId));
   // «دارای لوگوی کارخانه — منتشر نشود» ← is_public = false (سایت فقط is_public = true را نشان می‌دهد)
   const hasLogo = fd.get("hasLogo") === "yes";
-  const v = { productId, kind, storageKey: url, posterKey: posterRaw ? httpsUrl(posterRaw) : null, altFa: optStr(fd, "altFa", 200), isPublic: !hasLogo, listingId: listingId || null, sortOrder: n } as const;
+  const v = {
+    productId,
+    kind,
+    storageKey: url,
+    posterKey: posterRaw ? httpsUrl(posterRaw) : null,
+    altFa: optStr(fd, "altFa", 200),
+    isPublic: !hasLogo,
+    listingId: listingId || null,
+    sortOrder: n,
+  } as const;
   const [row] = await db.insert(productMedia).values(v).returning({ id: productMedia.id });
   await logActivity({ actorUserId: a.user.id, action: "product.media.add", entityType: "product", entityId: productId, after: { id: row.id, ...v } });
   revalidatePath("/", "layout");
@@ -217,7 +245,14 @@ export async function mediaCommandAction(fd: FormData): Promise<void> {
   if (!m) return;
   if (cmd === "toggle") {
     await db.update(productMedia).set({ isPublic: !m.isPublic }).where(eq(productMedia.id, id));
-    await logActivity({ actorUserId: a.user.id, action: "product.media.visibility", entityType: "product", entityId: m.productId, before: { id, isPublic: m.isPublic }, after: { id, isPublic: !m.isPublic } });
+    await logActivity({
+      actorUserId: a.user.id,
+      action: "product.media.visibility",
+      entityType: "product",
+      entityId: m.productId,
+      before: { id, isPublic: m.isPublic },
+      after: { id, isPublic: !m.isPublic },
+    });
   } else if (cmd === "delete") {
     await db.delete(productMedia).where(eq(productMedia.id, id));
     await logActivity({
@@ -233,7 +268,11 @@ export async function mediaCommandAction(fd: FormData): Promise<void> {
     await releaseKey(m.storageKey, actor);
     await releaseKey(m.posterKey, actor);
   } else if (cmd === "up" || cmd === "down" || cmd === "main") {
-    const all = await db.select({ id: productMedia.id }).from(productMedia).where(eq(productMedia.productId, m.productId)).orderBy(asc(productMedia.sortOrder), asc(productMedia.createdAt));
+    const all = await db
+      .select({ id: productMedia.id })
+      .from(productMedia)
+      .where(eq(productMedia.productId, m.productId))
+      .orderBy(asc(productMedia.sortOrder), asc(productMedia.createdAt));
     const i = all.findIndex((x) => x.id === id);
     if (cmd === "main") {
       // «عکس اصلی» = اول فهرست (کارت محصول و اول گالری سایت)
@@ -270,7 +309,15 @@ export async function setPosterAction(_prev: FormState, fd: FormData): Promise<F
   if (!m || m.kind !== "video") return { error: "ویدیو پیدا نشد." };
   if (m.posterKey === poster) return { ok: "بدون تغییر." };
   await db.update(productMedia).set({ posterKey: poster }).where(eq(productMedia.id, id));
-  await logActivity({ actorUserId: a.user.id, actingAsUserId: a.session.impersonatingUserId, action: "product.media.poster", entityType: "product", entityId: m.productId, before: { id, poster: m.posterKey }, after: { id, poster } });
+  await logActivity({
+    actorUserId: a.user.id,
+    actingAsUserId: a.session.impersonatingUserId,
+    action: "product.media.poster",
+    entityType: "product",
+    entityId: m.productId,
+    before: { id, poster: m.posterKey },
+    after: { id, poster },
+  });
   await releaseKey(m.posterKey, { userId: a.user.id, actingAs: a.session.impersonatingUserId });
   revalidatePath("/", "layout");
   return { ok: "ذخیره شد." };
@@ -285,7 +332,13 @@ function readListing(fd: FormData) {
   const unit = str(fd, "moqUnit", 20) || "piece";
   if (!UNITS[unit]) return { error: "واحد نامعتبر است." } as const;
   return {
-    v: { externalUrl: urlRaw ? httpsUrl(urlRaw) : null, titleEn: optStr(fd, "titleEn", 300), moq, moqUnit: unit, status: fd.get("status") === "inactive" ? ("inactive" as const) : ("active" as const) },
+    v: {
+      externalUrl: urlRaw ? httpsUrl(urlRaw) : null,
+      titleEn: optStr(fd, "titleEn", 300),
+      moq,
+      moqUnit: unit,
+      status: fd.get("status") === "inactive" ? ("inactive" as const) : ("active" as const),
+    },
   } as const;
 }
 
@@ -299,8 +352,13 @@ export async function createListingAction(_prev: FormState, fd: FormData): Promi
   if (!co) return { error: "کارخانه پیدا نشد." };
   const r = readListing(fd);
   if ("error" in r) return { error: r.error };
-  const [row] = await db.insert(productListings).values({ productId, companyId, ...r.v }).returning({ id: productListings.id });
-  await logActivity({ actorUserId: a.user.id, action: "listing.create", entityType: "product", entityId: productId, after: { listingId: row.id, companyId, ...r.v } });
+  // لینک علی‌بابا فقط با companies.links (فیلدش برای بقیه نمایش داده نمی‌شود)
+  const v = { ...r.v, externalUrl: (await can(a.user, "companies.links")) ? r.v.externalUrl : null };
+  const [row] = await db
+    .insert(productListings)
+    .values({ productId, companyId, ...v })
+    .returning({ id: productListings.id });
+  await logActivity({ actorUserId: a.user.id, action: "listing.create", entityType: "product", entityId: productId, after: { listingId: row.id, companyId, ...v } });
   revalidatePath("/", "layout");
   redirect(`/admin/products/${productId}/listings/${row.id}`);
 }
@@ -310,14 +368,30 @@ export async function updateListingAction(_prev: FormState, fd: FormData): Promi
   const id = str(fd, "id", 40);
   if (!UUID.test(id)) return { error: "لیستینگ نامعتبر است." };
   const [before] = await db
-    .select({ productId: productListings.productId, externalUrl: productListings.externalUrl, titleEn: productListings.titleEn, moq: productListings.moq, moqUnit: productListings.moqUnit, status: productListings.status })
+    .select({
+      productId: productListings.productId,
+      externalUrl: productListings.externalUrl,
+      titleEn: productListings.titleEn,
+      moq: productListings.moq,
+      moqUnit: productListings.moqUnit,
+      status: productListings.status,
+    })
     .from(productListings)
     .where(eq(productListings.id, id));
   if (!before) return { error: "لیستینگ پیدا نشد." };
   const r = readListing(fd);
   if ("error" in r) return { error: r.error };
-  await db.update(productListings).set(r.v).where(eq(productListings.id, id));
-  await logActivity({ actorUserId: a.user.id, action: "listing.update", entityType: "product", entityId: before.productId ?? undefined, before: { listingId: id, ...before }, after: r.v });
+  // بدون companies.links فیلد لینک در فرم نیست؛ لینک قبلی دست نمی‌خورد
+  const v = { ...r.v, externalUrl: (await can(a.user, "companies.links")) ? r.v.externalUrl : before.externalUrl };
+  await db.update(productListings).set(v).where(eq(productListings.id, id));
+  await logActivity({
+    actorUserId: a.user.id,
+    action: "listing.update",
+    entityType: "product",
+    entityId: before.productId ?? undefined,
+    before: { listingId: id, ...before },
+    after: v,
+  });
   revalidatePath("/", "layout");
   return { ok: "ذخیره شد." };
 }
@@ -387,7 +461,9 @@ export async function addLeadTimeBatchAction(_prev: FormState, fd: FormData): Pr
   if (te) return { error: te };
   const observedAt = new Date();
   const note = optStr(fd, "note", 500);
-  await db.insert(leadTimeObservations).values(tiers.map((t) => ({ listingId, observedAt, minQty: t.minQty, maxQty: t.maxQty, days: t.days as number, note, createdBy: a.user.id })));
+  await db
+    .insert(leadTimeObservations)
+    .values(tiers.map((t) => ({ listingId, observedAt, minQty: t.minQty, maxQty: t.maxQty, days: t.days as number, note, createdBy: a.user.id })));
   await logActivity({ actorUserId: a.user.id, action: "lead_time.add", entityType: "product", entityId: l.productId ?? undefined, after: { listingId, tiers, note } });
   revalidatePath("/", "layout");
   return { ok: "ثبت شد." };

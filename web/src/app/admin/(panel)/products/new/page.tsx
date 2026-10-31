@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ActionForm } from "@/components/ui/ActionForm";
-import { requirePermission } from "@/lib/auth/can";
+import { can, requirePermission } from "@/lib/auth/can";
 import { adminCategoryTree } from "@/lib/catalog/admin-tree";
 import { ratesReady } from "@/lib/db-ready";
 import styles from "../../panel.module.css";
@@ -11,7 +11,7 @@ import { ProductFields } from "../ProductFields";
 export const metadata: Metadata = { title: "محصول جدید" };
 
 export default async function NewProductPage() {
-  await requirePermission("products.manage");
+  const a = await requirePermission("products.manage");
   const [tree, hsReady] = await Promise.all([adminCategoryTree(), ratesReady()]);
   return (
     <>
@@ -30,7 +30,7 @@ export default async function NewProductPage() {
           📷 <strong>عکس و ویدیو:</strong> بعد از ذخیره‌ی محصول، عکس و ویدیو را اضافه کنید؛ با زدن «ساخت محصول» مستقیم به بخش عکس‌های همین محصول می‌روید.
         </p>
         <ActionForm action={createProductAction} submitLabel="ساخت محصول">
-          <ProductFields tree={tree} hs={{ ready: hsReady, current: null }} />
+          <ProductFields tree={tree} hs={{ ready: hsReady, current: null }} canPublish={await can(a.user, "products.publish")} />
         </ActionForm>
       </div>
     </>

@@ -18,6 +18,7 @@ import { getAuth } from "@/lib/auth/current";
 import { mediaReady } from "@/lib/db-ready";
 import { isTrustedPanelRequest } from "@/lib/media/request-guard";
 import { fmtMb, maxInputBytes, mediaLimits, type MediaPurpose, storeMedia } from "@/lib/media/service";
+import { readCapped } from "@/lib/http/read-capped";
 import { mediaUrl } from "@/lib/storage";
 
 export const runtime = "nodejs";
@@ -26,27 +27,6 @@ export const dynamic = "force-dynamic";
 const PERM: Record<MediaPurpose, string> = { product: "products.manage", poster: "products.manage", category: "categories.manage", slide: "site.manage" };
 const UUID = /^[0-9a-f-]{36}$/i;
 const err = (error: string, status: number) => NextResponse.json({ ok: false, error }, { status });
-
-// خواندن بدنه با سقف حجم: اگر Content-Length بزرگ‌تر باشد فوراً رد می‌شود، وگرنه هنگام خواندن شمرده می‌شود
-async function readCapped(req: NextRequest, max: number): Promise<Buffer | "too_big" | "empty"> {
-  const len = Number(req.headers.get("content-length") ?? "");
-  if (Number.isFinite(len) && len > max) return "too_big";
-  if (!req.body) return "empty";
-  const reader = req.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let n = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    n += value.length;
-    if (n > max) {
-      await reader.cancel().catch(() => undefined);
-      return "too_big";
-    }
-    chunks.push(value);
-  }
-  return n ? Buffer.concat(chunks) : "empty";
-}
 
 export async function POST(req: NextRequest) {
   if (!isTrustedPanelRequest(req)) return err("درخواست نامعتبر است.", 403);

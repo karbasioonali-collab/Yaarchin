@@ -173,6 +173,21 @@
       "key": "ai.tests",
       "groupKey": "ai",
       "nameFa": "آزمون دستیار هوشمند: سؤال‌های آزمون، اجرا، قضاوت نتیجه‌ها و پیشنهاد سؤال تازه"
+    },
+    {
+      "key": "catalog.import",
+      "groupKey": "catalog",
+      "nameFa": "ورود صفحه‌ی علی‌بابا: آپلود، بررسی، رد و خواندن دوباره"
+    },
+    {
+      "key": "companies.links",
+      "groupKey": "companies",
+      "nameFa": "دیدن لینک‌های علی‌بابا (پروفایل فروشنده و صفحه‌ی محصول)"
+    },
+    {
+      "key": "products.publish",
+      "groupKey": "products",
+      "nameFa": "انتشار محصول برای مشتری‌ها (و برداشتن از انتشار)"
     }
   ],
   "rolePermissions": {

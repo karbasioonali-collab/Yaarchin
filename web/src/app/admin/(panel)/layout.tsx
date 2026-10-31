@@ -9,7 +9,8 @@ import { CHAT_PERMS, chatAccess } from "@/lib/chat/access";
 import { chatCounters } from "@/lib/chat/admin";
 import { chatReady } from "@/lib/db-ready";
 import { isEnabled } from "@/lib/settings";
-import { aiReady, aiTestsReady } from "@/lib/db-ready";
+import { aiReady, aiTestsReady, importReady } from "@/lib/db-ready";
+import { DB_IMAGES_WARN_BYTES, dbImageBytes } from "@/lib/import/service";
 import { staleWarning } from "@/lib/ai/tests";
 import { overdueCount } from "@/lib/ai/kb";
 import { costWarning } from "@/lib/ai/usage";
@@ -34,6 +35,7 @@ const NAV: (NavItem & { permission: string | string[]; feature?: string })[] = [
   { href: "/admin/ai/suggestions", label: "پیشنهاد سؤال تازه", permission: ["ai.knowledge", "ai.tests"] },
   { href: "/admin/roles", label: "نقش‌ها و دسترسی", permission: "roles.manage" },
   { href: "/admin/products", label: "محصولات", permission: ["products.manage", "products.rate"] },
+  { href: "/admin/import", label: "ورود از علی‌بابا", permission: "catalog.import" },
   { href: "/admin/categories", label: "دسته‌بندی‌ها", permission: "categories.manage" },
   { href: "/admin/companies", label: "کارخانه‌ها", permission: "companies.view" },
   { href: "/admin/rates", label: "نرخ‌ها و هزینه‌ها", permission: RATE_PERMS },
@@ -62,6 +64,8 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
   const kbOverdue = aiOn && (await canAny(a.user, ["ai.knowledge"])) ? await overdueCount() : 0;
   // آزمون دستیار (ai.tests): آزمون کامل بیش از ai.test_stale_days روز اجرا نشده، یا مدل/دستورالعمل بعد از آن عوض شده
   const testWarn = (await aiTestsReady()) && (await canAny(a.user, ["ai.tests"])) ? await staleWarning() : null;
+  // ورود از علی‌بابا: عکس‌های داخل دیتابیس از ۱ گیگابایت گذشت ← وقت فضای ابری (docs/infoyaarchin.md بخش ۳۶)
+  const importImgBytes = (await importReady()) && (await canAny(a.user, ["catalog.import"])) ? await dbImageBytes() : 0;
 
   return (
     <div className={styles.shell}>
@@ -130,6 +134,14 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
             <span>{fmtNum(kbOverdue)} مورد پایگاه دانش دستیار بیش از بازه‌ی تنظیم‌شده بررسی نشده‌اند.</span>
             <Link href="/admin/ai/knowledge?filter=overdue" className={styles.btnGhost}>
               فهرست موردها
+            </Link>
+          </div>
+        )}
+        {importImgBytes >= DB_IMAGES_WARN_BYTES && (
+          <div className={styles.rateWarn} role="status">
+            <span>عکس‌های «ورود از علی‌بابا» در دیتابیس از ۱ گیگابایت گذشته ({fmtNum(Math.round(importImgBytes / 1024 / 1024))} مگابایت)؛ وقت راه‌اندازی فضای ابری (S3) است.</span>
+            <Link href="/admin/import" className={styles.btnGhost}>
+              ورود از علی‌بابا
             </Link>
           </div>
         )}
