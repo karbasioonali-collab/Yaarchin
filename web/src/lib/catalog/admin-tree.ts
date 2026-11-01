@@ -1,5 +1,5 @@
 import "server-only";
-import { asc, count, eq } from "drizzle-orm";
+import { asc, count, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { categories, products } from "@/db/schema";
 
@@ -15,6 +15,8 @@ export type AdminCategory = {
   sortOrder: number;
   status: "active" | "hidden";
   source: string;
+  // آیکون خودکار انتخاب شده (categories.meta.autoIcon؛ بخش ۳۸)
+  autoIcon: boolean;
   depth: number;
   // تعداد محصولاتی که مستقیم در همین دسته‌اند (نه زیرشاخه‌ها)
   productCount: number;
@@ -34,6 +36,7 @@ export async function adminCategoryTree(): Promise<AdminCategory[]> {
       sortOrder: categories.sortOrder,
       status: categories.status,
       source: categories.source,
+      autoIcon: sql<boolean>`coalesce((${categories.meta}->>'autoIcon')::boolean, false)`,
     })
     .from(categories)
     .orderBy(asc(categories.sortOrder), asc(categories.nameFa));

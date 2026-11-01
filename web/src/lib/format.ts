@@ -22,9 +22,11 @@ export function fmtDate(d: Date | string | null | undefined): string {
 }
 
 // قیمت دلاری با ارقام فارسی (۱۲٫۵۰)
-const money = new Intl.NumberFormat("fa-IR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-export function fmtMoney(n: number): string {
-  return money.format(n);
+// دلار فقط در نمایش گرد می‌شود (بخش ۳۸): کمتر از ۱ تا ۳ رقم اعشار (۰٫۰۳۵)، ۱ و بیشتر ۲ رقم (۱۲٫۳۰). در ذخیره و محاسبه گرد کردن نیست.
+const usdSmall = new Intl.NumberFormat("fa-IR", { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+const usdBig = new Intl.NumberFormat("fa-IR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export function fmtUsd(n: number): string {
+  return (Math.abs(n) < 1 ? usdSmall : usdBig).format(n);
 }
 
 // واحدهای قیمت (products.price_unit)

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, eq, ne } from "drizzle-orm";
+import { and, count, eq, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { isUploadKey } from "@/lib/storage";
 import { redirect } from "next/navigation";
@@ -10,7 +10,7 @@ import { categories, products } from "@/db/schema";
 import { logActivity } from "@/lib/activity";
 import { requirePermission } from "@/lib/auth/can";
 import { httpsUrl, num, optStr, SLUG_RE, str } from "@/lib/catalog/admin-input";
-import { categoryIconPath, isCategoryIcon } from "@/lib/catalog/category-icons";
+import { categoryIconPath, isCategoryIcon, pickCategoryIcon } from "@/lib/catalog/category-icons";
 import { adminCategoryTree, subtree } from "@/lib/catalog/admin-tree";
 
 // مدیریت دسته‌ها (دسترسی categories.manage). همه‌ی تغییرات در لاگ فعالیت.
@@ -25,6 +25,8 @@ type Input = {
   image: string | null;
   sortOrder: number;
   status: "active" | "hidden";
+  // آیکون خودکار (بخش ۳۸): وقتی نه عکس داده شده نه آیکون، از روی اسم یک آیکون گرافیکی؛ هرگز عکس محصول
+  autoIcon: boolean;
 };
 
 async function read(fd: FormData, selfId?: string, currentImage?: string | null): Promise<{ error: string } | { v: Input }> {
@@ -38,15 +40,16 @@ async function read(fd: FormData, selfId?: string, currentImage?: string | null)
   // مقدار فعلی (مثلاً کلید storage دسته‌های demo مثل demo/categories/x.svg) بدون تغییر پذیرفته می‌شود
   const keepImage = !!imageRaw && imageRaw === currentImage;
   // عکس آپلودی (کلید img/…) یا آدرس https
-  if (imageRaw && !keepImage && !httpsUrl(imageRaw) && !(isUploadKey(imageRaw) && imageRaw.startsWith("img/"))) return { error: "عکس را آپلود کنید یا آدرسی که با https:// شروع شود بدهید." };
+  if (imageRaw && !keepImage && !httpsUrl(imageRaw) && !(isUploadKey(imageRaw) && imageRaw.startsWith("img/")))
+    return { error: "عکس را آپلود کنید یا آدرسی که با https:// شروع شود بدهید." };
   // آیکون آماده: فقط از فهرست (مقدار دستکاری‌شده رد می‌شود). اگر آدرس عکس هم وارد شده، عکس اولویت دارد.
   const iconRaw = str(fd, "icon", 40);
   if (iconRaw && !isCategoryIcon(iconRaw)) return { error: "آیکون انتخاب‌شده معتبر نیست." };
   if (sort !== null && (Number.isNaN(sort) || !Number.isInteger(sort))) return { error: "ترتیب نمایش باید عدد صحیح باشد." };
   const parentId = parentRaw && UUID.test(parentRaw) ? parentRaw : null;
   if (parentRaw && !parentId) return { error: "دسته‌ی والد نامعتبر است." };
+  const tree = await adminCategoryTree();
   if (parentId) {
-    const tree = await adminCategoryTree();
     if (!tree.some((c) => c.id === parentId)) return { error: "دسته‌ی والد پیدا نشد." };
     // جلوگیری از حلقه: والد نباید خودش یا یکی از زیرشاخه‌هایش باشد
     if (selfId && subtree(tree, selfId).has(parentId)) return { error: "یک دسته نمی‌تواند زیرمجموعه‌ی خودش یا زیرشاخه‌هایش شود." };
@@ -56,16 +59,20 @@ async function read(fd: FormData, selfId?: string, currentImage?: string | null)
     .from(categories)
     .where(selfId ? and(eq(categories.slug, slug), ne(categories.id, selfId)) : eq(categories.slug, slug));
   if (dup) return { error: "این slug قبلاً برای دسته‌ی دیگری استفاده شده است." };
+  const nameEn = optStr(fd, "nameEn", 120);
+  const chosen = keepImage ? imageRaw : imageRaw ? (isUploadKey(imageRaw) ? imageRaw : httpsUrl(imageRaw)) : isCategoryIcon(iconRaw) ? categoryIconPath(iconRaw) : null;
+  const parentImage = parentId ? (tree.find((c) => c.id === parentId)?.image ?? null) : null;
   return {
     v: {
       nameFa,
-      nameEn: optStr(fd, "nameEn", 120),
+      nameEn,
       slug,
       parentId,
       descriptionFa: optStr(fd, "descriptionFa", 1000),
-      image: keepImage ? imageRaw : imageRaw ? (isUploadKey(imageRaw) ? imageRaw : httpsUrl(imageRaw)) : isCategoryIcon(iconRaw) ? categoryIconPath(iconRaw) : null,
+      image: chosen ?? categoryIconPath(pickCategoryIcon({ nameFa, nameEn, parentImage })),
       sortOrder: sort ?? 0,
       status: fd.get("status") === "hidden" ? "hidden" : "active",
+      autoIcon: !chosen,
     },
   };
 }
@@ -74,7 +81,11 @@ export async function createCategoryAction(_prev: FormState, fd: FormData): Prom
   const a = await requirePermission("categories.manage");
   const r = await read(fd);
   if ("error" in r) return r;
-  const [row] = await db.insert(categories).values(r.v).returning({ id: categories.id });
+  const { autoIcon, ...v } = r.v;
+  const [row] = await db
+    .insert(categories)
+    .values({ ...v, meta: { autoIcon } })
+    .returning({ id: categories.id });
   await logActivity({ actorUserId: a.user.id, action: "category.create", entityType: "category", entityId: row.id, after: r.v });
   revalidatePath("/", "layout");
   redirect(`/admin/categories/${row.id}`);
@@ -88,7 +99,11 @@ export async function updateCategoryAction(_prev: FormState, fd: FormData): Prom
   if (!before) return { error: "دسته پیدا نشد." };
   const r = await read(fd, id, before.image);
   if ("error" in r) return r;
-  await db.update(categories).set(r.v).where(eq(categories.id, id));
+  const { autoIcon, ...v } = r.v;
+  await db
+    .update(categories)
+    .set({ ...v, meta: { ...((before.meta as Record<string, unknown>) ?? {}), autoIcon } })
+    .where(eq(categories.id, id));
   await logActivity({
     actorUserId: a.user.id,
     action: "category.update",
@@ -160,4 +175,27 @@ export async function deleteCategoryAction(_prev: FormState, fd: FormData): Prom
   });
   revalidatePath("/", "layout");
   redirect("/admin/categories");
+}
+
+// «پر کردن آیکونِ دسته‌های بی‌عکس» (بخش ۳۸): فقط دسته‌هایی که image ندارند؛ به عکس یا آیکون دستی دست نمی‌زند.
+// والدها قبل از فرزندها (ترتیب درخت) تا فرزندِ بی‌کلمه آیکون والد را بگیرد.
+export async function fillCategoryIconsAction(_prev: FormState, _fd: FormData): Promise<FormState> {
+  const a = await requirePermission("categories.manage");
+  const tree = await adminCategoryTree();
+  const imageOf = new Map(tree.map((c) => [c.id, c.image]));
+  const filled: { id: string; image: string }[] = [];
+  for (const c of tree) {
+    if (c.image) continue;
+    const image = categoryIconPath(pickCategoryIcon({ nameFa: c.nameFa, nameEn: c.nameEn, parentImage: c.parentId ? (imageOf.get(c.parentId) ?? null) : null }));
+    const [cur] = await db.select({ meta: categories.meta }).from(categories).where(eq(categories.id, c.id));
+    await db
+      .update(categories)
+      .set({ image, meta: { ...((cur?.meta as Record<string, unknown>) ?? {}), autoIcon: true } })
+      .where(and(eq(categories.id, c.id), isNull(categories.image)));
+    imageOf.set(c.id, image);
+    filled.push({ id: c.id, image });
+  }
+  if (filled.length) await logActivity({ actorUserId: a.user.id, action: "category.fill_icons", entityType: "category", after: { filled } });
+  revalidatePath("/", "layout");
+  return { ok: filled.length ? `${filled.length.toLocaleString("fa-IR")} دسته آیکون گرفت.` : "همه‌ی دسته‌ها عکس یا آیکون دارند." };
 }

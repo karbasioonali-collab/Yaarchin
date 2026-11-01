@@ -7,7 +7,7 @@ import { products } from "@/db/schema";
 import { requireAnyPermission } from "@/lib/auth/can";
 import { PRODUCT_STATUS_FA } from "@/lib/catalog/admin-labels";
 import { fmtDate, fmtNum, unitFa } from "@/lib/format";
-import { round1000, type MethodResult } from "@/lib/pricing/compute";
+import { round10, round1000, type MethodResult } from "@/lib/pricing/compute";
 import { clampQty, landedCostFor } from "@/lib/pricing/landed";
 import { METHOD_FA, RATE_KIND_FA, RATE_PERMS } from "@/lib/pricing/labels";
 import styles from "../../panel.module.css";
@@ -189,7 +189,7 @@ function MethodCard({ m, unit }: { m: MethodResult; unit: string }) {
       <p style={{ fontSize: 14, marginBottom: 0 }}>
         {m.total !== null ? (
           <>
-            هر {unit}: <strong>{toman(m.unit)}</strong> تومان (در سایت: {fmtNum(round1000(m.unit!))}) · جمع در سایت: {fmtNum(round1000(m.total))} تومان
+            هر {unit}: <strong>{toman(m.unit)}</strong> تومان (در سایت: {fmtNum(round10(m.unit!))}) | جمع در سایت: {fmtNum(round1000(m.total))} تومان
           </>
         ) : (
           "در سایت: «استعلام از کارشناس»"

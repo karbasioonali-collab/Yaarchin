@@ -13,6 +13,7 @@ import { catalogAdminReady, catalogReady, importScoreReady, ratesReady } from "@
 import { type ImportScore, toImportScore } from "./import-score";
 import { mediaUrl } from "@/lib/storage";
 import { clampQty, type LandedCost, publicLandedCost } from "@/lib/pricing/landed";
+import { referencePrice, type RefListing } from "@/lib/pricing/reference";
 
 export type PublicCategory = {
   slug: string;
@@ -30,7 +31,9 @@ export type PriceSummary = {
   avg: number;
   min: number;
   max: number;
-  // تعداد کارخانه‌هایی (نه لیستینگ‌هایی) که قیمت دارند
+  // تعداد مرجع: قیمت‌ها برای این تعداد است (reference.ts؛ بخش ۳۸)
+  refQty: number;
+  // تعداد کارخانه‌هایی (نه لیستینگ‌هایی) که در این تعداد قیمت دارند
   pricedSuppliers: number;
   lastObservedAt: string;
 };
@@ -49,7 +52,16 @@ export type ProductCard = {
 
 export type PublicSpec = { label: string; value: string };
 // url = اندازه‌ی صفحه‌ی محصول؛ thumbUrl = عکس کوچک؛ zoomUrl = بزرگ‌نمایی. برای عکس با آدرس دستی هر سه یکی است.
-export type PublicMedia = { kind: "image" | "video"; url: string; thumbUrl: string; zoomUrl: string; posterUrl: string | null; alt: string; width: number | null; height: number | null };
+export type PublicMedia = {
+  kind: "image" | "video";
+  url: string;
+  thumbUrl: string;
+  zoomUrl: string;
+  posterUrl: string | null;
+  alt: string;
+  width: number | null;
+  height: number | null;
+};
 
 export type PublicProduct = ProductCard & {
   titleEn: string | null;
@@ -163,7 +175,10 @@ type Stats = { suppliers: number; moqMin: number | null; ltMin: number | null; l
 async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
   const out = new Map<string, Stats>();
   if (!productIds.length) return out;
-  const ids = sql`array[${sql.join(productIds.map((id) => sql`${id}::uuid`), sql`, `)}]`;
+  const ids = sql`array[${sql.join(
+    productIds.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  )}]`;
 
   // لیستینگ‌های فعالِ کارخانه‌های فعال (مسدود یا ادغام‌شده حساب نمی‌شوند)
   // زمان آماده‌سازی: از آخرین نوبت پله‌های lead_time_observations (migration ۰۰۰۴؛ مثل قیمت، همه‌ی ردیف‌های تا ۲ ثانیه
@@ -191,53 +206,62 @@ async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
   // (پله‌های یک نوبت ممکن است چند میلی‌ثانیه فاصله داشته باشند، پس «برابر بودن زمان» کافی نیست؛ ولی پنجره نباید بزرگ باشد:
   // با پنجره‌ی یک ساعته، قیمتی که کارشناس چند دقیقه بعد اصلاح می‌کرد با نوبت قبلی قاطی می‌شد. پنل همه‌ی پله‌های یک نوبت را
   // با یک زمانِ واحد ثبت می‌کند؛ اکستنشن هم باید همین کار را بکند. docs/infoyaarchin.md بخش ۱۹.)
-  // «میانگین» = میانگینِ وسطِ بازه‌ی هر کارخانه (هر کارخانه یک رأی، حتی با چند لیستینگ)؛
-  // «بازه» = کمترین تا بیشترین قیمت همه‌ی کارخانه‌ها.
+  // «میانگین» و «بازه» برای «تعداد مرجع» محصول (src/lib/pricing/reference.ts؛ بخش ۳۸): پله‌ی همان تعداد در هر لیستینگ،
+  // هر کارخانه یک رأی؛ لیستینگی با حداقل سفارش بیشتر از تعداد مرجع حساب نمی‌شود. (تا 2026-11-01: وسطِ ارزان‌ترین تا گران‌ترین پله.)
   // قیمت یوانی (migration ۰۰۰۵): وقتی نرخ بازار دلار و یوان هر دو ثبت شده، یوان با نسبت «نرخ یوان ÷ نرخ دلار» به دلار
   // تبدیل و وارد میانگین می‌شود؛ وگرنه مثل قبل کنار گذاشته می‌شود. «آخرین نوبت» هر لیستینگ بین همه‌ی ارزهای قابل‌استفاده
   // حساب می‌شود (اگر کارشناس بعد از قیمت دلاری، قیمت یوانی تازه ثبت کند، قیمت یوانی ملاک است). docs/infoyaarchin.md بخش ۲۱.
   const lastRate = (code: string) => sql`(select rate_toman from exchange_rates where currency_code = ${code} and kind = 'market'
       and rate_date <= (now() at time zone 'Asia/Tehran')::date order by rate_date desc, created_at desc, id desc limit 1)`;
   const fx = (await ratesReady()) ? sql`select ${lastRate("CNY")} / ${lastRate("USD")} as cny_usd` : sql`select null::numeric as cny_usd`;
-  const priceStats = await db.execute<{ product_id: string; n: number; lo: string; hi: string; avg: string; at: Date }>(sql`
+  // قیمت: پله‌های آخرین نوبت هر لیستینگ (به دلار؛ یوان با نسبت نرخ بازار)، بعد قیمت «تعداد مرجع» در reference.ts.
+  const tierRows = await db.execute<{
+    product_id: string;
+    listing_id: string;
+    company_id: string;
+    moq: number | null;
+    ref: string | null;
+    min_qty: number | null;
+    max_qty: number | null;
+    lo: string;
+    hi: string | null;
+    at: Date;
+  }>(sql`
     with fx as (${fx}), latest as (
-      select po.listing_id, pl.product_id, pl.company_id,
-             po.price_min * f.k as price_min, coalesce(po.price_max, po.price_min) * f.k as price_max, po.observed_at,
+      select po.listing_id, pl.product_id, pl.company_id, pl.moq, po.min_qty, po.max_qty,
+             po.price_min * f.k as lo, po.price_max * f.k as hi, po.observed_at,
              max(po.observed_at) over (partition by po.listing_id) as last_at
       from price_observations po
       join product_listings pl on pl.id = po.listing_id and pl.status = 'active'
       join companies c on c.id = pl.company_id and c.status = 'active'
       cross join lateral (select case when po.currency = 'CNY' then (select cny_usd from fx) else 1 end as k) f
       where f.k is not null and po.currency in ('USD', 'CNY') and pl.product_id = any(${ids})
-    ), per_listing as (
-      select product_id, listing_id, company_id, min(price_min) as lo, max(price_max) as hi, max(observed_at) as at
-      from latest where observed_at > last_at - interval '2 seconds' group by product_id, listing_id, company_id
-    ), per_company as (
-      select product_id, company_id, min(lo) as lo, max(hi) as hi, avg((lo + hi) / 2) as mid, max(at) as at
-      from per_listing group by product_id, company_id
     )
-    select product_id, count(*)::int as n, min(lo) as lo, max(hi) as hi, avg(mid) as avg, max(at) as at
-    from per_company group by product_id`);
+    select l.product_id, l.listing_id, l.company_id, l.moq, p.meta->>'referenceQty' as ref, l.min_qty, l.max_qty, l.lo, l.hi, l.observed_at as at
+    from latest l join products p on p.id = l.product_id
+    where l.observed_at > l.last_at - interval '2 seconds'`);
+  const byProduct = new Map<string, { ref: number | null; at: number; listings: Map<string, RefListing> }>();
+  for (const r of tierRows.rows) {
+    const g = byProduct.get(r.product_id) ?? { ref: r.ref && /^\d+$/.test(r.ref) ? Number(r.ref) : null, at: 0, listings: new Map() };
+    const l = g.listings.get(r.listing_id) ?? { listingId: r.listing_id, companyId: r.company_id, moq: r.moq, tiers: [] };
+    l.tiers.push({ minQty: r.min_qty, maxQty: r.max_qty, priceMin: Number(r.lo), priceMax: r.hi === null ? null : Number(r.hi) });
+    g.listings.set(r.listing_id, l);
+    g.at = Math.max(g.at, new Date(r.at).getTime());
+    byProduct.set(r.product_id, g);
+  }
 
   for (const r of listingStats.rows) {
     out.set(r.product_id, { suppliers: r.suppliers, moqMin: r.moq_min, ltMin: r.lt_min, ltMax: r.lt_max, price: null });
   }
-  for (const r of priceStats.rows) {
-    const s = out.get(r.product_id);
-    if (!s) continue;
-    s.price = {
-      currency: "USD",
-      avg: round2(Number(r.avg)),
-      min: round2(Number(r.lo)),
-      max: round2(Number(r.hi)),
-      pricedSuppliers: r.n,
-      lastObservedAt: new Date(r.at).toISOString(),
-    };
+  for (const [pid, g] of byProduct) {
+    const s = out.get(pid);
+    const rp = referencePrice([...g.listings.values()], g.ref);
+    if (!s || !rp) continue;
+    // بدون گرد کردن؛ فقط در نمایش (fmtUsd)
+    s.price = { currency: "USD", avg: rp.avg, min: rp.min, max: rp.max, refQty: rp.qty, pricedSuppliers: rp.suppliers, lastObservedAt: new Date(g.at).toISOString() };
   }
   return out;
 }
-
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 // ---------- محصول ----------
 // ستون import_score فقط وقتی select می‌شود که migration ۰۰۰۲ اجرا شده باشد؛ قبل از آن null.
@@ -322,6 +346,12 @@ export async function productCardsByIds(ids: string[]): Promise<ProductCard[]> {
 }
 
 // شناسه‌ی محصول منتشرشده از روی slug (یا null)
+// قیمت تمام‌شده برای یک تعداد دلخواه، بدون connection() (دستیار: «قیمت در حداقل سفارش»؛ کارت سایت از تعداد مرجع است)
+export async function loadLandedAt(slug: string, qty: number): Promise<LandedCost | null> {
+  const id = await publishedProductId(slug);
+  return id ? publicLandedCost(id, clampQty(qty, 1)) : null;
+}
+
 export async function publishedProductId(slug: string): Promise<string | null> {
   if (!(await catalogReady())) return null;
   const [r] = await db
@@ -419,8 +449,8 @@ export async function loadPublishedProduct(slug: string): Promise<PublicProduct 
     moqMin: s?.moqMin ?? null,
     leadTimeDays: s?.ltMin != null && s?.ltMax != null ? { min: s.ltMin, max: s.ltMax } : null,
     breadcrumb: ancestors(idx, p.categoryId),
-    // پیش‌فرض تعداد در کارت «قیمت تمام‌شده» = حداقل سفارش؛ مشتری در صفحه عوضش می‌کند (/api/v1/products/[slug]/landed)
-    landedCost: await publicLandedCost(p.id, s?.moqMin ?? 1),
+    // پیش‌فرض تعداد در کارت «قیمت تمام‌شده» = تعداد مرجع (همان تعداد قیمت کارخانه؛ بخش ۳۸)؛ مشتری در صفحه عوضش می‌کند (/api/v1/products/[slug]/landed)
+    landedCost: await publicLandedCost(p.id, s?.price?.refQty ?? s?.moqMin ?? 1),
     updatedAt: p.updatedAt.toISOString(),
   };
 }
@@ -433,7 +463,7 @@ export async function landedForSlug(slug: string, qtyRaw: unknown): Promise<Land
   const id = await publishedProductId(slug);
   if (!id) return null;
   const s = (await statsFor([id])).get(id);
-  return publicLandedCost(id, clampQty(qtyRaw, s?.moqMin ?? 1));
+  return publicLandedCost(id, clampQty(qtyRaw, s?.price?.refQty ?? s?.moqMin ?? 1));
 }
 
 // برای فوتر و نقشه‌ی سایت

@@ -7,7 +7,7 @@ import { catalogReady } from "@/lib/db-ready";
 import { fmtNum } from "@/lib/format";
 import { mediaUrl } from "@/lib/storage";
 import styles from "../panel.module.css";
-import { createCategoryAction, moveCategoryAction } from "./actions";
+import { createCategoryAction, fillCategoryIconsAction, moveCategoryAction } from "./actions";
 import { CategoryFields } from "./CategoryFields";
 
 export const metadata: Metadata = { title: "دسته‌بندی‌ها" };
@@ -26,6 +26,16 @@ export default async function CategoriesPage() {
         </div>
       </div>
 
+      {tree.some((c) => !c.image) && (
+        <div className={styles.notice} data-testid="fill-icons" style={{ marginBottom: 12 }}>
+          {fmtNum(tree.filter((c) => !c.image).length)} دسته عکس یا آیکون ندارد (در سایت جعبه‌ی ساده نشان داده می‌شود).
+          <ActionForm action={fillCategoryIconsAction} submitLabel="پر کردن آیکونِ دسته‌های بی‌عکس" submitVariant="secondary">
+            <span className={styles.muted} style={{ fontSize: 12 }}>
+              از روی اسم یک آیکون گرافیکی هم‌سبک انتخاب می‌شود؛ به عکس یا آیکون دستی دست نمی‌زند و عکس محصول هرگز عکس دسته نمی‌شود.
+            </span>
+          </ActionForm>
+        </div>
+      )}
       <div className={styles.card}>
         <div className={styles.tableWrap}>
           <table className={styles.table}>
@@ -53,6 +63,11 @@ export default async function CategoriesPage() {
                         <span className={styles.catThumb} aria-hidden="true" />
                       )}
                       <Link href={`/admin/categories/${c.id}`}>{c.nameFa}</Link>
+                      {c.autoIcon && (
+                        <span className={`${styles.badge} ${styles.badgeMuted}`} style={{ marginInlineStart: 6 }}>
+                          آیکون خودکار
+                        </span>
+                      )}
                       {c.source === "demo" && (
                         <span className={`${styles.badge} ${styles.badgeMuted}`} style={{ marginInlineStart: 6 }}>
                           نمونه

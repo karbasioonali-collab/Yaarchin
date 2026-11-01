@@ -468,3 +468,66 @@ export async function addLeadTimeBatchAction(_prev: FormState, fd: FormData): Pr
   revalidatePath("/", "layout");
   return { ok: "ثبت شد." };
 }
+
+// ---------- تعداد مرجع قیمت سایت (بخش ۳۸) ----------
+// products.meta.referenceQty؛ خالی = پیش‌فرض (میانه‌ی بالاییِ حداقل سفارش لیستینگ‌ها). بدون migration.
+export async function setReferenceQtyAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("products.manage");
+  const id = str(fd, "id", 40);
+  if (!UUID.test(id)) return { error: "محصول نامعتبر است." };
+  const raw = num(fd.get("referenceQty"));
+  if (raw !== null && (isBadInt(raw) || raw > 100_000_000)) return { error: "تعداد مرجع باید عدد صحیح بزرگ‌تر از صفر باشد (یا خالی برای پیش‌فرض)." };
+  const [before] = await db.select({ meta: products.meta }).from(products).where(eq(products.id, id));
+  if (!before) return { error: "محصول پیدا نشد." };
+  const meta = { ...((before.meta as Record<string, unknown>) ?? {}) };
+  const old = meta.referenceQty ?? null;
+  if (raw === null) delete meta.referenceQty;
+  else meta.referenceQty = raw;
+  await db.update(products).set({ meta }).where(eq(products.id, id));
+  await logActivity({ actorUserId: a.user.id, action: "product.reference_qty", entityType: "product", entityId: id, before: { referenceQty: old }, after: { referenceQty: raw } });
+  revalidatePath("/", "layout");
+  return { ok: raw === null ? "تعداد مرجع به پیش‌فرض برگشت." : "ذخیره شد." };
+}
+
+// ---------- «همه عمومی» / «هیچ‌کدام» برای عکس‌های محصول ----------
+export async function mediaBulkAction(fd: FormData): Promise<void> {
+  const a = await requirePermission("products.manage");
+  const productId = str(fd, "productId", 40);
+  const on = fd.get("cmd") === "all";
+  if (!UUID.test(productId)) return;
+  // فقط عکس‌ها؛ ویدیو دست نمی‌خورد
+  await db
+    .update(productMedia)
+    .set({ isPublic: on })
+    .where(and(eq(productMedia.productId, productId), eq(productMedia.kind, "image")));
+  await logActivity({ actorUserId: a.user.id, action: "product.media.visibility_all", entityType: "product", entityId: productId, after: { isPublic: on } });
+  revalidatePath("/", "layout");
+}
+
+// ---------- مشخصات ترکیبی ← «مشخصات مشترک» محصول ----------
+// ردیف‌های تیک‌خورده (با عنوان/مقدار/واحد اصلاح‌شده) به مشخصات اضافه می‌شوند؛ ردیفی با همان عنوان جایگزین می‌شود.
+export async function applySpecsAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("products.manage");
+  const id = str(fd, "id", 40);
+  if (!UUID.test(id)) return { error: "محصول نامعتبر است." };
+  const picked = fd.getAll("pick").map(String);
+  if (!picked.length) return { error: "هیچ ویژگی‌ای انتخاب نشده." };
+  const add: { labelFa: string; valueFa: string; unit?: string }[] = [];
+  for (const k of picked.slice(0, 60)) {
+    if (!/^\d{1,3}$/.test(k)) continue;
+    const labelFa = str(fd, `label_${k}`, 80);
+    const valueFa = str(fd, `value_${k}`, 200);
+    const unit = str(fd, `unit_${k}`, 40);
+    if (!labelFa || !valueFa) return { error: "هر ردیف انتخاب‌شده عنوان و مقدار لازم دارد." };
+    add.push({ labelFa, valueFa, ...(unit ? { unit } : {}) });
+  }
+  const [before] = await db.select({ specs: products.specs }).from(products).where(eq(products.id, id));
+  if (!before) return { error: "محصول پیدا نشد." };
+  const cur = (Array.isArray(before.specs) ? before.specs : []) as { labelFa: string; valueFa: string; unit?: string }[];
+  const labels = new Set(add.map((s) => s.labelFa));
+  const specs = [...cur.filter((s) => !labels.has(s.labelFa)), ...add].slice(0, 60);
+  await db.update(products).set({ specs }).where(eq(products.id, id));
+  await logActivity({ actorUserId: a.user.id, action: "product.specs_merge", entityType: "product", entityId: id, before: { specs: cur }, after: { specs } });
+  revalidatePath("/", "layout");
+  return { ok: `${add.length.toLocaleString("fa-IR")} ردیف در «مشخصات مشترک» ذخیره شد.` };
+}

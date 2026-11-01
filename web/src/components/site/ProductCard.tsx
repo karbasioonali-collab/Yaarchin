@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ProductCard as Card } from "@/lib/catalog/public";
-import { fmtMoney, fmtNum, unitFa } from "@/lib/format";
+import { fmtUsd, fmtNum, unitFa } from "@/lib/format";
 import { Icon } from "./Icon";
 import { ImportStars } from "./ImportStars";
 import styles from "./ProductCard.module.css";
@@ -30,10 +30,10 @@ export function ProductCard({ p, priority = false }: { p: Card; priority?: boole
           <span className={styles.price}>
             <span className={styles.priceLabel}>میانگین قیمت هر {unitFa(p.price.unit)}</span>
             <span className={styles.priceValue}>
-              {fmtMoney(p.price.avg)} <small>دلار</small>
+              {fmtUsd(p.price.avg)} <small>دلار</small>
             </span>
             <span className={styles.range}>
-              بازه: {fmtMoney(p.price.min)} تا {fmtMoney(p.price.max)}
+              بازه: {fmtUsd(p.price.min)} تا {fmtUsd(p.price.max)} | برای {fmtNum(p.price.refQty)} {unitFa(p.price.unit)}
             </span>
           </span>
         ) : (

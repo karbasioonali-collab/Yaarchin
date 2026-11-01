@@ -14,6 +14,8 @@ import { DB_IMAGES_WARN_BYTES, dbImageBytes } from "@/lib/import/service";
 import { staleWarning } from "@/lib/ai/tests";
 import { overdueCount } from "@/lib/ai/kb";
 import { costWarning } from "@/lib/ai/usage";
+import { headers } from "next/headers";
+import { oldBrowser } from "@/lib/old-browser";
 import { PanelPulse } from "./PanelPulse";
 import { logoutAction } from "../(auth)/actions";
 import { stopImpersonationAction } from "./users/actions";
@@ -66,6 +68,8 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
   const testWarn = (await aiTestsReady()) && (await canAny(a.user, ["ai.tests"])) ? await staleWarning() : null;
   // ورود از علی‌بابا: عکس‌های داخل دیتابیس از ۱ گیگابایت گذشت ← وقت فضای ابری (docs/infoyaarchin.md بخش ۳۶)
   const importImgBytes = (await importReady()) && (await canAny(a.user, ["catalog.import"])) ? await dbImageBytes() : 0;
+  // مرورگر قدیمی‌تر از حداقل Next.js 16 (بخش ۳۸)
+  const old = oldBrowser((await headers()).get("user-agent"));
 
   return (
     <div className={styles.shell}>
@@ -105,6 +109,20 @@ export default async function PanelLayout({ children }: LayoutProps<"/admin">) {
                 پایان
               </button>
             </form>
+          </div>
+        )}
+        {old && (
+          <div className={styles.rateWarn} role="alert" data-testid="old-browser">
+            <span>
+              مرورگر شما قدیمی است ({old.name} {fmtNum(old.version)}). پنل برای Chrome، Edge یا Firefox نسخه‌ی ۱۱۱ به بالا ساخته شده و در این مرورگر ممکن است فرم‌ها درست کار نکنند
+              (مثلاً انتخاب‌ها خودبه‌خود برگردند).{" "}
+              {old.win7 ? "روی ویندوز ۷ آخرین نسخه‌ی کروم ۱۰۹ است؛ Firefox ESR 115 هنوز روی ویندوز ۷ نصب می‌شود و پشتیبانی می‌شود." : "لطفاً مرورگر را به‌روز کنید."}
+            </span>
+            {old.win7 && (
+              <a href="https://www.mozilla.org/firefox/enterprise/" target="_blank" rel="noreferrer noopener" className={styles.btnGhost}>
+                دریافت Firefox ESR ↗
+              </a>
+            )}
           </div>
         )}
         {missingRates.length > 0 && (

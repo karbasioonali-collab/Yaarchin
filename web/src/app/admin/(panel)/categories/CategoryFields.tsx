@@ -13,6 +13,8 @@ import { mediaUrl } from "@/lib/storage";
 export async function CategoryFields({ tree, value, excluded }: { tree: AdminCategory[]; value?: Partial<AdminCategory>; excluded?: Set<string> }) {
   // آیکون آماده (اگر عکس فعلی یکی از آیکون‌هاست) از قبل انتخاب‌شده نشان داده می‌شود
   const icon = iconKeyFromImage(value?.image);
+  // آیکون خودکار: گزینه‌ی «خودکار» انتخاب‌شده می‌ماند تا با تغییر اسم دوباره انتخاب شود
+  const auto = !value || value.autoIcon === true || !value.image;
   const uploads = await mediaReady();
   const image = icon ? "" : (value?.image ?? "");
   return (
@@ -41,12 +43,15 @@ export async function CategoryFields({ tree, value, excluded }: { tree: AdminCat
         <legend className={ui.label}>آیکون دسته</legend>
         <div className={styles.iconGrid}>
           <label className={styles.iconOption}>
-            <input type="radio" name="icon" value="" defaultChecked={!icon} />
-            <span className={styles.iconNone}>بدون آیکون</span>
+            <input type="radio" name="icon" value="" defaultChecked={auto} />
+            <span className={styles.iconNone}>
+              خودکار
+              {auto && icon ? ` (الان: ${CATEGORY_ICONS.find((x) => x.key === icon)?.labelFa ?? icon})` : " (از روی اسم)"}
+            </span>
           </label>
           {CATEGORY_ICONS.map((i) => (
             <label key={i.key} className={styles.iconOption} title={i.labelFa}>
-              <input type="radio" name="icon" value={i.key} defaultChecked={icon === i.key} />
+              <input type="radio" name="icon" value={i.key} defaultChecked={!auto && icon === i.key} />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={categoryIconPath(i.key)} alt="" width={64} height={64} loading="lazy" />
               <span>{i.labelFa}</span>

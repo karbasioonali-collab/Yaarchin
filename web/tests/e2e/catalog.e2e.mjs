@@ -168,7 +168,9 @@ await addTier(500, "", 4);
 await priceForm().getByRole("button", { name: "ثبت قیمت" }).click();
 ok(await waitFor(() => psql(`select count(*) from price_observations where listing_id='${L}'`) === "2"), "2 USD tiers saved");
 let api = await (await fetch(B + `/api/v1/products/cat-test-${run}`)).json();
-ok(JSON.stringify(api).includes("4") && api.product?.suppliers === 1, `site: 1 supplier, price from tiers (${JSON.stringify(api.product?.price)})`);
+// قیمت «تعداد مرجع» (بخش ۳۸): یک لیستینگ ← تعداد مرجع = حداقل سفارشش (۱۰۰)، پله‌ی ۱۰۰ تا ۴۹۹ ← ۵ دلار
+// (قبلاً «وسطِ ارزان‌ترین تا گران‌ترین پله» = ۴٫۵ و این بررسی فقط دنبال رقم «4» در کل JSON بود؛ با تاریخِ بدون ۴ شکست می‌خورد)
+ok(api.product?.suppliers === 1 && api.product?.price?.avg === 5 && api.product?.price?.refQty === 100, `site: 1 supplier, price of the ref-qty tier (${JSON.stringify(api.product?.price)})`);
 // نوبت تازه (بیش از ۲ ثانیه بعد) جایگزین نوبت قبلی در سایت؛ یوان با نرخ به دلار
 await sleep(2500);
 await ad.reload();

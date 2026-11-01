@@ -23,7 +23,7 @@ export TEST_DB="$PG_URL/$DB"
 psql "$PG_URL/postgres" -qAtc "select 1" >/dev/null 2>&1 || { echo "Postgres محلی در دسترس نیست؛ اول: service postgresql start" >&2; exit 1; }
 MOCK_ENV=(AI_BASE_URL=http://127.0.0.1:3399/v1 AI_API_KEY=test AI_MODEL=mock/primary AI_FALLBACK_MODEL=mock/fallback)
 # ترتیب لازم: سایت ← محتوای سایت ← امتیاز …؛ کاتالوگ همیشه آخر
-ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live alibaba-import alibaba-register "$PRE_TEST" catalog)
+ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live alibaba-import alibaba-register catalog-4a "$PRE_TEST" catalog)
 
 if [ "$SETUP" = 1 ]; then
   bash tests/e2e/setup-db.sh "$DB" || exit 1

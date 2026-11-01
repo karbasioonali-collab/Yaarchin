@@ -20,6 +20,7 @@ import {
   rawPages,
 } from "@/db/schema";
 import { SLUG_RE } from "@/lib/catalog/admin-input";
+import { categoryIconPath, pickCategoryIcon } from "@/lib/catalog/category-icons";
 import { UNITS } from "@/lib/format";
 import { hsLookup } from "@/lib/pricing/admin";
 import { ratesReady } from "@/lib/db-ready";
@@ -213,9 +214,23 @@ export async function registerPage(rawPageId: string, input: RegisterInput, by: 
         let categoryId = np.categoryId;
         if (np.newCategory) {
           const slug = slugify(np.newCategory.nameEn) || `cat-${Date.now().toString(36)}`;
+          // آیکون گرافیکی خودکار (بخش ۳۸): از اسم، مسیر دسته‌ی علی‌بابا و آیکون والد؛ هرگز عکس محصول
+          const [parent] = np.newCategory.parentId ? await tx.select({ image: categories.image }).from(categories).where(eq(categories.id, np.newCategory.parentId)) : [];
+          const image = categoryIconPath(
+            pickCategoryIcon({ nameFa: np.newCategory.nameFa, nameEn: np.newCategory.nameEn, path: p.categoryPath, parentImage: parent?.image ?? null }),
+          );
           const [cat] = await tx
             .insert(categories)
-            .values({ nameFa: np.newCategory.nameFa, nameEn: np.newCategory.nameEn, parentId: np.newCategory.parentId, slug, status: "active", source: "import" })
+            .values({
+              nameFa: np.newCategory.nameFa,
+              nameEn: np.newCategory.nameEn,
+              parentId: np.newCategory.parentId,
+              slug,
+              status: "active",
+              source: "import",
+              image,
+              meta: { autoIcon: true },
+            })
             .returning({ id: categories.id });
           categoryId = cat.id;
         }
