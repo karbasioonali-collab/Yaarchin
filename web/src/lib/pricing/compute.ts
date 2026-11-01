@@ -9,6 +9,9 @@
 // «کیسه‌ی ارز» (Bag): مبلغ‌ها تا آخرین لحظه به ارز خودشان نگه داشته می‌شوند ({USD: 120, CNY: 300, IRT: 50000}) تا
 // هم با نرخ بازار (برای نمایش) و هم با نرخ گمرکی (برای پایه‌ی حقوق ورودی و ارزش افزوده) قابل تبدیل باشند.
 import { compileFormula, FormulaError, VARIABLES } from "./formula";
+import { pickTier, round10, round1000, type QtyTier } from "./tiers";
+
+export { pickTier, round10, round1000, type QtyTier };
 
 export const BASE = "IRT"; // تومان
 
@@ -64,7 +67,6 @@ export type RateSnapshot = {
   hs: Record<string, HsRule>;
 };
 
-export type QtyTier = { minQty: number | null; maxQty: number | null };
 export type PriceBatchIn = { currency: string; observedAt: string; tiers: (QtyTier & { priceMin: number; priceMax: number | null })[] };
 export type ListingIn = { companyId: string; moq: number | null; prices: PriceBatchIn[]; leadTiers: (QtyTier & { days: number })[] | null; leadDaysLegacy: number | null };
 export type Packing = {
@@ -124,17 +126,6 @@ const bagText = (b: Bag, names: RateSnapshot["currencies"]) =>
     .filter(([, v]) => v !== 0)
     .map(([k, v]) => `${fa(v)} ${names[k]?.nameFa ?? k}`)
     .join(" + ") || "۰";
-
-// پله‌ی متناسب با تعداد: بزرگ‌ترین «از» که ≤ تعداد باشد (و «تا»ی آن تعداد را بپوشاند)؛ اگر تعداد از همه‌ی پله‌ها کمتر است، پله‌ی اول.
-export function pickTier<T extends QtyTier>(tiers: T[], qty: number): { tier: T; below: boolean } | null {
-  if (!tiers.length) return null;
-  const sorted = [...tiers].sort((a, b) => (a.minQty ?? 1) - (b.minQty ?? 1));
-  const cover = sorted.filter((t) => (t.minQty ?? 1) <= qty && (t.maxQty === null || qty <= t.maxQty));
-  if (cover.length) return { tier: cover.at(-1)!, below: false };
-  const under = sorted.filter((t) => (t.minQty ?? 1) <= qty);
-  if (under.length) return { tier: under.at(-1)!, below: false }; // تعداد بین دو پله (فاصله‌ی ثبت‌نشده)
-  return { tier: sorted[0], below: true };
-}
 
 class Converter {
   used = new Map<string, { currency: string; kind: "market" | "customs"; rate: number; date: string }>();
@@ -492,7 +483,8 @@ function costFor(c: CostRule, x: CostCtx, conv: Converter, s: RateSnapshot): { b
 }
 
 // ---------- خروجی عمومی سایت ----------
-// فقط عددهای گردشده (نزدیک‌ترین ۱٬۰۰۰ تومان) و بدون ریز محاسبه؛ اسم یا قیمت تک‌تک کارخانه‌ها هرگز در آن نیست.
+// فقط عددهای گردشده و بدون ریز محاسبه؛ اسم یا قیمت تک‌تک کارخانه‌ها هرگز در آن نیست.
+// گرد کردن فقط اینجا (نمایش؛ بخش ۳۸): قیمت هر عدد ← نزدیک‌ترین ۱۰ تومان، جمع سفارش ← نزدیک‌ترین ۱٬۰۰۰ تومان. محاسبه از عدد دقیق است.
 export type PublicLanded = {
   qty: number;
   moq: number | null;
@@ -500,7 +492,6 @@ export type PublicLanded = {
   ratesDate: string | null;
   methods: { key: string; nameFa: string; status: "ok" | "inquiry"; unit: number | null; total: number | null; days: { min: number; max: number } | null }[];
 };
-export const round1000 = (n: number) => Math.max(1000, Math.round(n / 1000) * 1000);
 
 export function toPublic(r: LandedResult): PublicLanded {
   return {
@@ -514,7 +505,7 @@ export function toPublic(r: LandedResult): PublicLanded {
         key: m.key,
         nameFa: m.nameFa,
         status: m.status,
-        unit: m.unit === null ? null : round1000(m.unit),
+        unit: m.unit === null ? null : round10(m.unit),
         total: m.total === null ? null : round1000(m.total),
         days: m.days,
       })),

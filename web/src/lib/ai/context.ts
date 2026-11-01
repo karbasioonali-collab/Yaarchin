@@ -5,7 +5,7 @@ import "server-only";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { chatMessages, products } from "@/db/schema";
-import { loadPublishedProduct } from "@/lib/catalog/public";
+import { loadPublishedProduct, loadLandedAt } from "@/lib/catalog/public";
 import { getSetting } from "@/lib/settings";
 import { clampQty, publicLandedCost, type LandedCost } from "@/lib/pricing/landed";
 import { contextJson, DEFAULT_GENERIC_WORDS, LIMITS, priceIntent, shapeKb, shapeProduct, titleMention, trimHistory, type LandedCompact } from "./context-shape";
@@ -46,7 +46,10 @@ export async function productCtx(slug: string): Promise<ProductCtx | null> {
     specs: p.specs,
     moq: p.moqMin,
     leadTimeDays: p.leadTimeDays,
-    landedAtMoq: compactLanded(p.landedCost),
+    // کارت سایت از «تعداد مرجع» است (بخش ۳۸)؛ دستیار مثل قبل قیمت حداقل سفارش را می‌گیرد (اسم فیلد در prompt همین است)
+    landedAtMoq: compactLanded(
+      p.moqMin && p.landedCost.status === "ready" && p.landedCost.qty !== p.moqMin ? ((await loadLandedAt(p.slug, p.moqMin)) ?? p.landedCost) : p.landedCost,
+    ),
   };
 }
 

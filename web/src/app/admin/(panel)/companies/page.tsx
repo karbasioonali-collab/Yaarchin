@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { and, count, desc, eq, ilike, inArray, max, or, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, ilike, inArray, max, or, type SQL } from "drizzle-orm";
 import { db } from "@/db/client";
-import { companies, companyCorrespondence, companyExternalIds, productListings } from "@/db/schema";
+import { companies, companyCorrespondence, companyExternalIds, productListings, products } from "@/db/schema";
 import { can, requirePermission } from "@/lib/auth/can";
 import { COMPANY_STATUS_FA, COMPANY_TYPE_FA } from "@/lib/catalog/admin-labels";
 import { catalogAdminReady, catalogReady } from "@/lib/db-ready";
@@ -20,6 +20,13 @@ export default async function CompaniesPage({ searchParams }: PageProps<"/admin/
   const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 100) : "";
   const status = sp.status === "active" || sp.status === "blocked" ? sp.status : "";
   const page = Math.max(1, Number(sp.page) || 1);
+  // فیلتر «محصول»: کارخانه‌هایی که برای این محصول لیستینگ دارند (بخش ۳۸)
+  const product = typeof sp.product === "string" && /^[0-9a-f-]{36}$/i.test(sp.product) ? sp.product : "";
+  const productOptions = await db
+    .selectDistinct({ id: products.id, titleFa: products.titleFa })
+    .from(products)
+    .innerJoin(productListings, eq(productListings.productId, products.id))
+    .orderBy(asc(products.titleFa));
 
   const conds: SQL[] = [];
   if (q) {
@@ -41,6 +48,7 @@ export default async function CompaniesPage({ searchParams }: PageProps<"/admin/
     );
   }
   if (status) conds.push(eq(companies.status, status));
+  if (product) conds.push(inArray(companies.id, db.select({ id: productListings.companyId }).from(productListings).where(eq(productListings.productId, product))));
   const where = conds.length ? and(...conds) : undefined;
   const [{ total }] = await db.select({ total: count() }).from(companies).where(where);
   const rows = await db
@@ -78,7 +86,7 @@ export default async function CompaniesPage({ searchParams }: PageProps<"/admin/
   const listingsOf = new Map(listings.map((l) => [l.companyId, l.n]));
   const lastOf = new Map(lastMsg.map((m) => [m.companyId, m.at]));
   const pages = Math.max(1, Math.ceil(total / PAGE));
-  const qs = (p: number) => `?${new URLSearchParams({ ...(q && { q }), ...(status && { status }), page: String(p) })}`;
+  const qs = (p: number) => `?${new URLSearchParams({ ...(q && { q }), ...(status && { status }), ...(product && { product }), page: String(p) })}`;
 
   return (
     <>
@@ -100,6 +108,14 @@ export default async function CompaniesPage({ searchParams }: PageProps<"/admin/
             <option value="">همه</option>
             <option value="active">فعال</option>
             <option value="blocked">مسدود</option>
+          </select>
+          <select name="product" defaultValue={product} aria-label="محصول">
+            <option value="">همه‌ی محصولات</option>
+            {productOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.titleFa}
+              </option>
+            ))}
           </select>
           <button type="submit" className={styles.btnGhost}>
             جستجو

@@ -14,7 +14,7 @@ import { customerProductConversation, markRead, messagesOf } from "@/lib/chat/se
 import { getCustomer } from "@/lib/customer/auth";
 import { chatReady } from "@/lib/db-ready";
 import { isFavorite } from "@/lib/customer/favorites";
-import { fmtDate, fmtMoney, fmtNum, unitFa } from "@/lib/format";
+import { fmtDate, fmtUsd, fmtNum, unitFa } from "@/lib/format";
 import { isEnabled } from "@/lib/settings";
 import { LandedCalculator } from "./LandedCalculator";
 import styles from "./product.module.css";
@@ -41,29 +41,32 @@ function PriceCard({ p }: { p: PublicProduct }) {
     <div className={styles.priceCard}>
       <div className={styles.priceHead}>
         قیمت کارخانه در چین
-        <span className={styles.priceUnit}>هر {unitFa(pr.unit)}</span>
+        <span className={styles.priceUnit} data-testid="ref-qty">
+          هر {unitFa(pr.unit)} | برای سفارش {fmtNum(pr.refQty)} {unitFa(pr.unit)}
+        </span>
       </div>
       <div className={styles.avgRow}>
         <span className={styles.avgLabel}>میانگین</span>
         <span className={styles.avg}>
-          {fmtMoney(pr.avg)} <small>دلار</small>
+          {fmtUsd(pr.avg)} <small>دلار</small>
         </span>
       </div>
-      <div className={styles.range} aria-label={`بازه‌ی قیمت از ${fmtMoney(pr.min)} تا ${fmtMoney(pr.max)} دلار`}>
+      <div className={styles.range} aria-label={`بازه‌ی قیمت از ${fmtUsd(pr.min)} تا ${fmtUsd(pr.max)} دلار`}>
         <div className={styles.rangeBar}>
           <span className={styles.rangeMarker} style={{ insetInlineStart: `${Math.min(96, Math.max(4, pos))}%` }} />
         </div>
         <div className={styles.rangeLabels}>
           <span>
-            کمترین <strong>{fmtMoney(pr.min)}</strong>
+            کمترین <strong>{fmtUsd(pr.min)}</strong>
           </span>
           <span>
-            بیشترین <strong>{fmtMoney(pr.max)}</strong>
+            بیشترین <strong>{fmtUsd(pr.max)}</strong>
           </span>
         </div>
       </div>
       <p className={styles.priceNote}>
-        بر اساس آخرین قیمت {fmtNum(pr.pricedSuppliers)} کارخانه، به‌روز شده در {fmtDate(pr.lastObservedAt)}. قیمت نهایی به تعداد سفارش بستگی دارد.
+        قیمت سفارش {fmtNum(pr.refQty)} {unitFa(pr.unit)}، بر اساس آخرین قیمت {fmtNum(pr.pricedSuppliers)} کارخانه، به‌روز شده در {fmtDate(pr.lastObservedAt)}. برای تعداد دیگر، قیمت
+        تمام‌شده‌ی پایین را ببینید.
       </p>
     </div>
   );
@@ -81,9 +84,7 @@ function LandedCard({ p }: { p: PublicProduct }) {
       {lc.status === "ready" ? (
         <LandedCalculator slug={p.slug} unit={p.price?.unit ?? "piece"} initial={lc} />
       ) : (
-        <p className={styles.priceNote}>
-          به‌زودی قیمت رسیده به ایران (با حمل، بیمه، حقوق ورودی، مالیات و نرخ روز ارز) برای هر روش حمل اینجا نمایش داده می‌شود.
-        </p>
+        <p className={styles.priceNote}>به‌زودی قیمت رسیده به ایران (با حمل، بیمه، حقوق ورودی، مالیات و نرخ روز ارز) برای هر روش حمل اینجا نمایش داده می‌شود.</p>
       )}
     </div>
   );
@@ -156,10 +157,7 @@ export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
             {p.leadTimeDays && (
               <li>
                 <Icon name="clock" size={18} />
-                آماده‌سازی{" "}
-                {p.leadTimeDays.min === p.leadTimeDays.max
-                  ? `${fmtNum(p.leadTimeDays.min)} روز`
-                  : `${fmtNum(p.leadTimeDays.min)} تا ${fmtNum(p.leadTimeDays.max)} روز`}
+                آماده‌سازی {p.leadTimeDays.min === p.leadTimeDays.max ? `${fmtNum(p.leadTimeDays.min)} روز` : `${fmtNum(p.leadTimeDays.min)} تا ${fmtNum(p.leadTimeDays.max)} روز`}
               </li>
             )}
           </ul>
@@ -207,13 +205,7 @@ export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
         </div>
         {chatOn && (
           <div className={styles.detailsSide}>
-            <ChatBox
-              slug={p.slug}
-              title={p.titleFa}
-              viewer={viewer}
-              conversation={conv ? { id: conv.id, status: conv.status } : null}
-              initial={convMsgs.map(toCustomerMsg)}
-            />
+            <ChatBox slug={p.slug} title={p.titleFa} viewer={viewer} conversation={conv ? { id: conv.id, status: conv.status } : null} initial={convMsgs.map(toCustomerMsg)} />
           </div>
         )}
       </div>
@@ -229,13 +221,7 @@ export default async function ProductPage({ params }: PageProps<"/p/[slug]">) {
         </section>
       )}
 
-      <MobileProductBar
-        slug={p.slug}
-        favorite={favOn}
-        isFavorite={fav}
-        chat={chatOn}
-        price={p.price ? `${fmtMoney(p.price.min)} تا ${fmtMoney(p.price.max)} $` : null}
-      />
+      <MobileProductBar slug={p.slug} favorite={favOn} isFavorite={fav} chat={chatOn} price={p.price ? `${fmtUsd(p.price.min)} تا ${fmtUsd(p.price.max)} $` : null} />
     </div>
   );
 }
