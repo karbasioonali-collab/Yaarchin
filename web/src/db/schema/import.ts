@@ -92,3 +92,14 @@ export const listingExternalIds = pgTable(
   },
   (t) => [uniqueIndex("listing_external_ids_uq").on(t.platform, t.externalId), index("listing_external_ids_listing_idx").on(t.listingId)],
 );
+
+// اصلاح‌های انسان روی صفحه‌ی واردشده (migration ۰۰۱۳). جدا از raw_pages.parsed تا «خواندن دوباره» آن‌ها را پاک نکند،
+// و جدول جدا (نه ستون تازه روی raw_pages) تا بین استقرار و migrate صفحه‌ها خطا ندهند. شکل data: src/lib/import/edits.ts
+export const rawPageEdits = pgTable("raw_page_edits", {
+  rawPageId: uuid("raw_page_id")
+    .primaryKey()
+    .references(() => rawPages.id, { onDelete: "cascade" }),
+  data: jsonb("data").notNull().default({}),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+  updatedAt: updatedAt(),
+});

@@ -38,11 +38,13 @@ export default async function ImportPage({ searchParams }: PageProps<"/admin/imp
         uploader: string | null;
         same_product: number;
         known_company: boolean;
+        same_store: number;
         listed: boolean;
       }>(
         sql`select p.id, p.title, p.status, p.created_at, p.parser_version, p.parsed, u.full_name as uploader,
           (select count(*)::int from raw_pages q where q.platform = p.platform and q.external_product_id = p.external_product_id and q.id <> p.id) as same_product,
           exists (select 1 from company_external_ids c where c.platform = p.platform and c.external_id = p.store_id) as known_company,
+          (select count(*)::int from raw_pages q where q.platform = p.platform and q.store_id = p.store_id and q.id <> p.id) as same_store,
           exists (select 1 from listing_external_ids l where l.platform = p.platform and l.external_id = p.external_product_id) as listed
         from raw_pages p left join users u on u.id = p.uploaded_by
         where p.status = ${tab} order by p.created_at desc limit 200`,
@@ -123,6 +125,7 @@ export default async function ImportPage({ searchParams }: PageProps<"/admin/imp
                         {r.same_product > 0 && <span className={`${styles.badge} ${styles.badgeWarn}`}>همین محصول {fmtNum(r.same_product)} بار دیگر آپلود شده</span>}
                         {r.listed && <span className={`${styles.badge} ${styles.badgeWarn}`}>لیستینگ موجود است</span>}
                         {r.known_company && <span className={styles.badge}>فروشنده ثبت شده</span>}
+                        {!r.known_company && r.same_store > 0 && <span className={styles.badge}>همین فروشنده در {fmtNum(r.same_store)} صفحه‌ی دیگر</span>}
                         {r.parser_version < PARSER_VERSION && <span className={`${styles.badge} ${styles.badgeMuted}`}>خواننده‌ی قدیمی</span>}
                       </div>
                     </td>

@@ -2,60 +2,10 @@
 // آپلود هم‌زمان، هشدار حجم عکس‌ها و دسترسی‌ها (catalog.import، companies.links، products.publish). docs/infoyaarchin.md بخش ۳۶.
 // فایل MHTML واقعی در ریپو نیست: از نمونه‌های ناشناس tests/fixtures/alibaba و عکس‌های PNG ساختگی همین‌جا ساخته می‌شود.
 // اجرا: TEST_DB=postgres://…/yarchin_e2e node tests/e2e/alibaba-import.e2e.mjs
-import { createRequire } from "node:module";
-import { readFileSync } from "node:fs";
+import { mhtml } from "./alibaba-mhtml.mjs";
 import { B, admin, done, expert, launch, ok, psql, setS, sleep, vis, waitFor } from "./lib.mjs";
 
-const sharp = createRequire(new URL("../../package.json", import.meta.url))("sharp");
-const FX = new URL("../fixtures/alibaba/", import.meta.url);
 const run = Date.now().toString(36);
-
-// ---------- ساخت MHTML ساختگی ----------
-// quoted-printable مثل کروم: «=» و بایت‌های غیر ASCII ← =XX، خط‌های حداکثر ۷۶ با «=» آخر خط
-function qp(buf) {
-  const out = [];
-  let line = "";
-  for (const b of buf) {
-    const t = b === 0x0a ? "\n" : b === 0x3d || b > 126 || (b < 32 && b !== 9 && b !== 0x0a) ? "=" + b.toString(16).toUpperCase().padStart(2, "0") : String.fromCharCode(b);
-    if (t === "\n") {
-      out.push(line + "\r");
-      line = "";
-      continue;
-    }
-    if (line.length + t.length > 75) {
-      out.push(line + "=\r");
-      line = "";
-    }
-    line += t;
-  }
-  out.push(line);
-  return out.join("\n");
-}
-async function mhtml(name, { extra = "" } = {}) {
-  const html = readFileSync(new URL(`${name}.html`, FX), "utf8").replace("</body>", `${extra}</body>`);
-  const { url } = JSON.parse(readFileSync(new URL(`${name}.resources.json`, FX), "utf8"));
-  const exp = JSON.parse(readFileSync(new URL(`${name}.expected.json`, FX), "utf8"));
-  const B0 = "----MultipartBoundary--e2e" + run + "----";
-  const parts = [
-    `From: <Saved by Blink>\r\nSnapshot-Content-Location: ${url}\r\nSubject: test\r\nMIME-Version: 1.0\r\nContent-Type: multipart/related;\r\n\ttype="text/html";\r\n\tboundary="${B0}"\r\n\r\n`,
-    `--${B0}\r\nContent-Type: text/html\r\nContent-Transfer-Encoding: quoted-printable\r\nContent-Location: ${url}\r\n\r\n${qp(Buffer.from(html, "utf8"))}\r\n`,
-    `--${B0}\r\nContent-Type: text/css\r\nContent-Transfer-Encoding: quoted-printable\r\nContent-Location: cid:css-1@mhtml.blink\r\n\r\nbody{color:red}\r\n`,
-  ];
-  let i = 0;
-  for (const img of exp.images) {
-    if (!img.embedded) continue;
-    const png = await sharp({ create: { width: 64, height: 64, channels: 3, background: { r: (i * 40) % 256, g: 120, b: 200 } } })
-      .png()
-      .toBuffer();
-    parts.push(
-      `--${B0}\r\nContent-Type: image/avif\r\nContent-Transfer-Encoding: base64\r\nContent-Location: ${img.url}\r\n\r\n${png.toString("base64").replace(/(.{76})/g, "$1\r\n")}\r\n`,
-    );
-    i++;
-  }
-  parts.push(`--${B0}--\r\n`);
-  return Buffer.from(parts.join(""), "latin1");
-}
-
 psql("delete from raw_pages; delete from listing_external_ids");
 psql("delete from company_external_ids where external_id in ('supplier-a', 'supplier-b')");
 setS("auth.enforce_permissions", false);
@@ -119,8 +69,8 @@ let id1;
   ok(
     psql(
       `select status || '|' || parser_version || '|' || (octet_length(html_gz) < html_bytes) || '|' || (select count(*) from raw_page_images where raw_page_id='${id1}') from raw_pages where id='${id1}'`,
-    ) === "new|1|true|6",
-    "DB: new, parser v1, gzipped html, 6 images",
+    ) === "new|2|true|6",
+    "DB: new, parser v2, gzipped html, 6 images",
   );
   ok(
     psql(`select count(*) from raw_page_images where raw_page_id='${id1}' and bytes is not null and storage_key is null`) === "6",
@@ -179,7 +129,7 @@ let id1;
   await ad.goto(B + `/admin/import/${id1}`);
   await ad.getByRole("button", { name: "خواندن دوباره" }).click();
   ok(
-    await waitFor(() => psql(`select parser_version || '|' || title from raw_pages where id='${id1}'`) === "1|Wholesale Disposable Portable Smokeless Ashtray With Gel"),
+    await waitFor(() => psql(`select parser_version || '|' || title from raw_pages where id='${id1}'`) === "2|Wholesale Disposable Portable Smokeless Ashtray With Gel"),
     "reparse from stored HTML",
   );
   psql("update raw_pages set parser_version = 0");

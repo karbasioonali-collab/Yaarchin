@@ -10,7 +10,8 @@ import { byAttr, byTag, type DomNode, type El, first, insideRecommendation, isEl
 import { type Currency, estimateCarton, normUnit, type Packing, parseDims, parsePerCarton, parsePrice, parseQtyRange, parseWeight } from "./values";
 
 // با هر تغییر رفتار خواننده یک واحد بالا برود (در raw_pages ذخیره می‌شود تا صفحه‌های قدیمی دوباره خوانده شوند)
-export const PARSER_VERSION = 1;
+// ۱ ← ۲ (2026-10-31): Highlights جدا از «عبارت‌های تبلیغاتی»؛ متن خام سابقه («1 yr») و سال تأسیس از متن فروشنده
+export const PARSER_VERSION = 2;
 
 export type FieldStatus = "found" | "estimated" | "missing";
 export type PriceTier = { minQty: number; maxQty: number | null; price: number; priceMax: number | null };
@@ -22,7 +23,11 @@ export type Supplier = {
   type: "trading" | "manufacturer" | "other" | null;
   typeRaw: string | null;
   country: string | null;
+  // سابقه در علی‌بابا (عدد) و متن خام کارت («1 yr»)
   years: number | null;
+  yearsText: string | null;
+  // سال تأسیس از «About this supplier» («Founded in 2016»، «Established in 2008»، «since 2010»)؛ فرق دارد با سابقه در علی‌بابا
+  foundedYear: number | null;
   rating: number | null;
   revenue: string | null;
   responseTime: string | null;
@@ -54,7 +59,10 @@ export type AlibabaPage = {
   galleryCount: number;
   descriptionImages: PageImage[];
   hasVideo: boolean;
+  // ویژگی‌های واقعی محصول (جمله‌ی فعل‌دار یا «عنوان: توضیح»)
   highlights: string[];
+  // بقیه‌ی خط‌های همان کادر: اسم‌های پر از کلیدواژه‌ی تبلیغاتی (در ترجمه و توضیح محصول استفاده نمی‌شوند)
+  promoPhrases: string[];
   supplier: Supplier;
   fields: Record<string, FieldStatus>;
   warnings: string[];
@@ -102,6 +110,8 @@ function supplierOf(R: DomNode): Supplier {
     typeRaw: null,
     country: null,
     years: null,
+    yearsText: null,
+    foundedYear: null,
     rating: null,
     revenue: null,
     responseTime: null,
@@ -121,7 +131,10 @@ function supplierOf(R: DomNode): Supplier {
     for (const t of texts(mini)) {
       if (!s.country && /^[A-Z]{2}$/.test(t)) s.country = t;
       const y = /^(\d+)\s*yrs?$/i.exec(t);
-      if (y && s.years === null) s.years = Number(y[1]);
+      if (y && s.years === null) {
+        s.years = Number(y[1]);
+        s.yearsText = t;
+      }
       // نوع فروشنده عبارت کوتاه جداگانه است؛ خود اسم («… Factory Co., Ltd.»، «… Supplier …») حساب نمی‌شود
       if (!s.typeRaw && t !== s.name && t.length < 40 && /^(trading company|(custom )?manufacturer|agent|distributor|wholesaler|buying office|other)\b/i.test(t)) s.typeRaw = t;
     }
@@ -170,8 +183,22 @@ function supplierOf(R: DomNode): Supplier {
   if (about) {
     const t = text(about).replace(/^About this supplier\s*/, "");
     s.about = t ? t.slice(0, 3000) : null;
+    const f = /\b(?:founded|established|set up|since)\b(?:\s+(?:in|on))?\s+((?:19|20)\d{2})\b/i.exec(t);
+    const year = f ? Number(f[1]) : null;
+    s.foundedYear = year && year <= new Date().getFullYear() ? year : null;
   }
   return s;
+}
+
+// خط Highlights ویژگی واقعی است یا اسم تبلیغاتی پر از کلیدواژه؟ (هر دو در همان کادر «Highlights at a glance» و با همان برچسب‌اند.)
+// ویژگی = «عنوان: توضیح»، یا جمله‌ای با فعل (Ensures، Extinguishes، Locks، Prevents، is، can …). اسم تبلیغاتی فعل ندارد:
+// «Resin Ashtray Modern Design Customized Shape … For Yacht Balcony Cigar Lounge Deco».
+const FEATURE_VERBS =
+  /\b(ensures?|extinguish(?:es)|locks|absorbs|enables|prevents|improves|keeps|holds|adds|provides|makes|allows|helps|reduces|protects|supports|offers|contains|includes|fits|lasts|works|resists|eliminates|removes|stops|traps|seals|blocks|comes|requires|delivers|guarantees|lets|gives|stays|saves|is|are|was|can|will|does|do)\b/i;
+export function isFeatureLine(line: string): boolean {
+  const t = line.trim();
+  if (/^[^:：]{2,60}[:：]\s*\S/.test(t)) return true;
+  return FEATURE_VERBS.test(t);
 }
 
 export function parseAlibabaProduct(html: string, opts: { url?: string | null; lookup?: ResourceLookup } = {}): AlibabaPage {
@@ -324,7 +351,9 @@ export function parseAlibabaProduct(html: string, opts: { url?: string | null; l
     if (miss) warnings.push(`${miss} عکس توضیحات داخل فایل نیست (فقط لینک)؛ دفعه‌ی بعد قبل از ذخیره صفحه را آرام تا پایین اسکرول کنید.`);
   }
 
-  const highlights = (descMod ? byAttr(descMod, "data-testid", "product-detail-text-sort") : []).map(text).filter(Boolean);
+  const lines = (descMod ? byAttr(descMod, "data-testid", "product-detail-text-sort") : []).map(text).filter(Boolean);
+  const highlights = lines.filter(isFeatureLine);
+  const promoPhrases = lines.filter((l) => !isFeatureLine(l));
   const supplier = supplierOf(R);
 
   const has = (v: unknown) => (Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined && v !== "");
@@ -375,6 +404,7 @@ export function parseAlibabaProduct(html: string, opts: { url?: string | null; l
     descriptionImages,
     hasVideo,
     highlights,
+    promoPhrases,
     supplier,
     fields,
     warnings,

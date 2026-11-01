@@ -3,7 +3,8 @@
 // نمونه‌ی تازه = یک دستور make-fixture و بازبینی expected.json؛ این تست همه‌ی sample*.html پوشه را خودش پیدا می‌کند.
 import { readdirSync, readFileSync } from "node:fs";
 import { decodeQuotedPrintable, MhtmlError, parseMhtml } from "../../src/lib/import/alibaba/mhtml.ts";
-import { originalImageUrl, parseAlibabaProduct, PARSER_VERSION } from "../../src/lib/import/alibaba/parse.ts";
+import { isFeatureLine, originalImageUrl, parseAlibabaProduct, PARSER_VERSION } from "../../src/lib/import/alibaba/parse.ts";
+import { diffEdits, effective } from "../../src/lib/import/edits.ts";
 import { estimateCarton, normUnit, parseDims, parsePerCarton, parsePrice, parseQtyRange, parseWeight } from "../../src/lib/import/alibaba/values.ts";
 
 let fails = 0,
@@ -71,11 +72,14 @@ function fieldsMissing(r) {
   ok(a.placeOfOrigin === "Guangdong, China", "s1 place of origin");
   ok(a.images.length === 6 && a.images.every((i) => i.embedded && i.type === "image/avif") && a.galleryCount === 7 && a.hasVideo, "s1 gallery: 6 embedded AVIF + video");
   ok(a.descriptionImages.length === 11 && a.descriptionImages.every((i) => i.embedded), "s1 description images (supplier photos excluded)");
-  ok(a.highlights.length === 20, "s1 highlights");
+  ok(a.highlights.length === 5 && a.promoPhrases.length === 15 && a.highlights[0].startsWith("Disposable Foam Ashtray Ensures"), "s1: 5 real features, 15 promotional phrases");
+  ok(R.sample2.highlights.length === 0 && R.sample2.promoPhrases.length === 12, "s2: all 12 lines promotional");
+  ok(R.sample3.highlights.length === 5 && R.sample3.promoPhrases.length === 0, "s3: 5 «Title: description» features");
   ok(a.warnings.some((w) => w.includes("Quantity: 25 pieces")) && a.packing.unitsPerCarton === null, "s1 ambiguous «Quantity» → warning, not units per carton");
   const s = a.supplier;
   ok(s.name === "Sample Supplier A Technology Co., Ltd." && s.type === "trading" && s.typeRaw === "Trading Company", "s1 supplier name/type");
   ok(s.country === "CN" && s.years === 1 && s.rating === 5 && s.topBuyers === 13 && s.avgDispatchDays === 6, "s1 supplier metrics");
+  ok(s.yearsText === "1 yr" && s.foundedYear === 2016, "s1: 1 yr on Alibaba vs founded 2016 (separate)");
   ok(s.revenue === "$5K — $10K" && s.responseTime === "≤2h" && s.onTimeRate === "77.8%", "s1 supplier text metrics");
   ok(
     s.storeId === "supplier-a" && s.storeUrl === "https://supplier-a.en.alibaba.com/" && s.profileUrl === "https://supplier-a.en.alibaba.com/company_profile.html",
@@ -224,6 +228,32 @@ ok(originalImageUrl("//s.alicdn.com/@sc04/kf/Habc.jpg_960x960q80.jpg") === "http
   }
   ok(err instanceof MhtmlError, "non-MHTML file → MhtmlError");
   ok(decodeQuotedPrintable(Buffer.from("a=3Db=\nc=ZZ")).toString() === "a=bc=ZZ", "qp: LF soft break, invalid escape kept");
+}
+
+// ---- ویژگی یا عبارت تبلیغاتی
+for (const t of ["Easy Clean: Quick and hassle-free cleaning", "Built In Gel Component Extinguishes Cigarettes Instantly", "The lid is made of steel", "It can hold 30 butts"])
+  ok(isFeatureLine(t), `feature: ${t}`);
+for (const t of [
+  "Resin Ashtray Customized Shape For Rooftop Deck Bistro Smoking Section",
+  "Ashtray Foam Rapid Extinguish Balm Lightweight Leakproof Disposable Pouch For High Speed Train Cabin",
+  "Wholesale Foam Disposable Ash Tray Infused Extinguishing Gel",
+])
+  ok(!isFeatureLine(t), `promo: ${t}`);
+
+// ---- اصلاح‌ها (بخش ۳۷): فقط فرق‌ها ذخیره می‌شوند؛ ترتیب کلیدها (jsonb) فرق حساب نمی‌شود
+{
+  const p = JSON.parse(readFileSync(new URL("sample1.expected.json", FX), "utf8"));
+  // همان پله‌ها با ترتیب کلید دیگر (مثل خروجی jsonb) و همان مقدارها
+  const reordered = p.priceTiers.map((t) => ({ price: t.price, maxQty: t.maxQty, minQty: t.minQty, priceMax: t.priceMax }));
+  const d = diffEdits(p, { title: p.title, unit: p.unit, priceTiers: reordered, leadTimes: p.leadTimes, unitWeightKg: 0.01, qtyChoice: { kind: "carton", value: 25 } });
+  ok(eq(Object.keys(d).sort(), ["qtyChoice", "unitWeightKg"]), `diffEdits: only changed fields (${Object.keys(d)})`);
+  const v = effective(p, d);
+  ok(v.packing.unitsPerCarton === 25 && v.packing.cartonWeightKg === 0.25 && v.packing.estimated.cartonWeightKg, "effective: «25 per carton» → carton weight estimated");
+  ok(
+    effective(p, { qtyChoice: { kind: "pack", value: 25 } }).packQty === 25 && effective(p, { qtyChoice: { kind: "pack", value: 25 } }).packing.unitsPerCarton === null,
+    "effective: «25 per pack» → packQty, not carton",
+  );
+  ok(eq(effective(p, {}).edited, []) && effective(p, d).edited.includes("unitWeightKg"), "effective: edited keys");
 }
 
 console.log(`${n} checks${fails ? `, ${fails} FAILED` : ", ALL PASSED"}`);

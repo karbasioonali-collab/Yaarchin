@@ -1,5 +1,5 @@
 {
- "parserVersion": 1,
+ "parserVersion": 2,
  "productUrl": "https://www.alibaba.com/product-detail/Disposable-Paper-Ashtray-with-Self-Extinguishing_9406360732090.html",
  "productId": "9406360732090",
  "title": "Disposable Paper Ashtray with Self-Extinguishing Sand, No Ash Flying Easy Clean for Cafe Pub Lounge Club Bistro",
@@ -237,12 +237,15 @@
   "Restaurant-Approved: Perfect for cafes, pubs, lounges, and bistros.",
   "Stylish Design: Modern aesthetic adds elegance to any setting."
  ],
+ "promoPhrases": [],
  "supplier": {
   "name": "Sample Supplier B Trading Co., Ltd.",
   "type": "trading",
   "typeRaw": "Trading Company",
   "country": "CN",
   "years": 1,
+  "yearsText": "1 yr",
+  "foundedYear": null,
   "rating": 4.3,
   "revenue": "$10K — $20K",
   "responseTime": "≤2h",
