@@ -40,7 +40,7 @@ const input = buildDraftInput([listing(fx(1)), listing(fx(2)), listing(fx(3))], 
   const raw =
     'متن قبل ```json\n{"titleFa":"زیرسیگاری يکبار مصرف","summaryFa":"بوی سیگار را کم می کند .","descriptionFa":"• ژل خاموش کننده","specs":[{"name":"Type","labelFa":"نوع","valueFa":"رومیزی","unit":""},{"labelFa":"","valueFa":"x"}]}\n```';
   const o = parseDraft(raw);
-  ok(o && o.titleFa === "زیرسیگاری یکبار مصرف", "parse + ي→ی");
+  ok(o && o.titleFa === `زیرسیگاری یک${Z}بار مصرف`, "parse + ي→ی + یکبار → یک‌بار");
   ok(o.summaryFa === `بوی سیگار را کم می${Z}کند.`, `normalize: می‌کند, no space before dot (${o.summaryFa})`);
   ok(o.specs.length === 1 && o.specs[0].labelFa === "نوع", "empty spec rows dropped");
   ok(parseDraft("not json") === null && parseDraft("{}") === null, "bad/empty JSON → null");

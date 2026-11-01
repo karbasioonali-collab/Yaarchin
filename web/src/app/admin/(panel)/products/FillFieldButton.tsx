@@ -1,20 +1,38 @@
 "use client";
-// «بگذار در فرم»: مقدار پیش‌نویس AI را فقط در فیلد فرم محصول (همین صفحه) می‌گذارد؛ تا «ذخیره‌ی محصول» زده نشود چیزی ذخیره نمی‌شود. بخش ۴۰.
-export function FillFieldButton({ name, value, className }: { name: string; value: string; className?: string }) {
+// «بگذار در فرم» / «استفاده»: مقدار(ها) را فقط در فیلد(های) فرم همین صفحه می‌گذارد؛ تا «ذخیره‌ی محصول» زده نشود چیزی ذخیره نمی‌شود.
+// بخش‌های ۴۰ (پیش‌نویس AI) و ۴۱ (پیشنهاد بسته‌بندی از مشخصات).
+export function FillFieldButton({
+  name,
+  value,
+  values,
+  label = "بگذار در فرم",
+  className,
+}: {
+  name?: string;
+  value?: string;
+  values?: Record<string, string>;
+  label?: string;
+  className?: string;
+}) {
   return (
     <button
       type="button"
       className={className}
       onClick={() => {
-        const el = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`form [name="${name}"]`);
-        if (!el) return;
-        el.value = value;
-        el.dispatchEvent(new Event("input", { bubbles: true }));
-        el.scrollIntoView({ block: "center", behavior: "smooth" });
-        el.focus();
+        const all = values ?? (name ? { [name]: value ?? "" } : {});
+        let first: HTMLElement | null = null;
+        for (const [n, v] of Object.entries(all)) {
+          const el = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`form [name="${n}"]`);
+          if (!el) continue;
+          el.value = v;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          first ??= el;
+        }
+        first?.scrollIntoView({ block: "center", behavior: "smooth" });
+        first?.focus();
       }}
     >
-      بگذار در فرم
+      {label}
     </button>
   );
 }

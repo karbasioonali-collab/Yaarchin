@@ -2,6 +2,7 @@
 // هزینه‌ی هر جواب بیشتر از توکن ورودی است؛ این سقف‌ها حجم را کم نگه می‌دارند بی‌آنکه داده‌ی لازم جواب حذف شود.
 // docs/infoyaarchin.md بخش ۳۲.
 import { normFa } from "./normalize";
+import type { LandedCost } from "../pricing/landed";
 
 export const LIMITS = {
   descriptionChars: 600,
@@ -24,6 +25,8 @@ export type LandedCompact =
       qty: number;
       belowMoq: boolean;
       ratesDate: string | null;
+      goods_and_shipping_to_iran_border_only?: true;
+      excludes?: string;
       methods: { method: string; unitToman: number | null; totalToman: number | null; days: { min: number; max: number } | null; needsInquiry: boolean }[];
     };
 
@@ -101,4 +104,19 @@ export function titleMention(text: string, title: string, generic: string[]): nu
   const hits = words.filter((w) => msg.includes(w)).length;
   if (head && msg.includes(head)) return hits + 10;
   return hits >= 2 && hits * 2 >= words.length ? hits : 0;
+}
+
+// خلاصه‌ی کارت «قیمت تمام‌شده» برای مدل (بخش‌های ۲۹ و ۴۱)
+export function compactLanded(l: LandedCost): LandedCompact {
+  if (l.status !== "ready") return { available: false as const };
+  return {
+    available: true as const,
+    estimated: true,
+    qty: l.qty,
+    belowMoq: l.belowMoq,
+    ratesDate: l.ratesDate,
+    // بدون HS: عددها فقط «کالا + حمل تا مرز ایران» است (بخش ۴۱)؛ دستیار باید همین را بگوید، نه «قیمت تمام‌شده»
+    ...(l.borderOnly ? { goods_and_shipping_to_iran_border_only: true as const, excludes: "customs, clearance, insurance and other costs (announced by a Yarchin expert)" } : {}),
+    methods: l.methods.map((m) => ({ method: m.nameFa, unitToman: m.unit, totalToman: m.total, days: m.days, needsInquiry: m.status === "inquiry" })),
+  };
 }

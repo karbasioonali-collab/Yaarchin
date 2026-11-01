@@ -309,31 +309,8 @@ export function parseAlibabaProduct(html: string, opts: { url?: string | null; l
     break;
   }
 
-  // بسته‌بندی: از همه‌ی ردیف‌های مشخصات
-  let unitWeightKg: number | null = null;
-  let unitDimsCm: Packing["unitDimsCm"] = null;
-  let cartonDimsCm: Packing["cartonDimsCm"] = null;
-  let cartonWeightKg: number | null = null;
-  let unitsPerCarton: number | null = null;
-  for (const { name, value } of attributes) {
-    const n = name.toLowerCase();
-    const carton = /carton|ctn|outer (box|package)|export (box|package)|master/.test(n);
-    if (/size|dimension/.test(n) && /(package|packing|carton|ctn|box)/.test(n)) {
-      const dims = parseDims(value);
-      if (dims) {
-        if (carton) cartonDimsCm ??= dims;
-        else unitDimsCm ??= dims;
-      }
-    }
-    if (/weight/.test(n)) {
-      const w = parseWeight(value);
-      if (w) {
-        if (carton) cartonWeightKg ??= w;
-        else if (/single|unit|gross|net|^weight|product weight/.test(n)) unitWeightKg ??= w;
-      }
-    }
-    unitsPerCarton ??= parsePerCarton(`${value}`) ?? (carton && /(qty|quantity|pcs|pieces|units)/.test(n) ? Number(value.replace(/[^\d]/g, "")) || null : null);
-  }
+  // بسته‌بندی: از همه‌ی ردیف‌های مشخصات (packingFromAttributes؛ صفحه‌ی محصول هم برای «پیشنهاد از مشخصات» همین را صدا می‌زند)
+  const { unitWeightKg, unitDimsCm, unitsPerCarton, cartonDimsCm, cartonWeightKg } = packingFromAttributes(attributes);
   const packing = estimateCarton({ unitWeightKg, unitDimsCm, unitsPerCarton, cartonDimsCm, cartonWeightKg });
   const qtyAttr = attr(/^quantity$/i);
   if (qtyAttr && !unitsPerCarton) warnings.push(`مشخصات «Quantity: ${qtyAttr}» دارد؛ معلوم نیست تعداد در بسته است یا در کارتن. در صفحه‌ی بررسی روشن کنید.`);
@@ -409,4 +386,33 @@ export function parseAlibabaProduct(html: string, opts: { url?: string | null; l
     fields,
     warnings,
   };
+}
+
+// وزن، ابعاد و تعداد در کارتن از ردیف‌های مشخصات («Single gross weight»، «Single package size»، «Carton size»، …). بخش‌های ۳۵ و ۴۱.
+export function packingFromAttributes(attributes: { name: string; value: string }[]): Omit<Packing, "estimated"> {
+  let unitWeightKg: number | null = null;
+  let unitDimsCm: Packing["unitDimsCm"] = null;
+  let cartonDimsCm: Packing["cartonDimsCm"] = null;
+  let cartonWeightKg: number | null = null;
+  let unitsPerCarton: number | null = null;
+  for (const { name, value } of attributes) {
+    const n = name.toLowerCase();
+    const carton = /carton|ctn|outer (box|package)|export (box|package)|master/.test(n);
+    if (/size|dimension/.test(n) && /(package|packing|carton|ctn|box)/.test(n)) {
+      const dims = parseDims(value);
+      if (dims) {
+        if (carton) cartonDimsCm ??= dims;
+        else unitDimsCm ??= dims;
+      }
+    }
+    if (/weight/.test(n)) {
+      const w = parseWeight(value);
+      if (w) {
+        if (carton) cartonWeightKg ??= w;
+        else if (/single|unit|gross|net|^weight|product weight/.test(n)) unitWeightKg ??= w;
+      }
+    }
+    unitsPerCarton ??= parsePerCarton(`${value}`) ?? (carton && /(qty|quantity|pcs|pieces|units)/.test(n) ? Number(value.replace(/[^\d]/g, "")) || null : null);
+  }
+  return { unitWeightKg, unitDimsCm, unitsPerCarton, cartonDimsCm, cartonWeightKg };
 }

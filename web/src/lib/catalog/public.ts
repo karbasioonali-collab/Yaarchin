@@ -77,6 +77,9 @@ export type PublicProduct = ProductCard & {
   leadTimeDays: { min: number; max: number } | null;
   breadcrumb: { slug: string; nameFa: string }[];
   landedCost: LandedCost;
+  // «معادل X تومان» زیر میانگین دلاری (بخش ۴۱): میانگین × آخرین نرخ بازار دلار (یوان قبلاً با نسبت نرخ‌ها به دلار تبدیل شده).
+  // toman دقیق است؛ گرد کردن (۱۰ تومان) فقط در نمایش. rateDate = تاریخ آخرین نرخ (با یوان، قدیمی‌ترِ دو نرخ)
+  priceToman: { avg: number; rateDate: string; isToday: boolean } | null;
   updatedAt: string;
 };
 
@@ -175,7 +178,8 @@ function isReachable(idx: CatIndex, row: CatRow): boolean {
 }
 
 // ---------- قیمت و آمار لیستینگ‌ها (بدون هیچ فیلد شناسایی کارخانه) ----------
-type Stats = { suppliers: number; moqMin: number | null; ltMin: number | null; ltMax: number | null; price: Omit<PriceSummary, "unit"> | null };
+// usesCny: یکی از قیمت‌ها یوانی است (برای تاریخ نرخ «معادل تومان»؛ بخش ۴۱)
+type Stats = { suppliers: number; moqMin: number | null; ltMin: number | null; ltMax: number | null; price: Omit<PriceSummary, "unit"> | null; usesCny: boolean };
 
 async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
   const out = new Map<string, Stats>();
@@ -231,9 +235,10 @@ async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
     lo: string;
     hi: string | null;
     at: Date;
+    cur: string;
   }>(sql`
     with fx as (${fx}), latest as (
-      select po.listing_id, pl.product_id, pl.company_id, pl.moq, po.min_qty, po.max_qty,
+      select po.listing_id, pl.product_id, pl.company_id, pl.moq, po.min_qty, po.max_qty, po.currency as cur,
              po.price_min * f.k as lo, po.price_max * f.k as hi, po.observed_at,
              max(po.observed_at) over (partition by po.listing_id) as last_at
       from price_observations po
@@ -242,12 +247,13 @@ async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
       cross join lateral (select case when po.currency = 'CNY' then (select cny_usd from fx) else 1 end as k) f
       where f.k is not null and po.currency in ('USD', 'CNY') and pl.product_id = any(${ids})
     )
-    select l.product_id, l.listing_id, l.company_id, l.moq, p.meta->>'referenceQty' as ref, l.min_qty, l.max_qty, l.lo, l.hi, l.observed_at as at
+    select l.product_id, l.listing_id, l.company_id, l.moq, p.meta->>'referenceQty' as ref, l.min_qty, l.max_qty, l.lo, l.hi, l.observed_at as at, l.cur
     from latest l join products p on p.id = l.product_id
     where l.observed_at > l.last_at - interval '2 seconds'`);
-  const byProduct = new Map<string, { ref: number | null; at: number; listings: Map<string, RefListing> }>();
+  const byProduct = new Map<string, { ref: number | null; at: number; cny: boolean; listings: Map<string, RefListing> }>();
   for (const r of tierRows.rows) {
-    const g = byProduct.get(r.product_id) ?? { ref: r.ref && /^\d+$/.test(r.ref) ? Number(r.ref) : null, at: 0, listings: new Map() };
+    const g = byProduct.get(r.product_id) ?? { ref: r.ref && /^\d+$/.test(r.ref) ? Number(r.ref) : null, at: 0, cny: false, listings: new Map() };
+    if (r.cur === "CNY") g.cny = true;
     const l = g.listings.get(r.listing_id) ?? { listingId: r.listing_id, companyId: r.company_id, moq: r.moq, tiers: [] };
     l.tiers.push({ minQty: r.min_qty, maxQty: r.max_qty, priceMin: Number(r.lo), priceMax: r.hi === null ? null : Number(r.hi) });
     g.listings.set(r.listing_id, l);
@@ -256,7 +262,7 @@ async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
   }
 
   for (const r of listingStats.rows) {
-    out.set(r.product_id, { suppliers: r.suppliers, moqMin: r.moq_min, ltMin: r.lt_min, ltMax: r.lt_max, price: null });
+    out.set(r.product_id, { suppliers: r.suppliers, moqMin: r.moq_min, ltMin: r.lt_min, ltMax: r.lt_max, price: null, usesCny: false });
   }
   for (const [pid, g] of byProduct) {
     const s = out.get(pid);
@@ -265,6 +271,7 @@ async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
     const span = orderSpan(ls);
     if (!s || !rp || !span) continue;
     // بدون گرد کردن؛ فقط در نمایش (fmtUsd)
+    s.usesCny = g.cny;
     s.price = { currency: "USD", avg: rp.avg, min: rp.min, max: rp.max, refQty: rp.qty, pricedSuppliers: rp.suppliers, ...span, lastObservedAt: new Date(g.at).toISOString() };
   }
   return out;
@@ -353,6 +360,20 @@ export async function productCardsByIds(ids: string[]): Promise<ProductCard[]> {
 }
 
 // شناسه‌ی محصول منتشرشده از روی slug (یا null)
+// معادل تومانی میانگین دلاری با آخرین نرخ بازار (تا امروز تهران)
+async function tomanOf(usdAmount: number, usesCny: boolean): Promise<PublicProduct["priceToman"]> {
+  if (!(await ratesReady())) return null;
+  const r = await db.execute<{ code: string; rate: string; d: string; today: string }>(sql`
+    select distinct on (currency_code) currency_code as code, rate_toman as rate, rate_date::text as d, (now() at time zone 'Asia/Tehran')::date::text as today
+    from exchange_rates where kind = 'market' and currency_code in ('USD', 'CNY') and rate_date <= (now() at time zone 'Asia/Tehran')::date
+    order by currency_code, rate_date desc, created_at desc, id desc`);
+  const usd = r.rows.find((x) => x.code === "USD");
+  if (!usd) return null;
+  const cny = r.rows.find((x) => x.code === "CNY");
+  const rateDate = usesCny && cny && cny.d < usd.d ? cny.d : usd.d;
+  return { avg: usdAmount * Number(usd.rate), rateDate, isToday: rateDate === usd.today };
+}
+
 // قیمت تمام‌شده برای یک تعداد دلخواه، بدون connection() (دستیار: «قیمت در حداقل سفارش»؛ کارت سایت از تعداد مرجع است)
 export async function loadLandedAt(slug: string, qty: number): Promise<LandedCost | null> {
   const id = await publishedProductId(slug);
@@ -458,6 +479,7 @@ export async function loadPublishedProduct(slug: string): Promise<PublicProduct 
     breadcrumb: ancestors(idx, p.categoryId),
     // پیش‌فرض تعداد در کارت «قیمت تمام‌شده» = تعداد مرجع (همان تعداد قیمت کارخانه؛ بخش ۳۸)؛ مشتری در صفحه عوضش می‌کند (/api/v1/products/[slug]/landed)
     landedCost: await publicLandedCost(p.id, s?.price?.refQty ?? s?.moqMin ?? 1),
+    priceToman: s?.price ? await tomanOf(s.price.avg, s.usesCny) : null,
     updatedAt: p.updatedAt.toISOString(),
   };
 }

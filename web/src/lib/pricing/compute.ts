@@ -85,7 +85,8 @@ export type MethodResult = {
   key: string;
   nameFa: string;
   isActive: boolean;
-  status: "ok" | "inquiry";
+  // ok = کامل؛ border = بدون HS: فقط «کالا + حمل» تا مرز ایران (بخش ۴۱)؛ inquiry = استعلام از کارشناس
+  status: "ok" | "border" | "inquiry";
   missing: string[];
   goods: number | null;
   shipping: number | null;
@@ -106,6 +107,8 @@ export type LandedResult = {
   packing: { cartons: number | null; weightKg: number | null; volumeCbm: number | null; missing: string[] };
   goods: Part;
   hs: HsRule | null;
+  // HS ثبت نشده یا در لیست HS نیست ← همه‌ی روش‌ها فقط «کالا + حمل» (بخش ۴۱)؛ متن دلیل برای پنل
+  borderOnly: string | null;
   ratesUsed: { currency: string; kind: "market" | "customs"; rate: number; date: string }[];
   ratesDate: string | null; // قدیمی‌ترین تاریخ نرخ بازارِ استفاده‌شده
   ratesStale: boolean; // نرخ یکی از ارزها مال امروز نیست
@@ -247,6 +250,9 @@ export function computeLanded(input: LandedInput, s: RateSnapshot): LandedResult
   // HS
   const hs = input.hsCode ? (s.hs[input.hsCode] ?? null) : null;
   const hsMissing = !input.hsCode ? "HS code محصول ثبت نشده" : !hs || !hs.isActive ? `HS code ${input.hsCode} در لیست HS نیست` : null;
+  // بدون HS (یا HS خارج از لیست): فقط «قیمت کالا + هزینه‌ی حمل» تا مرز ایران؛ بیمه، هزینه‌های دیگر، حقوق ورودی و ارزش افزوده
+  // اصلاً حساب نمی‌شوند (تصمیم مالک، بخش ۴۱). با HS همه‌چیز مثل قبل.
+  const borderOnly = hsMissing;
 
   const methods: MethodResult[] = [];
   for (const m of [...s.shipping].sort((a, b) => a.sortOrder - b.sortOrder)) {
@@ -284,7 +290,7 @@ export function computeLanded(input: LandedInput, s: RateSnapshot): LandedResult
 
     // بیمه و هزینه‌های دیگر (هرکدام به ارز خودش؛ درصدی = درصد از کیسه‌ی پایه)
     let costsBag: Bag | null = {};
-    for (const c of s.costs) {
+    for (const c of borderOnly ? [] : s.costs) {
       if (c.methods && !c.methods.includes(m.key)) continue;
       const r = costFor(c, { goodsBag, shipBag, weightKg, volumeCbm, chargeable, qty, cartons }, conv, s);
       if ("missing" in r) {
@@ -296,13 +302,14 @@ export function computeLanded(input: LandedInput, s: RateSnapshot): LandedResult
       if (costsBag) costsBag = addBag(costsBag, r.bag);
       lines.push({ section: "costs", line: { label: c.nameFa, formula: r.formula, toman: conv.toman(r.bag, "market") } });
     }
-    const costsToman = costsBag ? conv.toman(costsBag, "market") : null;
+    const costsToman = borderOnly ? null : costsBag ? conv.toman(costsBag, "market") : null;
 
     // حقوق ورودی
     const dutyKind = s.tax?.customsRateFor.includes("duty") ? "customs" : "market";
     let dutyToman: number | null = null;
-    if (hsMissing) missing.add(hsMissing);
-    else if (hs) {
+    if (borderOnly) {
+      // حقوق ورودی و ارزش افزوده حساب نمی‌شوند
+    } else if (hs) {
       if (hs.dutyType === "percent") {
         const base = hs.dutyBase?.length ? hs.dutyBase : (["goods", "shipping", "costs"] as const);
         const bags = { goods: goodsBag, shipping: shipBag, costs: costsBag };
@@ -343,7 +350,9 @@ export function computeLanded(input: LandedInput, s: RateSnapshot): LandedResult
 
     // ارزش افزوده (جدا از حقوق ورودی)
     let vatToman: number | null = null;
-    if (!s.tax) missing.add("درصد مالیات ارزش افزوده ثبت نشده");
+    if (borderOnly) {
+      // بدون HS: ارزش افزوده هم نه
+    } else if (!s.tax) missing.add("درصد مالیات ارزش افزوده ثبت نشده");
     else {
       const vatKind = s.tax.customsRateFor.includes("vat") ? "customs" : "market";
       const bags = { goods: goodsBag, shipping: shipBag, costs: costsBag };
@@ -369,15 +378,21 @@ export function computeLanded(input: LandedInput, s: RateSnapshot): LandedResult
       }
     }
 
-    const all = [goodsToman, shipToman, costsToman, dutyToman, vatToman];
+    const all = borderOnly ? [goodsToman, shipToman] : [goodsToman, shipToman, costsToman, dutyToman, vatToman];
     const total = missing.size || all.some((x) => x === null) ? null : all.reduce((a, b) => a! + b!, 0)!;
-    if (total !== null) lines.push({ section: "total", line: { label: "جمع کل", formula: "کالا + حمل + بیمه و هزینه‌ها + حقوق ورودی + ارزش افزوده", toman: total } });
+    if (total !== null)
+      lines.push({
+        section: "total",
+        line: borderOnly
+          ? { label: "جمع تا مرز ایران", formula: `کالا + حمل (${borderOnly}؛ گمرک، ترخیص، بیمه و هزینه‌های دیگر حساب نشد)`, toman: total }
+          : { label: "جمع کل", formula: "کالا + حمل + بیمه و هزینه‌ها + حقوق ورودی + ارزش افزوده", toman: total },
+      });
     const days = leadDays !== null && m.transitMinDays !== null ? { min: leadDays + m.transitMinDays, max: leadDays + (m.transitMaxDays ?? m.transitMinDays) } : null;
     methods.push({
       key: m.key,
       nameFa: m.nameFa,
       isActive: m.isActive,
-      status: total === null ? "inquiry" : "ok",
+      status: total === null ? "inquiry" : borderOnly ? "border" : "ok",
       missing: [...missing],
       goods: goodsToman,
       shipping: shipToman,
@@ -403,6 +418,7 @@ export function computeLanded(input: LandedInput, s: RateSnapshot): LandedResult
     packing: { cartons, weightKg, volumeCbm, missing: packMissing },
     goods,
     hs,
+    borderOnly,
     ratesUsed,
     ratesDate,
     ratesStale: ratesDate !== null && ratesDate < s.today,
@@ -490,7 +506,9 @@ export type PublicLanded = {
   moq: number | null;
   belowMoq: boolean;
   ratesDate: string | null;
-  methods: { key: string; nameFa: string; status: "ok" | "inquiry"; unit: number | null; total: number | null; days: { min: number; max: number } | null }[];
+  // borderOnly: عددها فقط «کالا + حمل تا مرز ایران» است، نه قیمت تمام‌شده‌ی کامل (بخش ۴۱)
+  borderOnly: boolean;
+  methods: { key: string; nameFa: string; status: "ok" | "border" | "inquiry"; unit: number | null; total: number | null; days: { min: number; max: number } | null }[];
 };
 
 export function toPublic(r: LandedResult): PublicLanded {
@@ -498,6 +516,7 @@ export function toPublic(r: LandedResult): PublicLanded {
     qty: r.qty,
     moq: r.moq,
     belowMoq: r.belowMoq,
+    borderOnly: r.borderOnly !== null,
     ratesDate: r.ratesDate,
     methods: r.methods
       .filter((m) => m.isActive)
