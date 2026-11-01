@@ -14,7 +14,7 @@ import { reviewDays } from "@/lib/ai/kb";
 import { PROMPT_VERSION } from "@/lib/ai/prompt";
 import { HANDOFF_FA } from "@/lib/ai/rules";
 import { aiStatus } from "@/lib/ai/state";
-import { aiLimits, testLimits, todayUsage } from "@/lib/ai/usage";
+import { aiLimits, catalogLimits, testLimits, todayUsage } from "@/lib/ai/usage";
 import { requirePermission } from "@/lib/auth/can";
 import { aiReady, aiTestsReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
@@ -166,6 +166,14 @@ export default async function AiPage() {
                 hint="جدا از سقف چت؛ آزمون جلوی جواب به مشتری را نمی‌گیرد"
               />
               <Field label="هشدار «آزمون کامل اجرا نشده» بعد از (روز)" name="testStaleDays" defaultValue={String(tl.staleDays)} inputMode="numeric" ltr />
+              <Field
+                label="سقف هزینه‌ی روزانه‌ی «متن فارسی محصول با AI» (تومان)"
+                name="catalogDailyCost"
+                defaultValue={String((await catalogLimits()).dailyCostToman)}
+                inputMode="numeric"
+                ltr
+                hint="جدا از سقف چت و آزمون؛ بخش ۴۰"
+              />
             </div>
           </ActionForm>
         </div>

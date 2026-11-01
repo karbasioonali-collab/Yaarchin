@@ -41,15 +41,22 @@ export async function aiLimits(): Promise<AiLimits> {
 // مصرف امروز (فقط درخواست‌های زنده؛ حالت آزمایشی هزینه ندارد). دو سقف جدا (بخش ۳۳):
 //   chat ← فقط purpose = chat (جواب به مشتری؛ سقف ai.daily_requests و ai.daily_cost_toman)
 //   test ← آزمون دستیار و «پیشنهاد سؤال فریبنده با AI» (purpose = test_run | suggest؛ سقف ai.test_daily_cost_toman)
+//   catalog ← «متن فارسی محصول با AI» (purpose = catalog_text؛ سقف ai.catalog_daily_cost_toman؛ بخش ۴۰)
 // تست اتصال در هیچ‌کدام حساب نمی‌شود (چند ده تومان). پس آزمون هیچ‌وقت جواب دادن به مشتری را متوقف نمی‌کند.
-export async function todayUsage(scope: "chat" | "test" = "chat"): Promise<{ requests: number; costToman: number; promptTokens: number; completionTokens: number }> {
+export async function todayUsage(scope: "chat" | "test" | "catalog" = "chat"): Promise<{ requests: number; costToman: number; promptTokens: number; completionTokens: number }> {
   const start = tehranDayStart(tehranYmd());
-  const purpose = scope === "chat" ? sql`purpose = 'chat'` : sql`purpose in ('test_run', 'suggest')`;
+  const purpose = scope === "chat" ? sql`purpose = 'chat'` : scope === "catalog" ? sql`purpose = 'catalog_text'` : sql`purpose in ('test_run', 'suggest')`;
   const r = await db.execute<{ n: string; cost: string; pt: string; ct: string }>(sql`
     select count(*) filter (where model is not null) as n, coalesce(sum(cost_toman), 0) as cost, coalesce(sum(prompt_tokens), 0) as pt, coalesce(sum(completion_tokens), 0) as ct
     from ai_requests where mode = 'live' and ${purpose} and created_at >= ${start}`);
   const x = r.rows[0];
   return { requests: Number(x?.n ?? 0), costToman: Number(x?.cost ?? 0), promptTokens: Number(x?.pt ?? 0), completionTokens: Number(x?.ct ?? 0) };
+}
+
+// سقف روزانه‌ی «متن فارسی محصول با AI» (بخش ۴۰)؛ جدا از چت و آزمون
+export async function catalogLimits(): Promise<{ dailyCostToman: number }> {
+  const a = await getSetting("ai.catalog_daily_cost_toman").catch(() => null);
+  return { dailyCostToman: int(a, 20000, 0, 1_000_000_000) };
 }
 
 // سقف روزانه‌ی آزمون و بازه‌ی هشدار «آزمون کامل اجرا نشده»

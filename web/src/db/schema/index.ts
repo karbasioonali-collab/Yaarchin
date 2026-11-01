@@ -11,3 +11,4 @@ export * from "./leads";
 export * from "./ai";
 export * from "./ai-tests";
 export * from "./import";
+export * from "./catalog-text";

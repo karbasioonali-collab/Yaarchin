@@ -5,6 +5,7 @@ import "server-only";
 //   AI_MODEL           ← مدل اصلی (پیش‌فرض anthropic/claude-haiku-4.5)
 //   AI_FALLBACK_MODEL  ← مدل پشتیبان (اختیاری): اگر مدل اصلی خطا داد یا جواب نداد، یک بار با این مدل
 // هر کدام از AI_BASE_URL یا AI_API_KEY خالی ← «حالت آزمایشی» (مدل ساختگی؛ جواب‌ها فقط در پنل، مشتری مثل قبل به کارشناس).
+//   AI_CATALOG_MODEL   ← (اختیاری) مدل «متن فارسی محصول با AI» (بخش ۴۰)؛ خالی = همان AI_MODEL. پشتیبان همان AI_FALLBACK_MODEL.
 // مدل جدا برای کارهای دیگر (مثلاً تشخیص لوگو) بعداً با متغیر جدا (مثل AI_LOGO_MODEL)، نه تنظیم پنل.
 export const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
@@ -28,4 +29,10 @@ export function aiConfig(): AiConfig {
   const model = (process.env.AI_MODEL ?? "").trim() || DEFAULT_MODEL;
   const fallbackModel = (process.env.AI_FALLBACK_MODEL ?? "").trim() || null;
   return { mode: baseUrl && apiKey ? "live" : "test", baseUrl, apiKey, model, fallbackModel: fallbackModel === model ? null : fallbackModel };
+}
+
+// مدل «متن فارسی محصول با AI»: AI_CATALOG_MODEL یا همان مدل اصلی دستیار (بخش ۴۰)
+export function catalogModel(cfg: AiConfig): { model: string; fallbackModel: string | null } {
+  const model = (process.env.AI_CATALOG_MODEL ?? "").trim() || cfg.model;
+  return { model, fallbackModel: cfg.fallbackModel && cfg.fallbackModel !== model ? cfg.fallbackModel : null };
 }

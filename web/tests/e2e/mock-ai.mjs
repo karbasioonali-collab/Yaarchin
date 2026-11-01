@@ -71,6 +71,21 @@ http
 
     // تست اتصال پنل
     if (sys.includes('{"ok": true')) return out(res, 200, completion(body.model, { content: '{"ok": true, "lang": "fa"}' }, 50));
+    // «متن فارسی محصول با AI» (lib/catalog/text-draft.ts؛ بخش ۴۰): نشانه در اسم انگلیسی لیستینگ
+    //   [[catleak]] ← اسم فروشنده و قیمت در متن (محافظ باید رد کند)؛ [[catnum]] ← عدد ساختگی؛ [[catbad]] ← جواب غیر JSON؛ پیش‌فرض ← متن درست
+    if (sys.includes("Persian product copywriter")) {
+      const u = lastUser;
+      if (u.includes("[[catbad]]")) return out(res, 200, completion(body.model, { content: "متأسفم، نمی‌توانم." }, 300));
+      const good = {
+        titleFa: "زیرسیگاری يکبار مصرف ژل دار",
+        summaryFa: "زیرسیگاری کاغذی که سیگار را سریع خاموش می کند .",
+        descriptionFa: "• ژل داخلی سیگار را بی دود خاموش می کند\n• سبک و قابل حمل برای خانه ها و خودرو",
+        specs: [{ name: "Type", labelFa: "نوع", valueFa: "رومیزی", unit: "" }],
+      };
+      if (u.includes("[[catleak]]")) good.descriptionFa += "\nساخت Supplier 4b Leak فقط ۰٫۰۲ دلار";
+      if (u.includes("[[catnum]]")) good.summaryFa = "مناسب برای ۵۰۰ نفر";
+      return out(res, 200, completion(body.model, { content: "```json\n" + JSON.stringify(good) + "\n```" }, 500));
+    }
     // «پیشنهاد سؤال فریبنده با AI» (lib/ai/tricky.ts): ۵ خط، یکی تکراری با سؤال‌های موجود
     if (sys.includes("tricky customer questions"))
       return out(

@@ -30,6 +30,8 @@ const LIMITS: [string, string, number, number][] = [
   // آزمون دستیار (بخش ۳۳)؛ جدا از سقف چت مشتری
   ["ai.test_daily_cost_toman", "testDailyCost", 0, 1_000_000_000],
   ["ai.test_stale_days", "testStaleDays", 1, 3650],
+  // متن فارسی محصول با AI (بخش ۴۰)؛ جدا از چت و آزمون
+  ["ai.catalog_daily_cost_toman", "catalogDailyCost", 0, 1_000_000_000],
 ];
 
 export async function saveAiLimitsAction(_prev: FormState, fd: FormData): Promise<FormState> {

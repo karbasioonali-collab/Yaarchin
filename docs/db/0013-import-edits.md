@@ -13,7 +13,7 @@
 
 - **کلیدهای خارجی:** `raw_page_id` ← `raw_pages` با CASCADE؛ `updated_by` ← `users` با SET NULL.
 - **Seed:** لازم نیست.
-- **قبل از migrate** هیچ صفحه‌ای خطا نمی‌دهد (`importEditsReady()`): صفحه‌ی بررسی فقط‌خواندنی. تست: `web/tests/e2e/import-edits-pre.e2e.mjs`.
+- **قبل از migrate** هیچ صفحه‌ای خطا نمی‌دهد (`importEditsReady()`): صفحه‌ی بررسی فقط‌خواندنی. تست آن زمان: `import-edits-pre.e2e.mjs` (با migration ۰۰۱۴ حذف شد؛ قاعده‌ی «فقط آخرین migration»).
 
 ## اجرا روی لیارا (به همین ترتیب)
 1. بک‌آپ دستی دیتابیس `yaarchin-db` در پنل لیارا.
