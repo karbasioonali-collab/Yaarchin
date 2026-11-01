@@ -16,6 +16,13 @@ export function fmtNum(n: number): string {
 }
 
 const date = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { dateStyle: "medium", timeZone: "Asia/Tehran" });
+// «۵ مهر» (روز و ماه شمسی، بدون سال؛ مثلاً «با نرخ ۵ مهر»)
+const dayMonth = new Intl.DateTimeFormat("fa-IR-u-ca-persian", { day: "numeric", month: "long", timeZone: "Asia/Tehran" });
+export function fmtDayMonth(d: Date | string): string {
+  // «2026-09-27» (تاریخ بدون ساعت) ← ظهر تهران، تا جابه‌جایی منطقه‌ی زمانی روز را عوض نکند
+  return dayMonth.format(typeof d === "string" ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T12:00:00+03:30` : d) : d);
+}
+
 export function fmtDate(d: Date | string | null | undefined): string {
   if (!d) return "—";
   return date.format(typeof d === "string" ? new Date(d) : d);

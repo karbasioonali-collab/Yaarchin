@@ -127,12 +127,16 @@ http
     const ho = /\[\[handoff:([a-z_]+)\]\]/.exec(text)?.[1];
     if (ho) return json({ answer: "", source: "general", handoff: { reason: ho, note: "mock" } });
     if (text.includes("[[tool]]")) {
-      if (toolMsg) return json({ answer: `قیمت تمام‌شده‌ی تخمینی: ${totals(JSON.parse(toolMsg.content))}. این قیمت تخمینی است.`, source: "calculator", handoff: null });
+      // بدون HS (بخش ۴۱): goods_and_shipping_to_iran_border_only ← «قیمت کالا و حمل تا مرز ایران»، نه «قیمت تمام‌شده»
+      const label = (d) =>
+        d.goods_and_shipping_to_iran_border_only ? "قیمت کالا و حمل تا مرز ایران (هزینه‌های گمرک، ترخیص و بیمه را کارشناس اعلام می‌کند)" : "قیمت تمام‌شده‌ی تخمینی";
+      if (toolMsg)
+        return json({ answer: `${label(JSON.parse(toolMsg.content))}: ${totals(JSON.parse(toolMsg.content))}. این قیمت تخمینی است.`, source: "calculator", handoff: null });
       // تعداد در پیام بود ← قیمت همان تعداد از قبل در داده‌هاست (بدون ابزار؛ بخش ۳۲)
       const data = JSON.parse((chatUser ?? "").split("\n---\n")[0].replace(/^[^{]*/, "") || "{}");
       if (data.landed_cost_for_requested_qty)
         return json({
-          answer: `قیمت تمام‌شده‌ی تخمینی برای ${data.landed_cost_for_requested_qty.qty} عدد: ${totals(data.landed_cost_for_requested_qty)}. این قیمت تخمینی است.`,
+          answer: `${label(data.landed_cost_for_requested_qty)} برای ${data.landed_cost_for_requested_qty.qty} عدد: ${totals(data.landed_cost_for_requested_qty)}. این قیمت تخمینی است.`,
           source: "calculator",
           handoff: null,
         });

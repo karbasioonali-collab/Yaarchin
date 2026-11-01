@@ -233,6 +233,9 @@ let listing2;
   await ad.goto(B + `/admin/import/${id3}`);
   const r = reg(ad);
   ok((await ad.getByTestId("qty-choice").count()) === 0, "sample3: no ambiguous quantity");
+  // بخش ۴۱: مقدارهای خوانده‌شده از مشخصات برچسب «از مشخصات» دارند (فرم جمع‌شده است؛ textContent)
+  const unitW = await ad.locator("label", { has: ad.locator('input[name="unitWeightKg"]') }).textContent();
+  ok(unitW.includes("از مشخصات") && (await ad.locator('input[name="unitWeightKg"]').inputValue()) === "0.005", "review: unit weight «از مشخصات»");
   await r.locator('input[name="companyMode"][value="new"]').check();
   await r.locator('input[name="productMode"][value="existing"]').check();
   await r.locator('select[name="productId"]').selectOption(prod);

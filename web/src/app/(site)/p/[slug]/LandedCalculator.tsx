@@ -7,6 +7,7 @@ import { toLatinDigits } from "@/lib/validation";
 import styles from "./product.module.css";
 
 // کارت «قیمت تمام‌شده تا ایران»: مشتری تعداد را عوض می‌کند و هر روش حمل فعال کنار هم نمایش داده می‌شود.
+// بدون HS (borderOnly): عددها فقط «کالا + حمل تا مرز ایران» است و عنوان کارت «قیمت تا مرز ایران» (بخش ۴۱).
 // اولین نمایش از سرور می‌آید (بدون جاوااسکریپت هم دیده می‌شود)؛ تغییر تعداد ← /api/v1/products/[slug]/landed?qty=
 export function LandedCalculator({ slug, unit, initial }: { slug: string; unit: string; initial: PublicLanded }) {
   const [data, setData] = useState(initial);
@@ -66,12 +67,17 @@ export function LandedCalculator({ slug, unit, initial }: { slug: string; unit: 
         </p>
       )}
 
+      {data.borderOnly && (
+        <p className={styles.landedWarn} data-testid="border-note">
+          قیمت کالا و حمل تا مرز ایران؛ هزینه‌های گمرک، ترخیص و بیمه را کارشناس اعلام می‌کند.
+        </p>
+      )}
       {data.methods.length ? (
         <div className={styles.methods} aria-live="polite" aria-busy={loading}>
           {data.methods.map((m) => (
             <div key={m.key} className={styles.method}>
               <div className={styles.methodName}>{m.nameFa}</div>
-              {m.status === "ok" ? (
+              {m.status !== "inquiry" ? (
                 <>
                   <div className={styles.methodUnit}>
                     {fmtNum(m.unit!)} <small>تومان هر {u}</small>

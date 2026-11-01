@@ -152,7 +152,13 @@ function MethodCard({ m, unit }: { m: MethodResult; unit: string }) {
     <div className={styles.card}>
       <h2 className={styles.cardTitle}>
         {m.nameFa} {!m.isActive && <span className={`${styles.badge} ${styles.badgeMuted}`}>غیرفعال (در سایت نمایش داده نمی‌شود)</span>}
-        {m.status === "ok" ? <span className={styles.badge}>کامل</span> : <span className={`${styles.badge} ${styles.badgeWarn}`}>استعلام از کارشناس</span>}
+        {m.status === "ok" ? (
+          <span className={styles.badge}>کامل</span>
+        ) : m.status === "border" ? (
+          <span className={`${styles.badge} ${styles.badgeWarn}`}>فقط کالا + حمل تا مرز (بدون HS)</span>
+        ) : (
+          <span className={`${styles.badge} ${styles.badgeWarn}`}>استعلام از کارشناس</span>
+        )}
       </h2>
       {m.missing.length > 0 && (
         <ul style={{ margin: "0 0 10px", paddingInlineStart: 18, fontSize: 14, color: "var(--orange-dark)" }}>

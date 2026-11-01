@@ -33,6 +33,7 @@ import { draftsOf, prepareDraft } from "@/lib/catalog/text-draft";
 import { HIT_FA, type DraftHit, type DraftOutput } from "@/lib/catalog/text-draft-core";
 import { adminReference } from "@/lib/catalog/admin-reference";
 import { mergeSpecs } from "@/lib/import/merge-specs";
+import { suggestPacking } from "@/lib/catalog/packing-suggest";
 import { DB_MEDIA_PREFIX } from "@/lib/import/register";
 import { MediaModeNote } from "@/components/admin/MediaModeNote";
 import { ProductMediaUploader } from "@/components/admin/ProductMediaUploader";
@@ -100,6 +101,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         companyType: companies.companyType,
         companyMeta: companies.meta,
         specs: productListings.specs,
+        meta: productListings.meta,
         externalUrl: productListings.externalUrl,
         moq: productListings.moq,
         moqUnit: productListings.moqUnit,
@@ -152,11 +154,38 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
   const specListings = listings.filter((l) => attrsOf(l.specs).length);
   const merged = mergeSpecs(specListings.map((l) => ({ listingId: l.id, attributes: attrsOf(l.specs) })));
   const listingIndex = new Map(listings.map((l, i) => [l.id, i]));
+  // بدون HS یا HS خارج از لیست: سایت فقط «کالا + حمل تا مرز ایران» نشان می‌دهد (بخش ۴۱)
+  const ratesOn = await ratesReady();
+  const hsCurrent = ratesOn && p.hsCode ? await hsLookup(p.hsCode) : null;
+  const hsWarn = !ratesOn
+    ? null
+    : p.hsCode && !hsCurrent
+      ? `HS این محصول (${p.hsCode}) در لیست HS نیست؛ تا اصلاح نشود، سایت فقط «قیمت کالا و حمل تا مرز ایران» را نشان می‌دهد.`
+      : !p.hsCode
+        ? "HS این محصول ثبت نشده؛ سایت فقط «قیمت کالا و حمل تا مرز ایران» را نشان می‌دهد (بدون گمرک، ترخیص و بیمه)."
+        : null;
   // متن فارسی با AI (migration ۰۰۱۴؛ بخش ۴۰)
   const textOn = await catalogTextReady();
   const [drafts, prep] = textOn ? await Promise.all([draftsOf(id, 3), aiConfirm ? prepareDraft(id) : Promise.resolve(null)]) : [[], null];
   // بدون دسترسی «دیدن کارخانه‌ها» اسم کارخانه نمایش داده نمی‌شود
   const companyLabel = (l: (typeof listings)[number], i: number) => (seeCompanies ? l.companyName : `کارخانه‌ی ${fmtNum(i + 1)}`);
+  // «پیشنهاد از مشخصات» برای خانه‌های خالی بسته‌بندی (بخش ۴۱؛ هیچ‌چیز خودکار پر نمی‌شود)
+  const numOrNull = (k: string) => {
+    const v = "unitWeightKg" in p ? (p as Record<string, unknown>)[k] : null;
+    return v === null || v === undefined ? null : Number(v);
+  };
+  const packSuggest = suggestPacking(
+    listings.filter((l) => l.status === "active").map((l, i) => ({ label: companyLabel(l, listingIndex.get(l.id) ?? i), meta: l.meta, specs: l.specs })),
+    {
+      unitWeightKg: numOrNull("unitWeightKg"),
+      unitsPerCarton: numOrNull("unitsPerCarton"),
+      cartonWeightKg: numOrNull("cartonWeightKg"),
+      cartonLengthCm: numOrNull("cartonLengthCm"),
+      cartonWidthCm: numOrNull("cartonWidthCm"),
+      cartonHeightCm: numOrNull("cartonHeightCm"),
+    },
+  );
+  const PACK_FA = { unitWeightKg: "وزن هر عدد", unitsPerCarton: "تعداد در کارتن", cartonWeightKg: "وزن کارتن پر", cartonDims: "ابعاد کارتن" } as const;
   // فایل‌های واردشده از لینک یا اکستنشن (برای برچسب «از لینک» و لینک منبع)
   const uploadKeys = media.map((m) => m.storageKey).filter((k) => isUploadKey(k));
   const imported = new Map(
@@ -195,11 +224,16 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
         </div>
       </div>
 
+      {hsWarn && (
+        <div className={styles.rateWarn} role="status" data-testid="hs-warning">
+          <span>{hsWarn}</span>
+        </div>
+      )}
       <div className={styles.card}>
         <h2 className={styles.cardTitle}>مشخصات محصول</h2>
         <ActionForm action={updateProductAction} submitLabel="ذخیره‌ی محصول">
           <input type="hidden" name="id" value={p.id} />
-          <ProductFields tree={tree} value={p} hs={{ ready: await ratesReady(), current: await hsLookup(p.hsCode) }} canPublish={await can(a.user, "products.publish")} />
+          <ProductFields tree={tree} value={p} hs={{ ready: ratesOn, current: hsCurrent }} canPublish={await can(a.user, "products.publish")} />
           <div className={ui.field}>
             <span className={ui.label}>مشخصات مشترک (در صفحه‌ی محصول نمایش داده می‌شود)</span>
             <RowsEditor
@@ -225,6 +259,26 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
                 <Field label="عرض کارتن (cm)" name="cartonWidthCm" defaultValue={pk("cartonWidthCm")} ltr inputMode="decimal" />
                 <Field label="ارتفاع کارتن (cm)" name="cartonHeightCm" defaultValue={pk("cartonHeightCm")} ltr inputMode="decimal" />
               </div>
+              {(packSuggest.suggestions.length > 0 || packSuggest.unitDims.length > 0) && (
+                <div className={styles.notice} data-testid="packing-suggest" style={{ fontSize: 13 }}>
+                  <strong>پیشنهاد از مشخصات</strong> (برای خانه‌های خالی؛ با «استفاده» فقط خانه پر می‌شود و با «ذخیره‌ی محصول» ذخیره)
+                  {packSuggest.suggestions.map((sg) => (
+                    <div key={`${sg.key}${sg.text}`} style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 4 }} data-testid={`suggest-${sg.key}`}>
+                      <span>
+                        {PACK_FA[sg.key]}: <span className={styles.ltr}>{sg.text}</span>
+                        {sg.estimated && <span className={`${styles.badge} ${styles.badgeWarn}`}>تخمینی</span>}
+                        <span className={styles.muted}> ({sg.sources.join("، ")})</span>
+                      </span>
+                      <FillFieldButton values={sg.fields} label="استفاده" className={styles.btnGhost} />
+                    </div>
+                  ))}
+                  {packSuggest.unitDims.map((u) => (
+                    <div key={u.text} className={styles.muted} style={{ marginTop: 4 }} data-testid="suggest-unitDims">
+                      ابعاد بسته‌ی تکی: <span className={styles.ltr}>{u.text}</span> ({u.sources.join("، ")}) — برای تخمین ابعاد کارتن «تعداد در کارتن» لازم است.
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <p className={styles.muted}>فیلدهای وزن و کارتن بعد از اجرای migration ۰۰۰۴.</p>

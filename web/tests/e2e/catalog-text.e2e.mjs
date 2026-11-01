@@ -81,7 +81,7 @@ if (!LIVE) {
   ok(psql("select status || '|' || cost_toman::float from ai_requests where purpose='catalog_text' order by id desc limit 1") === "ok|500", "AI log: catalog_text, cost");
   const d = ad.getByTestId("ai-draft").first();
   const title = await d.getByTestId("ai-field-titleFa").innerText();
-  ok(title.includes("زیرسیگاری یکبار مصرف ژل دار") && !title.includes("ي"), `normalized: ي → ی (${title})`);
+  ok(title.includes(`زیرسیگاری یک${Z}بار مصرف ژل دار`) && !title.includes("ي"), `normalized: ي → ی, یکبار → یک‌بار (${title})`);
   const sum = await d.getByTestId("ai-field-summaryFa").innerText();
   ok(sum.includes(`خاموش می${Z}کند.`), `normalized: می‌کند, no space before dot (${sum})`);
   ok((await d.getByTestId("ai-field-descriptionFa").innerText()).includes(`خانه${Z}ها`), "normalized: خانه‌ها");

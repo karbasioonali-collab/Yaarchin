@@ -102,6 +102,8 @@ export default async function ImportReviewPage({ params }: PageProps<"/admin/imp
   const range = (min: number, max: number | null) => (max ? `${fmtNum(min)} تا ${fmtNum(max)}` : `${fmtNum(min)} و بیشتر`);
   const s = p.supplier;
   const pk = v.packing;
+  // مقداری که خواننده از مشخصات صفحه برداشته و هنوز اصلاح نشده (بخش ۴۱)
+  const fromSpecs = (k: "unitWeightKg" | "unitDimsCm" | "unitsPerCarton"): string | undefined => (p.packing[k] !== null && !edited.has(k) ? "از مشخصات" : undefined);
   const mark = (k: string) => (edited.has(k) ? <span className={`${styles.badge} ${styles.badgeWarn}`}>اصلاح‌شده</span> : null);
 
   // داده‌های فرم ثبت
@@ -493,8 +495,8 @@ export default async function ImportReviewPage({ params }: PageProps<"/admin/imp
               initial={v.leadTimes.map((t) => ({ ltMin: s2(t.minQty), ltMax: s2(t.maxQty), ltDays: s2(t.days) }))}
             />
             <div className={styles.row}>
-              <Field label="وزن تکی (کیلوگرم)" name="unitWeightKg" defaultValue={s2(pk.unitWeightKg)} ltr inputMode="decimal" />
-              <Field label="طول تکی (سانتی‌متر)" name="unitL" defaultValue={s2(pk.unitDimsCm?.l)} ltr inputMode="decimal" />
+              <Field label="وزن تکی (کیلوگرم)" name="unitWeightKg" defaultValue={s2(pk.unitWeightKg)} ltr inputMode="decimal" hint={fromSpecs("unitWeightKg")} />
+              <Field label="طول تکی (سانتی‌متر)" name="unitL" defaultValue={s2(pk.unitDimsCm?.l)} ltr inputMode="decimal" hint={fromSpecs("unitDimsCm")} />
               <Field label="عرض تکی" name="unitW" defaultValue={s2(pk.unitDimsCm?.w)} ltr inputMode="decimal" />
               <Field label="ارتفاع تکی" name="unitH" defaultValue={s2(pk.unitDimsCm?.h)} ltr inputMode="decimal" />
             </div>
@@ -505,7 +507,7 @@ export default async function ImportReviewPage({ params }: PageProps<"/admin/imp
                 defaultValue={edited.has("unitsPerCarton") ? s2(pk.unitsPerCarton) : s2(p.packing.unitsPerCarton)}
                 ltr
                 inputMode="numeric"
-                hint="خالی = از انتخاب «Quantity» بالا"
+                hint={fromSpecs("unitsPerCarton") ?? "خالی = از انتخاب «Quantity» بالا"}
               />
               <Field
                 label="وزن کارتن (کیلوگرم)"

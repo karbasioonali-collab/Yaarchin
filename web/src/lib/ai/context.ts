@@ -7,8 +7,8 @@ import { db } from "@/db/client";
 import { chatMessages, products } from "@/db/schema";
 import { loadPublishedProduct, loadLandedAt } from "@/lib/catalog/public";
 import { getSetting } from "@/lib/settings";
-import { clampQty, publicLandedCost, type LandedCost } from "@/lib/pricing/landed";
-import { contextJson, DEFAULT_GENERIC_WORDS, LIMITS, priceIntent, shapeKb, shapeProduct, titleMention, trimHistory, type LandedCompact } from "./context-shape";
+import { clampQty, publicLandedCost } from "@/lib/pricing/landed";
+import { compactLanded, contextJson, DEFAULT_GENERIC_WORDS, LIMITS, priceIntent, shapeKb, shapeProduct, titleMention, trimHistory, type LandedCompact } from "./context-shape";
 import { searchKb, type KbHit } from "./kb";
 
 export type ProductCtx = {
@@ -23,17 +23,8 @@ export type ProductCtx = {
   landedAtMoq: ReturnType<typeof compactLanded>;
 };
 
-export function compactLanded(l: LandedCost): LandedCompact {
-  if (l.status !== "ready") return { available: false as const };
-  return {
-    available: true as const,
-    estimated: true,
-    qty: l.qty,
-    belowMoq: l.belowMoq,
-    ratesDate: l.ratesDate,
-    methods: l.methods.map((m) => ({ method: m.nameFa, unitToman: m.unit, totalToman: m.total, days: m.days, needsInquiry: m.status !== "ok" })),
-  };
-}
+// compactLanded در context-shape.ts است (خالص، با تست واحد)
+export { compactLanded };
 
 export async function productCtx(slug: string): Promise<ProductCtx | null> {
   const p = await loadPublishedProduct(slug);

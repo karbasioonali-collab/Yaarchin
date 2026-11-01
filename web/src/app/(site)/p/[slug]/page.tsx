@@ -14,7 +14,8 @@ import { customerProductConversation, markRead, messagesOf } from "@/lib/chat/se
 import { getCustomer } from "@/lib/customer/auth";
 import { chatReady } from "@/lib/db-ready";
 import { isFavorite } from "@/lib/customer/favorites";
-import { fmtDate, fmtUsd, fmtNum, unitFa } from "@/lib/format";
+import { fmtDate, fmtDayMonth, fmtUsd, fmtNum, unitFa } from "@/lib/format";
+import { round10 } from "@/lib/pricing/tiers";
 import { isEnabled } from "@/lib/settings";
 import { LandedCalculator } from "./LandedCalculator";
 import styles from "./product.module.css";
@@ -51,6 +52,15 @@ function PriceCard({ p }: { p: PublicProduct }) {
           {fmtUsd(pr.avg)} <small>دلار</small>
         </span>
       </div>
+      {p.priceToman && (
+        <div className={styles.avgRow} data-testid="price-toman">
+          <span className={styles.avgLabel}>معادل</span>
+          <span className={styles.avgToman}>
+            {fmtNum(round10(p.priceToman.avg))} <small>تومان</small>
+          </span>
+          <span className={styles.rateNote}>{p.priceToman.isToday ? "با نرخ امروز دلار" : `با نرخ ${fmtDayMonth(p.priceToman.rateDate)}`}</span>
+        </div>
+      )}
       <p className={styles.orderSpan} data-testid="order-span">
         حداقل سفارش از {fmtNum(pr.moqFrom)} {unitFa(pr.unit)}
         {pr.tierMin !== null && pr.tierMax !== null && (
@@ -84,9 +94,9 @@ function LandedCard({ p }: { p: PublicProduct }) {
   const lc = p.landedCost;
   return (
     <div className={styles.landed}>
-      <div className={styles.landedHead}>
+      <div className={styles.landedHead} data-testid="landed-title">
         <Icon name="truck" size={20} />
-        قیمت تمام‌شده تا ایران
+        {lc.status === "ready" && lc.borderOnly ? "قیمت تا مرز ایران" : "قیمت تمام‌شده تا ایران"}
         {lc.status !== "ready" && <span className={`${s.chip} ${s.chipOrange}`}>به‌زودی</span>}
       </div>
       {lc.status === "ready" ? (
