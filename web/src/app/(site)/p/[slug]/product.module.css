@@ -24,6 +24,7 @@
 .avgRow { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; }
 .avgLabel { font-size: 13px; color: var(--muted); }
 .avg { font-size: 32px; font-weight: 900; color: var(--orange-dark); line-height: 1.3; }
+.orderSpan { font-size: 13px; color: var(--muted, #666); margin: 2px 0 10px; }
 .avg small { font-size: 15px; font-weight: 700; }
 .range { margin-top: 12px; }
 .rangeBar { position: relative; height: 8px; border-radius: 999px; background: linear-gradient(to left, var(--green), var(--orange)); opacity: .9; }

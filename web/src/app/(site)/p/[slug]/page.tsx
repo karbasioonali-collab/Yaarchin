@@ -51,6 +51,14 @@ function PriceCard({ p }: { p: PublicProduct }) {
           {fmtUsd(pr.avg)} <small>دلار</small>
         </span>
       </div>
+      <p className={styles.orderSpan} data-testid="order-span">
+        حداقل سفارش از {fmtNum(pr.moqFrom)} {unitFa(pr.unit)}
+        {pr.tierMin !== null && pr.tierMax !== null && (
+          <>
+            {" | "}قیمت از {fmtUsd(pr.tierMin)} تا {fmtUsd(pr.tierMax)} دلار، بسته به تعداد
+          </>
+        )}
+      </p>
       <div className={styles.range} aria-label={`بازه‌ی قیمت از ${fmtUsd(pr.min)} تا ${fmtUsd(pr.max)} دلار`}>
         <div className={styles.rangeBar}>
           <span className={styles.rangeMarker} style={{ insetInlineStart: `${Math.min(96, Math.max(4, pos))}%` }} />
