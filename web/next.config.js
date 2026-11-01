@@ -26,6 +26,8 @@ const nextConfig = {
       "./src/db/test-drafts.json",
       "./src/lib/auth/password-policy.mjs",
       "./src/lib/contact.mjs",
+      // متن صفحه‌ی «آموزش» پنل (با fs خوانده می‌شود؛ docs/infoyaarchin.md بخش ۴۲)
+      "./content/admin-guide.md",
       // فقط فایل‌هایی که Node واقعاً اجرا می‌کند (ESM .js)؛ .d.ts/.cjs/.map حذف شدند (۴۴۹ فایل به‌جای ۲۶۹۰).
       "./node_modules/drizzle-orm/package.json",
       "./node_modules/drizzle-orm/**/*.js",

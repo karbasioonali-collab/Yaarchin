@@ -180,6 +180,11 @@
       "nameFa": "ورود صفحه‌ی علی‌بابا: آپلود، بررسی، رد و خواندن دوباره"
     },
     {
+      "key": "guide.view",
+      "groupKey": "guide",
+      "nameFa": "دیدن آموزش پنل"
+    },
+    {
       "key": "companies.links",
       "groupKey": "companies",
       "nameFa": "دیدن لینک‌های علی‌بابا (پروفایل فروشنده و صفحه‌ی محصول)"
