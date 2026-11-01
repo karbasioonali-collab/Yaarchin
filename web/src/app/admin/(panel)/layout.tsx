@@ -46,6 +46,8 @@ const NAV: (NavItem & { permission: string | string[]; feature?: string })[] = [
   { href: "/admin/activity", label: "لاگ فعالیت", permission: "activity.view" },
   { href: "/admin/sms", label: "پیامک‌های ارسالی", permission: ["settings.manage", "chats.assign"] },
   { href: "/admin/settings", label: "تنظیمات و سوئیچ‌ها", permission: "settings.manage" },
+  // آموزش پنل (بخش ۴۲)؛ همیشه آخر منو
+  { href: "/admin/guide", label: "آموزش", permission: "guide.view" },
 ];
 
 export default async function PanelLayout({ children }: LayoutProps<"/admin">) {

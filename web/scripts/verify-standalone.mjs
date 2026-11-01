@@ -25,6 +25,7 @@ const required = [
   "src/db/test-drafts.json",
   "src/lib/auth/password-policy.mjs",
   "src/lib/contact.mjs",
+  "content/admin-guide.md",
 ];
 const missing = required.filter((p) => !existsSync(new URL(p, root)));
 if (missing.length) {
