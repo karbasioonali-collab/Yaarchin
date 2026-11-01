@@ -1,7 +1,7 @@
 // تست واحد PR ۴الف (docs/infoyaarchin.md بخش ۳۸): قیمت «تعداد مرجع»، گرد کردن نمایش، مشخصات ترکیبی و واژه‌نامه،
 // آیکون خودکار دسته و تشخیص مرورگر قدیمی.
 import { readFileSync } from "node:fs";
-import { defaultReferenceQty, listingMoq, referencePrice } from "../../src/lib/pricing/reference.ts";
+import { defaultReferenceQty, listingMoq, orderSpan, referencePrice } from "../../src/lib/pricing/reference.ts";
 import { pickTier, round10, round1000 } from "../../src/lib/pricing/tiers.ts";
 import { fmtUsd } from "../../src/lib/format.ts";
 import { mergeSpecs } from "../../src/lib/import/merge-specs.ts";
@@ -65,6 +65,20 @@ const ash = [L("l1", "A", fx(1)), L("l2", "A", fx(2)), L("l3", "B", fx(3))];
     { listingId: "3", companyId: "B", moq: 1, tiers: [{ minQty: 1, maxQty: null, priceMin: 10, priceMax: null }] },
   ];
   ok(referencePrice(votes, 1).avg === 6, "one vote per company: A=(1+3)/2=2, B=10 → 6");
+}
+
+// ---- خط «حداقل سفارش از N | قیمت از X تا Y» (بخش ۳۹)
+{
+  const sp = orderSpan(ash);
+  ok(sp.moqFrom === 2500 && sp.tierMin === 0.02 && sp.tierMax === 0.05, `ashtray: from 2500, 0.02–0.05 incl. excluded listing (${JSON.stringify(sp)})`);
+  const single = orderSpan([ash[0]]);
+  ok(single.moqFrom === 30000 && single.tierMin === null && single.tierMax === null, "one listing → only MOQ");
+  const same = orderSpan([
+    { listingId: "a", companyId: "A", moq: 10, tiers: [{ minQty: 10, maxQty: null, priceMin: 1, priceMax: null }] },
+    { listingId: "b", companyId: "B", moq: 50, tiers: [{ minQty: 50, maxQty: null, priceMin: 1, priceMax: null }] },
+  ]);
+  ok(same.moqFrom === 10 && same.tierMin === null, "all one price → only MOQ");
+  ok(orderSpan([]) === null, "no prices → null");
 }
 
 // ---- گرد کردن فقط در نمایش

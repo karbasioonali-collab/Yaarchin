@@ -170,7 +170,11 @@ ok(await waitFor(() => psql(`select count(*) from price_observations where listi
 let api = await (await fetch(B + `/api/v1/products/cat-test-${run}`)).json();
 // قیمت «تعداد مرجع» (بخش ۳۸): یک لیستینگ ← تعداد مرجع = حداقل سفارشش (۱۰۰)، پله‌ی ۱۰۰ تا ۴۹۹ ← ۵ دلار
 // (قبلاً «وسطِ ارزان‌ترین تا گران‌ترین پله» = ۴٫۵ و این بررسی فقط دنبال رقم «4» در کل JSON بود؛ با تاریخِ بدون ۴ شکست می‌خورد)
-ok(api.product?.suppliers === 1 && api.product?.price?.avg === 5 && api.product?.price?.refQty === 100, `site: 1 supplier, price of the ref-qty tier (${JSON.stringify(api.product?.price)})`);
+ok(api.product?.price?.moqFrom === 100 && api.product?.price?.tierMin === null, `one listing: order span = only MOQ (${JSON.stringify(api.product?.price)})`);
+ok(
+  api.product?.suppliers === 1 && api.product?.price?.avg === 5 && api.product?.price?.refQty === 100,
+  `site: 1 supplier, price of the ref-qty tier (${JSON.stringify(api.product?.price)})`,
+);
 // نوبت تازه (بیش از ۲ ثانیه بعد) جایگزین نوبت قبلی در سایت؛ یوان با نرخ به دلار
 await sleep(2500);
 await ad.reload();

@@ -13,7 +13,7 @@ import { catalogAdminReady, catalogReady, importScoreReady, ratesReady } from "@
 import { type ImportScore, toImportScore } from "./import-score";
 import { mediaUrl } from "@/lib/storage";
 import { clampQty, type LandedCost, publicLandedCost } from "@/lib/pricing/landed";
-import { referencePrice, type RefListing } from "@/lib/pricing/reference";
+import { orderSpan, referencePrice, type RefListing } from "@/lib/pricing/reference";
 
 export type PublicCategory = {
   slug: string;
@@ -35,6 +35,11 @@ export type PriceSummary = {
   refQty: number;
   // تعداد کارخانه‌هایی (نه لیستینگ‌هایی) که در این تعداد قیمت دارند
   pricedSuppliers: number;
+  // خط «حداقل سفارش از N | قیمت از X تا Y، بسته به تعداد» (بخش ۳۹): کمترین حداقل سفارش، و بازه‌ی همه‌ی پله‌ها
+  // (null وقتی یک لیستینگ است یا همه یک قیمت‌اند)
+  moqFrom: number;
+  tierMin: number | null;
+  tierMax: number | null;
   lastObservedAt: string;
 };
 
@@ -255,10 +260,12 @@ async function statsFor(productIds: string[]): Promise<Map<string, Stats>> {
   }
   for (const [pid, g] of byProduct) {
     const s = out.get(pid);
-    const rp = referencePrice([...g.listings.values()], g.ref);
-    if (!s || !rp) continue;
+    const ls = [...g.listings.values()];
+    const rp = referencePrice(ls, g.ref);
+    const span = orderSpan(ls);
+    if (!s || !rp || !span) continue;
     // بدون گرد کردن؛ فقط در نمایش (fmtUsd)
-    s.price = { currency: "USD", avg: rp.avg, min: rp.min, max: rp.max, refQty: rp.qty, pricedSuppliers: rp.suppliers, lastObservedAt: new Date(g.at).toISOString() };
+    s.price = { currency: "USD", avg: rp.avg, min: rp.min, max: rp.max, refQty: rp.qty, pricedSuppliers: rp.suppliers, ...span, lastObservedAt: new Date(g.at).toISOString() };
   }
   return out;
 }

@@ -70,3 +70,16 @@ export function referencePrice(listings: RefListing[], manualQty?: number | null
     excluded,
   };
 }
+
+// خط «حداقل سفارش از N عدد | قیمت از X تا Y دلار، بسته به تعداد» صفحه‌ی محصول (بخش ۳۹).
+// N = کمترین حداقل سفارش لیستینگ‌های قیمت‌دار؛ X/Y = کمترین/بیشترین قیمت همه‌ی پله‌های آخرین نوبت همه‌ی لیستینگ‌ها
+// (حتی آن‌هایی که از میانگین تعداد مرجع کنار رفته‌اند). بازه فقط با دست‌کم دو لیستینگ و X ≠ Y؛ وگرنه null (فقط حداقل سفارش).
+export type OrderSpan = { moqFrom: number; tierMin: number | null; tierMax: number | null };
+export function orderSpan(listings: RefListing[]): OrderSpan | null {
+  const priced = listings.filter((l) => l.tiers.length);
+  if (!priced.length) return null;
+  const lo = Math.min(...priced.flatMap((l) => l.tiers.map((t) => t.priceMin)));
+  const hi = Math.max(...priced.flatMap((l) => l.tiers.map((t) => t.priceMax ?? t.priceMin)));
+  const range = priced.length >= 2 && hi > lo;
+  return { moqFrom: Math.min(...priced.map(listingMoq)), tierMin: range ? lo : null, tierMax: range ? hi : null };
+}

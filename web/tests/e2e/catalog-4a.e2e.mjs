@@ -61,6 +61,9 @@ const apiGet = (p, u) => p.evaluate(async (x) => (await fetch(x, { cache: "no-st
   const card = await ad.getByTestId("ref-qty").innerText();
   ok(card.includes("برای سفارش ۵٬۰۰۰ عدد"), `site: «برای سفارش ۵٬۰۰۰ عدد» (${card})`);
   ok(await vis(ad.getByText("۰٫۰۳۵").first()), "site: 0.035 shown with 3 decimals");
+  const span = await ad.getByTestId("order-span").innerText();
+  ok(span.trim() === "حداقل سفارش از ۲٬۵۰۰ عدد | قیمت از ۰٫۰۲ تا ۰٫۰۵ دلار، بسته به تعداد", `order span line (${span})`);
+  ok(pr.price.moqFrom === 2500 && pr.price.tierMin === 0.02 && pr.price.tierMax === 0.05, "API: moqFrom, tierMin, tierMax");
   ok(!/Supplier 4a|alibaba\.com/.test(await ad.locator("main").innerText()), "site: no supplier name or link");
 }
 
