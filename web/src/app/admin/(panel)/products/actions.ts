@@ -5,14 +5,15 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { FormState } from "@/components/ui/ActionForm";
 import { db } from "@/db/client";
-import { companies, leadTimeObservations, priceObservations, productListings, productMedia, products } from "@/db/schema";
+import { companies, leadTimeObservations, priceObservations, productListings, productMedia, products, productTextDrafts } from "@/db/schema";
 import { logActivity } from "@/lib/activity";
 import { can, requirePermission } from "@/lib/auth/can";
 import { httpsUrl, isBad, isBadInt, num, optStr, rows, SLUG_RE, str, type Tier, tierError } from "@/lib/catalog/admin-input";
 import { categoryExists } from "@/lib/catalog/admin-tree";
 import { UNITS } from "@/lib/format";
 import { fmtImportScore, IMPORT_SCORES, toImportScore } from "@/lib/catalog/import-score";
-import { catalogAdminReady, importScoreReady, ratesReady } from "@/lib/db-ready";
+import { catalogAdminReady, catalogTextReady, importScoreReady, ratesReady } from "@/lib/db-ready";
+import { runDraft } from "@/lib/catalog/text-draft";
 import { hsLookup } from "@/lib/pricing/admin";
 import { releaseKey } from "@/lib/media/service";
 import { isUploadKey } from "@/lib/storage";
@@ -528,6 +529,55 @@ export async function applySpecsAction(_prev: FormState, fd: FormData): Promise<
   const specs = [...cur.filter((s) => !labels.has(s.labelFa)), ...add].slice(0, 60);
   await db.update(products).set({ specs }).where(eq(products.id, id));
   await logActivity({ actorUserId: a.user.id, action: "product.specs_merge", entityType: "product", entityId: id, before: { specs: cur }, after: { specs } });
+  revalidatePath("/", "layout");
+  return { ok: `${add.length.toLocaleString("fa-IR")} ردیف در «مشخصات مشترک» ذخیره شد.` };
+}
+
+// ---------- متن فارسی با AI (migration ۰۰۱۴؛ بخش ۴۰) ----------
+// اجرا فقط بعد از صفحه‌ی تأیید (هزینه‌ی تخمینی). نتیجه پیش‌نویس است؛ products عوض نمی‌شود.
+export async function runTextDraftAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("products.manage");
+  const id = str(fd, "id", 40);
+  if (!UUID.test(id)) return { error: "محصول نامعتبر است." };
+  if (!(await catalogTextReady())) return { error: "این بخش بعد از اجرای migration ۰۰۱۴ فعال می‌شود." };
+  const [p] = await db.select({ id: products.id }).from(products).where(eq(products.id, id));
+  if (!p) return { error: "محصول پیدا نشد." };
+  const r = await runDraft(id, a.user.id);
+  if ("refused" in r) return { error: r.refused };
+  await logActivity({
+    actorUserId: a.user.id,
+    actingAsUserId: a.session.impersonatingUserId,
+    action: "product.ai_text",
+    entityType: "product",
+    entityId: id,
+    after: { draftId: r.id, status: r.status, hits: r.hits },
+  });
+  revalidatePath(`/admin/products/${id}`);
+  redirect(`/admin/products/${id}?draft=${r.id}#ai-text`);
+}
+
+// مشخصات پیش‌نویس ← «مشخصات مشترک» (ذخیره‌ی صریح با دکمه؛ ردیف هم‌عنوان جایگزین می‌شود)
+export async function applyDraftSpecsAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("products.manage");
+  const id = str(fd, "id", 40);
+  const draftId = str(fd, "draftId", 40);
+  if (!UUID.test(id) || !UUID.test(draftId) || !(await catalogTextReady())) return { error: "درخواست نامعتبر است." };
+  const [d] = await db
+    .select({ status: productTextDrafts.status, output: productTextDrafts.output })
+    .from(productTextDrafts)
+    .where(and(eq(productTextDrafts.id, draftId), eq(productTextDrafts.productId, id)));
+  if (!d || d.status !== "ready") return { error: "این پیش‌نویس قابل استفاده نیست." };
+  const add = ((d.output as { specs?: { labelFa: string; valueFa: string; unit?: string }[] } | null)?.specs ?? [])
+    .filter((s) => s.labelFa && s.valueFa)
+    .map((s) => ({ labelFa: s.labelFa.slice(0, 80), valueFa: s.valueFa.slice(0, 200), ...(s.unit ? { unit: s.unit.slice(0, 40) } : {}) }));
+  if (!add.length) return { error: "این پیش‌نویس مشخصاتی ندارد." };
+  const [before] = await db.select({ specs: products.specs }).from(products).where(eq(products.id, id));
+  if (!before) return { error: "محصول پیدا نشد." };
+  const cur = (Array.isArray(before.specs) ? before.specs : []) as { labelFa: string; valueFa: string; unit?: string }[];
+  const labels = new Set(add.map((s) => s.labelFa));
+  const specs = [...cur.filter((s) => !labels.has(s.labelFa)), ...add].slice(0, 60);
+  await db.update(products).set({ specs }).where(eq(products.id, id));
+  await logActivity({ actorUserId: a.user.id, action: "product.ai_text_specs", entityType: "product", entityId: id, before: { specs: cur }, after: { specs, draftId } });
   revalidatePath("/", "layout");
   return { ok: `${add.length.toLocaleString("fa-IR")} ردیف در «مشخصات مشترک» ذخیره شد.` };
 }

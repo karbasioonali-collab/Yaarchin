@@ -12,20 +12,25 @@ import { can, requirePermission } from "@/lib/auth/can";
 import { COMPANY_STATUS_FA, COMPANY_TYPE_FA, CURRENCY_FA, LISTING_STATUS_FA, PRODUCT_STATUS_FA } from "@/lib/catalog/admin-labels";
 import { latestByCurrency, leadTimeHistory, priceHistory, priceText, qtyRange } from "@/lib/catalog/admin-listing";
 import { adminCategoryTree } from "@/lib/catalog/admin-tree";
-import { catalogAdminReady, mediaReady, ratesReady } from "@/lib/db-ready";
+import { catalogAdminReady, catalogTextReady, mediaReady, ratesReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum, fmtUsd, UNITS, unitFa } from "@/lib/format";
 import { isUploadKey, mediaUrl } from "@/lib/storage";
 import styles from "../../panel.module.css";
 import {
   addMediaAction,
+  applyDraftSpecsAction,
   applySpecsAction,
   createListingAction,
   mediaBulkAction,
   mediaCommandAction,
+  runTextDraftAction,
   setPosterAction,
   setReferenceQtyAction,
   updateProductAction,
 } from "../actions";
+import { FillFieldButton } from "../FillFieldButton";
+import { draftsOf, prepareDraft } from "@/lib/catalog/text-draft";
+import { HIT_FA, type DraftHit, type DraftOutput } from "@/lib/catalog/text-draft-core";
 import { adminReference } from "@/lib/catalog/admin-reference";
 import { mergeSpecs } from "@/lib/import/merge-specs";
 import { DB_MEDIA_PREFIX } from "@/lib/import/register";
@@ -45,7 +50,9 @@ type Spec = { labelFa?: string; valueFa?: string; unit?: string };
 export default async function ProductPage({ params, searchParams }: PageProps<"/admin/products/[id]">) {
   const a = await requirePermission("products.manage");
   const { id } = await params;
-  const justCreated = (await searchParams).created === "1";
+  const sp = await searchParams;
+  const justCreated = sp.created === "1";
+  const aiConfirm = sp.aiText === "confirm";
   if (!UUID.test(id)) notFound();
   const ready = await catalogAdminReady();
   const [p] = await db
@@ -145,6 +152,9 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
   const specListings = listings.filter((l) => attrsOf(l.specs).length);
   const merged = mergeSpecs(specListings.map((l) => ({ listingId: l.id, attributes: attrsOf(l.specs) })));
   const listingIndex = new Map(listings.map((l, i) => [l.id, i]));
+  // متن فارسی با AI (migration ۰۰۱۴؛ بخش ۴۰)
+  const textOn = await catalogTextReady();
+  const [drafts, prep] = textOn ? await Promise.all([draftsOf(id, 3), aiConfirm ? prepareDraft(id) : Promise.resolve(null)]) : [[], null];
   // بدون دسترسی «دیدن کارخانه‌ها» اسم کارخانه نمایش داده نمی‌شود
   const companyLabel = (l: (typeof listings)[number], i: number) => (seeCompanies ? l.companyName : `کارخانه‌ی ${fmtNum(i + 1)}`);
   // فایل‌های واردشده از لینک یا اکستنشن (برای برچسب «از لینک» و لینک منبع)
@@ -220,6 +230,125 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
             <p className={styles.muted}>فیلدهای وزن و کارتن بعد از اجرای migration ۰۰۰۴.</p>
           )}
         </ActionForm>
+      </div>
+
+      <div id="ai-text" className={styles.card} style={{ marginTop: 16, scrollMarginTop: 16 }} data-testid="ai-text">
+        <h2 className={styles.cardTitle}>متن فارسی با AI</h2>
+        {!textOn ? (
+          <p className={styles.muted}>این بخش بعد از اجرای migration ۰۰۱۴ فعال می‌شود.</p>
+        ) : (
+          <>
+            <p className={styles.muted} style={{ marginTop: 0 }}>
+              پیش‌نویس اسم فارسی، خلاصه، توضیحات و ترجمه‌ی مشخصات از اسم انگلیسی، Highlights واقعی و مشخصات لیستینگ‌ها. اسم، برند، شهر و هر اطلاعات کارخانه، متن «About» و قیمت‌ها
+              فرستاده نمی‌شوند؛ محافظ خروجی هم روی متن اجرا می‌شود. نتیجه فقط پیش‌نویس است و تا شما در فرم بالا «ذخیره‌ی محصول» نزنید چیزی عوض نمی‌شود.
+            </p>
+            {prep ? (
+              <div className={styles.notice} data-testid="ai-text-confirm">
+                <div>
+                  فرستاده می‌شود: {fmtNum(prep.input.titles.length)} اسم انگلیسی | {fmtNum(prep.input.highlights.length)} ویژگی | {fmtNum(prep.input.specs.length)} ردیف مشخصات برای
+                  ترجمه. {fmtNum(prep.input.localSpecs.length)} ردیف را واژه‌نامه رایگان ترجمه کرد (به AI نمی‌رود).
+                </div>
+                <div style={{ marginTop: 4 }}>
+                  {prep.live ? (
+                    <>
+                      هزینه‌ی تخمینی: <strong data-testid="ai-text-estimate">{fmtNum(prep.estimateToman)} تومان</strong> (حدود {fmtNum(prep.tokens.prompt + prep.tokens.completion)}{" "}
+                      توکن؛ مدل <span className={styles.ltr}>{prep.model}</span>) | باقی‌مانده‌ی سقف امروز: {fmtNum(Math.round(prep.remainingToman))} از {fmtNum(prep.capToman)}{" "}
+                      تومان
+                    </>
+                  ) : (
+                    "حالت آزمایشی (کلید AI تنظیم نشده): فقط مشخصاتِ واژه‌نامه ساخته می‌شود؛ هزینه ندارد. برای متن کامل کلید AI لازم است."
+                  )}
+                </div>
+                <details style={{ marginTop: 6 }}>
+                  <summary className={styles.muted}>دیدن دقیق آنچه فرستاده می‌شود</summary>
+                  <pre dir="ltr" style={{ whiteSpace: "pre-wrap", fontSize: 12 }} data-testid="ai-text-input">
+                    {[...prep.input.titles, ...prep.input.highlights, ...prep.input.specs.map((x) => `${x.name}: ${x.value}`)].join("\n")}
+                  </pre>
+                </details>
+                {prep.live && prep.estimateToman > prep.remainingToman ? (
+                  <p className={styles.error} role="alert">
+                    هزینه‌ی تخمینی از باقی‌مانده‌ی سقف روزانه بیشتر است؛ سقف را در صفحه‌ی دستیار بالا ببرید یا فردا امتحان کنید.
+                  </p>
+                ) : (
+                  <ActionForm action={runTextDraftAction} submitLabel="اجرا و ساخت پیش‌نویس">
+                    <input type="hidden" name="id" value={p.id} />
+                  </ActionForm>
+                )}
+                <Link href={`/admin/products/${p.id}#ai-text`}>انصراف</Link>
+              </div>
+            ) : (
+              <Link href={`/admin/products/${p.id}?aiText=confirm#ai-text`} className={styles.btn}>
+                پیش‌نویس با AI (اول هزینه‌ی تخمینی)
+              </Link>
+            )}
+            {drafts.map((d) => {
+              const out = (d.status === "ready" || d.status === "blocked" ? d.output : null) as DraftOutput | null;
+              const hits = (d.guardHits ?? []) as DraftHit[];
+              const usable = d.status === "ready";
+              return (
+                <div key={d.id} className={styles.detailsBox} style={{ marginTop: 12 }} data-testid="ai-draft">
+                  <div>
+                    <span className={`${styles.badge} ${usable ? "" : styles.badgeWarn}`}>
+                      {usable ? "پیش‌نویس آماده" : d.status === "blocked" ? "رد شد (قابل استفاده نیست)" : "خطا"}
+                    </span>{" "}
+                    <span className={styles.muted} style={{ fontSize: 12 }}>
+                      {fmtDateTime(d.createdAt)} | {d.model ? <span className={styles.ltr}>{d.model}</span> : "حالت آزمایشی"} | هزینه {fmtNum(Number(d.costToman))} تومان
+                    </span>
+                  </div>
+                  {hits.length > 0 && (
+                    <p className={styles.error} data-testid="ai-draft-hits">
+                      رد شد: {hits.map((h) => `${HIT_FA[h.type] ?? h.type} «${h.type === "number" ? fmtNum(Number(h.match)) : h.match}»`).join("، ")}
+                    </p>
+                  )}
+                  {d.status === "error" && <p className={styles.error}>مدل جواب نداد یا قالب جواب نادرست بود؛ دوباره امتحان کنید.</p>}
+                  {out && (
+                    <div className={styles.tableWrap}>
+                      <table className={styles.table}>
+                        <thead>
+                          <tr>
+                            <th>فیلد</th>
+                            <th>الان</th>
+                            <th>پیش‌نویس</th>
+                            <th />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(
+                            [
+                              ["titleFa", "اسم فارسی", p.titleFa, out.titleFa],
+                              ["summaryFa", "خلاصه", p.summaryFa ?? "", out.summaryFa],
+                              ["descriptionFa", "توضیحات", p.descriptionFa ?? "", out.descriptionFa],
+                            ] as const
+                          ).map(([name, label, cur, draft]) => (
+                            <tr key={name} data-testid={`ai-field-${name}`}>
+                              <td>{label}</td>
+                              <td style={{ whiteSpace: "pre-wrap", fontSize: 13 }}>{cur || <span className={styles.muted}>—</span>}</td>
+                              <td style={{ whiteSpace: "pre-wrap", fontSize: 13 }}>{draft || <span className={styles.muted}>—</span>}</td>
+                              <td>{usable && draft && <FillFieldButton name={name} value={draft} className={styles.btnGhost} />}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {out && out.specs.length > 0 && (
+                    <>
+                      <div style={{ fontSize: 13, marginTop: 6 }} data-testid="ai-draft-specs">
+                        مشخصات: {out.specs.map((x) => `${x.labelFa}: ${x.valueFa}${x.unit ? ` ${x.unit}` : ""}`).join(" | ")}
+                      </div>
+                      {usable && (
+                        <ActionForm action={applyDraftSpecsAction} submitLabel="افزودن این مشخصات به مشخصات مشترک" submitVariant="secondary">
+                          <input type="hidden" name="id" value={p.id} />
+                          <input type="hidden" name="draftId" value={d.id} />
+                        </ActionForm>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
 
       {merged.length > 0 && (

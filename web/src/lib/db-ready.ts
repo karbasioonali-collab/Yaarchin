@@ -21,6 +21,7 @@ const schemaState = cache(
     aiTests: boolean;
     import: boolean;
     importEdits: boolean;
+    catalogText: boolean;
   }> => {
     const r = await db.execute<{
       catalog: boolean;
@@ -36,6 +37,7 @@ const schemaState = cache(
       ai_tests: boolean;
       import_ready: boolean;
       import_edits: boolean;
+      catalog_text: boolean;
     }>(sql`
     select
       (to_regclass('public.site_blocks') is not null and to_regclass('public.price_observations') is not null
@@ -63,7 +65,8 @@ const schemaState = cache(
         and to_regclass('public.ai_test_results') is not null and to_regclass('public.ai_suggestions') is not null) as ai_tests,
       (to_regclass('public.raw_pages') is not null and to_regclass('public.raw_page_images') is not null
         and to_regclass('public.listing_external_ids') is not null) as import_ready,
-      to_regclass('public.raw_page_edits') is not null as import_edits`);
+      to_regclass('public.raw_page_edits') is not null as import_edits,
+      to_regclass('public.product_text_drafts') is not null as catalog_text`);
     return {
       catalog: r.rows[0]?.catalog === true,
       importScore: r.rows[0]?.import_score === true,
@@ -78,6 +81,7 @@ const schemaState = cache(
       aiTests: r.rows[0]?.ai_tests === true,
       import: r.rows[0]?.import_ready === true,
       importEdits: r.rows[0]?.import_edits === true,
+      catalogText: r.rows[0]?.catalog_text === true,
     };
   },
 );
@@ -120,3 +124,5 @@ export const importReady = cache(async () => (await schemaState()).import);
 
 // migration ۰۰۱۳: اصلاح‌های انسان روی صفحه‌ی واردشده (raw_page_edits). قبل از آن صفحه‌ی بررسی فقط خواندنی است و ثبت غیرفعال.
 export const importEditsReady = cache(async () => (await schemaState()).importEdits);
+// migration ۰۰۱۴: پیش‌نویس متن فارسی محصول با AI (بخش ۴۰)
+export const catalogTextReady = cache(async () => (await schemaState()).catalogText);
