@@ -45,12 +45,16 @@ setS("auth.enforce_permissions", false);
 const { b, errs, page } = await launch();
 const ad = await page();
 await admin(ad);
-const apiGet = (p, u) => p.evaluate(async (x) => (await fetch(x)).json(), u);
+// no-store: پاسخ API عمومی در مرورگر کش می‌شود (Cache-Control)؛ بعد از تغییر تعداد مرجع باید عدد تازه خوانده شود
+const apiGet = (p, u) => p.evaluate(async (x) => (await fetch(x, { cache: "no-store" })).json(), u);
 
 // ---------- سایت: قیمت برای تعداد مرجع ----------
 {
   const pr = (await apiGet(ad, `/api/v1/products/${SLUG}`)).product;
-  ok(pr.price.refQty === 5000 && Math.abs(pr.price.avg - 0.035) < 1e-9 && pr.price.min === 0.02 && pr.price.max === 0.05, `API: ref qty 5000, exact avg 0.035 (${JSON.stringify(pr.price)})`);
+  ok(
+    pr.price.refQty === 5000 && Math.abs(pr.price.avg - 0.035) < 1e-9 && pr.price.min === 0.02 && pr.price.max === 0.05,
+    `API: ref qty 5000, exact avg 0.035 (${JSON.stringify(pr.price)})`,
+  );
   ok(pr.price.pricedSuppliers === 2, "2 suppliers at ref qty");
   ok(pr.landedCost.status !== "ready" || pr.landedCost.qty === 5000, "landed card opens at ref qty");
   await ad.goto(B + `/p/${SLUG}`);
@@ -73,12 +77,19 @@ const apiGet = (p, u) => p.evaluate(async (x) => (await fetch(x)).json(), u);
   const sum = await ad.getByTestId("ref-summary").innerText();
   ok(sum.includes("۵٬۰۰۰") && sum.includes("۰٫۰۳۵") && sum.includes("۱ لیستینگ با حداقل سفارش بیشتر حساب نشد"), `panel summary (${sum.slice(0, 160)})`);
   const cells = await ad.getByTestId("in-average").allInnerTexts();
-  ok(cells.some((c) => c.includes("حساب نشد: حداقل سفارش ۳۰٬۰۰۰")) && cells.some((c) => c.includes("۰٫۰۵")) && cells.some((c) => c.includes("۰٫۰۲")), `per-listing: excluded and used prices (${cells.join(" / ")})`);
+  ok(
+    cells.some((c) => c.includes("حساب نشد: حداقل سفارش ۳۰٬۰۰۰")) && cells.some((c) => c.includes("۰٫۰۵")) && cells.some((c) => c.includes("۰٫۰۲")),
+    `per-listing: excluded and used prices (${cells.join(" / ")})`,
+  );
   const prof = ad.getByTestId("supplier-profile-link").first();
   ok((await prof.getAttribute("href")) === `https://supplier-a-${run}.en.alibaba.com/` && (await prof.getAttribute("target")) === "_blank", "profile link → Alibaba, new tab");
   const pl = ad.getByTestId("listing-product-link");
   ok((await pl.count()) === 3 && (await pl.first().getAttribute("target")) === "_blank", "product link per listing, new tab");
-  ok((await ad.locator("table").filter({ hasText: "نوع و سابقه" }).innerText()).includes("سابقه در علی‌بابا: ۱ سال") && (await ad.locator("table").filter({ hasText: "نوع و سابقه" }).innerText()).includes("سال تأسیس: 2016"), "type, years and founded year");
+  ok(
+    (await ad.locator("table").filter({ hasText: "نوع و سابقه" }).innerText()).includes("سابقه در علی‌بابا: ۱ سال") &&
+      (await ad.locator("table").filter({ hasText: "نوع و سابقه" }).innerText()).includes("سال تأسیس: 2016"),
+    "type, years and founded year",
+  );
 }
 
 // ---------- تعداد مرجع دستی ----------
@@ -107,15 +118,35 @@ const apiGet = (p, u) => p.evaluate(async (x) => (await fetch(x)).json(), u);
   const rows = box.getByTestId("merge-row");
   const supplierRows = rows.filter({ hasText: "اطلاعات کارخانه" });
   ok((await supplierRows.count()) > 0 && (await supplierRows.locator('input[name="pick"]').count()) === 0, "supplier info rows (brand/origin/model): not selectable");
-  const mat = rows.filter({ hasText: /^Material/ }).first();
-  ok((await mat.count()) === 1 && (await mat.innerText()).includes("مشترک"), "Material: common");
-  ok((await rows.filter({ hasText: "متفاوت" }).count()) > 0, "some rows differ");
-  ok((await mat.locator('input[aria-label="عنوان"]').inputValue()) === "جنس", "dictionary label جنس");
-  await mat.locator('input[name="pick"]').check();
+  const shape = rows.filter({ hasText: /^Shape/ }).first();
+  ok((await shape.innerText()).includes("مشترک"), "Shape (Round in all 3): common");
+  ok(
+    (
+      await rows
+        .filter({ hasText: /^Application/ })
+        .first()
+        .innerText()
+    ).includes("مشترک"),
+    "Application: same items, other order → common",
+  );
+  ok(
+    (
+      await rows
+        .filter({ hasText: /^Material/ })
+        .first()
+        .innerText()
+    ).includes("متفاوت"),
+    "Material (Resin / Other / paper): different",
+  );
+  ok(
+    (await shape.locator('input[aria-label="عنوان"]').inputValue()) === "شکل" && (await shape.locator('input[aria-label="مقدار"]').inputValue()) === "گرد",
+    "dictionary: شکل: گرد",
+  );
+  await shape.locator('input[name="pick"]').check();
   await box.getByRole("button", { name: "افزودن انتخاب‌شده‌ها به مشخصات مشترک" }).click();
-  ok(await waitFor(() => psql(`select specs::text like '%جنس%' from products where id='${prod}'`) === "t"), "picked row saved to product specs");
+  ok(await waitFor(() => psql(`select specs::text like '%شکل%' from products where id='${prod}'`) === "t"), "picked row saved to product specs");
   await ad.goto(B + `/p/${SLUG}`);
-  ok(await vis(ad.getByText("جنس").first()), "site shows the merged spec");
+  ok(await vis(ad.getByText("گرد").first()), "site shows the merged spec");
 }
 
 // ---------- عکس‌ها ----------
@@ -142,7 +173,9 @@ const apiGet = (p, u) => p.evaluate(async (x) => (await fetch(x)).json(), u);
   setS("auth.enforce_permissions", true);
   const role = (keys) => {
     psql("delete from role_permissions where role_id=(select id from roles where key='expert')");
-    psql(`insert into role_permissions (role_id, permission_key) select r.id, k from roles r, unnest(array[${["dashboard.view", ...keys].map((k) => `'${k}'`).join(",")}]) k where r.key='expert'`);
+    psql(
+      `insert into role_permissions (role_id, permission_key) select r.id, k from roles r, unnest(array[${["dashboard.view", ...keys].map((k) => `'${k}'`).join(",")}]) k where r.key='expert'`,
+    );
   };
   const ex = await page();
   await expert(ex);
@@ -190,7 +223,10 @@ const catSlug = `ashtrays-4a-${run}`;
   const manual = one(`insert into categories (name_fa, slug, image) values ('دستی ${run}', 'manual-4a-${run}', 'https://example.com/x.png') returning id`);
   await ad.goto(B + "/admin/categories");
   await ad.getByTestId("fill-icons").getByRole("button", { name: "پر کردن آیکونِ دسته‌های بی‌عکس" }).click();
-  ok(await waitFor(() => psql(`select image from categories where id='${empty}'`) === "/media/icons/categories/packaging.svg"), "fill: empty category gets icon (paper bags → packaging)");
+  ok(
+    await waitFor(() => psql(`select image from categories where id='${empty}'`) === "/media/icons/categories/packaging.svg"),
+    "fill: empty category gets icon (paper bags → packaging)",
+  );
   ok(psql(`select image from categories where id='${manual}'`) === "https://example.com/x.png", "fill: manual image untouched");
   ok(psql(`select count(*) from categories where image is null`) === "0", "no category without image after fill");
   await ad.reload();

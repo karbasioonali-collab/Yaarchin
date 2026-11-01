@@ -96,6 +96,8 @@ const ash = [L("l1", "A", fx(1)), L("l2", "A", fx(2)), L("l3", "B", fx(3))];
   const u = translateSpec("Shape", "Hexagon Star");
   ok(u.labelFa === "شکل" && u.valueFa === "Hexagon Star" && !u.translated.value, "unknown value stays English (for human/AI)");
   ok(translateSpec("Color", "Black, White").valueFa === "مشکی، سفید", "list of known values");
+  ok(row("Application").common && !row("Material").common && row("Shape").common, "Application same items reordered → common; Material differs; Shape common");
+  ok(translateSpec("Single package size", "9X9X3.1 cm").valueFa === "9×9×3.1", "capital X as dimension separator");
   const one = mergeSpecs([{ listingId: "1", attributes: [{ name: "Material", value: "Paper" }] }]);
   ok(one[0].common, "single listing: rows count as common");
   const diff = mergeSpecs([

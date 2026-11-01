@@ -217,9 +217,9 @@ export type SpecFa = { labelFa: string; valueFa: string; unit: string; translate
 
 // «9*9*3.1cm» / «25 pieces» / «0.005 kg» ← عدد و واحد جدا
 function splitUnit(value: string): { value: string; unit: string } | null {
-  const m = /^\s*([\d.,]+(?:\s*[*x×]\s*[\d.,]+){0,2})\s*([a-zA-Z]+)\s*$/.exec(value);
+  const m = /^\s*([\d.,]+(?:\s*[*x×]\s*[\d.,]+){0,2})\s*([a-z]+)\s*$/i.exec(value);
   if (!m || !UNIT_FA[m[2].toLowerCase()]) return null;
-  return { value: m[1].replace(/\s*[*x×]\s*/g, "×"), unit: UNIT_FA[m[2].toLowerCase()] };
+  return { value: m[1].replace(/\s*[*x×]\s*/gi, "×"), unit: UNIT_FA[m[2].toLowerCase()] };
 }
 
 // ترجمه‌ی یک ردیف مشخصات از واژه‌نامه؛ هرچه پیدا نشد همان انگلیسی می‌ماند (translated=false) تا انسان یا AI ترجمه کند

@@ -16,6 +16,14 @@ export type MergedRow = {
   suggestion: SpecFa;
 };
 
+const canonList = (v: string) =>
+  v
+    .split(/\s*[,،/;]\s*/)
+    .map(norm)
+    .filter(Boolean)
+    .sort()
+    .join(",");
+
 export function mergeSpecs(listings: ListingSpecs[]): MergedRow[] {
   const rows = new Map<string, MergedRow>();
   listings.forEach((l, i) => {
@@ -37,7 +45,8 @@ export function mergeSpecs(listings: ListingSpecs[]): MergedRow[] {
   });
   for (const r of rows.values()) {
     const present = r.values.filter((v): v is string => v !== null);
-    const distinct = [...new Set(present.map(norm))];
+    // فهرستِ همان اقلام با ترتیب دیگر («Car, Home» و «Home, Car») یکی حساب می‌شود
+    const distinct = [...new Set(present.map(canonList))];
     r.common = distinct.length === 1 && (present.length >= 2 || listings.length === 1);
     const value = distinct.length === 1 ? present[0] : [...new Set(present)].join("، ");
     r.suggestion = translateSpec(r.name, value);
