@@ -15,7 +15,7 @@ import { alertNewChat } from "@/lib/chat/alerts";
 import type { CustomerPostResult } from "@/lib/chat/service";
 import { reportsReady } from "@/lib/db-ready";
 import { scoresFor } from "@/lib/leads/score";
-import { clarifyBudget, signalsFromMessage, stripSignals } from "@/lib/leads/signals";
+import { clarifyBudget, signalsFromMessage } from "@/lib/leads/signals";
 import { budgetClarifyAsked, marketRates, recordSignals } from "@/lib/leads/signals-store";
 import { absoluteUrl, siteUrl } from "@/lib/site/url";
 import { addUsage, AiCallError, chatCompletion, type ChatMsg, type ModelReply, type Usage, ZERO_USAGE } from "./client";
@@ -25,7 +25,7 @@ import { fakeModel } from "./fake";
 import { checkOutput, GUARD_REPLACEMENT } from "./guard";
 import { blacklistTerms } from "./guard-terms";
 import { BusyError, withSlot } from "./limiter";
-import { type Decision, FORMAT_REMINDER, parseDecision } from "./decision";
+import { type Decision, FORMAT_REMINDER, readReply } from "./decision";
 import { normFa } from "./normalize";
 import { LANDED_TOOL, PROMPT_VERSION, SYSTEM_PROMPT } from "./prompt";
 import { cannedReply } from "./canned";
@@ -143,7 +143,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
   let usage: Usage = ZERO_USAGE;
   let modelUsed: string | null = null;
   let fallbackUsed = 0;
-  let decision: Decision | null = null;
+  let decision: ReturnType<typeof readReply> = null;
   let raws: string[] = [];
   let content = "";
   try {
@@ -154,7 +154,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
     fallbackUsed = out.fallbackUsed;
     raws = out.raws;
     content = out.content;
-    decision = parseDecision(out.content);
+    decision = readReply(out.content);
   } catch (e) {
     const kind = e instanceof BusyError ? "busy" : "error";
     const reqId = await rec(e instanceof AiCallError && e.kind === "timeout" ? "timeout" : "error", kind, {
@@ -165,8 +165,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
   }
   // نشانه‌های جدیت از خط signals مدل (بخش ۴۳). خط signals و هر تکه‌ی جامانده‌اش هرگز به مشتری نمی‌رسد.
   // تعداد با کد قبلاً در API چت ثبت شده (via=code)؛ اینجا فقط نشانه‌های مدل. ذخیره فقط در حالت زنده.
-  const strip = decision ? stripSignals(decision.answer) : { text: "", leaked: false };
-  if (decision) decision.answer = strip.text;
+  // decision.answer از قبل پاک شده (readReply ← clean-answer.ts)
   const sig = decision ? signalsFromMessage(msg.body, content, await marketRates()) : null;
   const modelSigs = sig?.signals.filter((s) => s.via === "ai") ?? [];
   const saveSigs = (clarifyAsked = false) =>
@@ -193,10 +192,11 @@ export async function runAgent(c: RunCtx): Promise<void> {
       kb: site.kb.map((k) => k.id),
       ...(modelSigs.length ? { signals: modelSigs.map((s) => `${s.key}=${s.valueNum ?? s.valueText}`) } : {}),
       ...(sig?.ignoredModel ? { signalsIgnored: true } : {}),
-      ...(strip.leaked ? { signalsLeak: true } : {}),
+      ...(decision?.clean.leaked ? { signalsLeak: true, cleaned: decision.clean.removed.map((x) => x.slice(0, 300)) } : {}),
       products: site.products.map((p) => p.slug),
-      // خروجی خام مدل وقتی قالبش نادرست بود (برای «آخرین درخواست‌ها» در پنل)؛ retry = یک بار با یادآوری قالب دوباره پرسیده شد
-      ...(raws.length > 1 || !decision ? { retry: raws.length > 1 ? 1 : 0, raw: raws.map((r) => r.slice(0, 2000)) } : {}),
+      // خروجی خام مدل برای همه‌ی درخواست‌ها (از بخش ۴۴؛ «آخرین درخواست‌ها» فقط برای مدیر)؛ retry = یک بار با یادآوری قالب دوباره پرسیده شد
+      ...(raws.length > 1 ? { retry: 1 } : {}),
+      raw: raws.map((r) => r.slice(0, 2000)),
     },
   };
   // «پیشنهاد سؤال تازه» (فقط چت زنده؛ بخش ۳۳)
@@ -299,7 +299,7 @@ export async function converse(mode: Mode, site: SiteContext, prior: { role: "us
       const content = r.content ?? "";
       raws.push(content);
       // قالب نادرست ← یک بار یادآوری. (ابزار در درخواست می‌ماند: Claude درخواستی را که در تاریخچه‌اش tool call هست ولی tools ندارد رد می‌کند.)
-      if (raws.length === 1 && !parseDecision(content)) {
+      if (raws.length === 1 && !readReply(content)) {
         msgs.push({ role: "assistant", content: content.trim() || "(خالی)" }, { role: "user", content: FORMAT_REMINDER });
         continue;
       }

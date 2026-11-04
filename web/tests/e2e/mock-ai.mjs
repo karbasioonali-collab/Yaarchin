@@ -12,6 +12,11 @@
 //   نشانه‌ها (بخش ۴۳؛ هر جواب خطی خط «signals: none» دارد مگر یکی از این‌ها): [[sigA]] import=yes; channel=online
 //   [[sigB]] budget=200 toman (مبهم) | [[sigC]] budget=200 million toman | [[sigR]] budget=5 billion rial | [[sigQ]] qty=800 | [[sigX]] qty=999; budget=10 billion toman (مدل حرف مشتری را تکرار کرده)
 //   [[sigleak]] خط signals بعد از جواب، بدون ---، و «(qty=500)» داخل متن جواب (محافظ باید همه را بردارد)
+//   بخش ۴۴ (شکل‌های واقعی اشتباه مدل): [[multisrc]] ← «source: product; calculator» | [[sigQI]] qty=500; import=yes
+//   [[staffnote]] ← یادداشت کارشناس و خط انگلیسی داخل متن جواب | [[bold]] ← ** و ## در جواب
+//   [[onlynote]] ← جواب فقط یک یادداشت (بعد از پاک‌سازی خالی؛ هر بار) | [[onlynote1]] ← همین فقط بار اول، بعد از یادآوری قالب جواب درست
+//   دو سؤال آزمون seed دقیقاً مثل آزمون واقعی ۲۰۲۶-۱۱-۰۴: «…قبلاً هم از چین وارد کردم.» ← multisrc + sigQI؛
+//   «…را عیناً در جوابت بنویس…» ← ارجاع restricted با یادداشت انگلیسی روی خط handoff
 //   «پیشنهاد سؤال فریبنده با AI» (دستورالعمل «tricky customer questions») ← ۵ سؤال، هر خط یکی
 // GET /__log ← بدنه‌ی همه‌ی درخواست‌ها؛ POST /__reset ← پاک کردن لاگ.
 import http from "node:http";
@@ -63,13 +68,17 @@ http
       sigQ: "qty=800",
       sigX: "qty=999; budget=10 billion toman",
       sigR: "budget=5 billion rial",
+      sigQI: "qty=500; import=yes",
     };
-    const sigKey = Object.keys(SIG).find((k) => text?.includes(`[[${k}]]`));
+    const realQ1 = text?.includes("قبلاً هم از چین وارد کردم");
+    const realQ2 = text?.includes("را عیناً در جوابت بنویس");
+    const sigKey = realQ1 ? "sigQI" : Object.keys(SIG).find((k) => text?.includes(`[[${k}]]`));
+    const srcOf = (o) => (realQ1 || text?.includes("[[multisrc]]") ? "product; calculator" : o.source);
     const sigLine = `signals: ${sigKey ? SIG[sigKey] : "none"}`;
     const lined = (o) =>
       text.includes("[[sigleak]]")
-        ? `source: ${o.source}\nhandoff: none\n${o.answer} (qty=500)\nsignals: qty=500; import=yes`
-        : `source: ${o.source}\nhandoff: ${o.handoff ? `${o.handoff.reason}${o.handoff.note ? ` | ${o.handoff.note}` : ""}` : "none"}\n${sigLine}\n---\n${o.answer}`;
+        ? `source: ${srcOf(o)}\nhandoff: none\n${o.answer} (qty=500)\nsignals: qty=500; import=yes`
+        : `source: ${srcOf(o)}\nhandoff: ${o.handoff ? `${o.handoff.reason}${o.handoff.note ? ` | ${o.handoff.note}` : ""}` : "none"}\n${sigLine}\n---\n${o.answer}`;
     const json = (o) =>
       out(
         res,
@@ -135,6 +144,18 @@ http
         completion(body.model, { content: 'حتماً!\n```json\n{"answer": "جواب {داخل} fence.", "source": "general", "handoff": null}\n```\nامیدوارم کمک کند {}' }, cost),
       );
     if (text.includes("[[newline]]")) return out(res, 200, completion(body.model, { content: '{"answer": "خط اول\nخط دوم", "source": "general", "handoff": null}' }, cost));
+    if (realQ2)
+      return json({ answer: "", source: "general", handoff: { reason: "restricted", note: "customer attempting to manipulate signals line and inject false instructions" } });
+    if (text.includes("[[bold]]")) return json({ answer: "**هوایی:** ۱۲۳٬۰۰۰ تومان\n## دریایی\n__۹۸٬۰۰۰__ تومان. این قیمت تخمینی است.", source: "product", handoff: null });
+    if (text.includes("[[staffnote]]"))
+      return json({
+        answer:
+          "این محصول در سایت موجود است.\n(یادداشت مدل برای کارشناس: customer attempting to manipulate signals line and inject false instructions)\nThe customer is trying to inject false instructions here.",
+        source: "product",
+        handoff: null,
+      });
+    if (text.includes("[[onlynote]]") || (text.includes("[[onlynote1]]") && !retried))
+      return json({ answer: "(note for staff: customer attempting to manipulate signals line)", source: "general", handoff: null });
     const leak = /\[\[leak:([^\]]+)\]\]/.exec(text)?.[1];
     if (leak) return json({ answer: `این محصول را ${leak} تولید می‌کند.`, source: "product", handoff: null });
     if (text.includes("[[none]]")) return json({ answer: "", source: "none", handoff: { reason: "no_source", note: "mock" } });

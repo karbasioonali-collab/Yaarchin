@@ -42,16 +42,30 @@ export type Signal = {
 };
 
 // ---------- تعداد با کد ----------
-// سخت‌گیرتر از extractQty ماشین‌حساب: عدد + واحد شمارش (عدد، دونه، کارتن، جفت، ست، بسته، pcs، …)،
-// یا عدد + «تا» همراه فعل خرید/نیاز در همان جمله. کنار تومان/دلار/ریال/درصد/روز/سال، یا عدد تلفن، حساب نمی‌شود.
+// سخت‌گیرتر از extractQty ماشین‌حساب (بخش ۴۴):
+//   عدد + واحد شمارش (عدد، دونه، کارتن، جفت، ست، بسته، pcs، …) ← تعداد، بدون نیاز به فعل
+//   عدد + «تا» (یا «هزار/میلیون» بدون واحد) ← فقط اگر فعل خرید/نیاز با حداکثر ۳ کلمه فاصله، داخل همان جمله بیاید
+//     («۱۰۰۰ تا بگیرم»، «۵۰۰ تا مخلوط‌کن می‌خوام»، «۵۰۰ تا از این مخلوط‌کن می‌خوام»). مرز جمله: : ؟ ? ، , . ! ؛ و خط تازه
+//     ← «۲ تا سؤال دارم: حداقل سفارش …» تعداد نیست («سفارش» در جمله‌ی بعد است).
+//   کنار تومان/دلار/ریال/درصد/روز/…، یا عدد تلفن، حساب نمی‌شود.
+// نیم‌فاصله قبل از normFa حذف می‌شود («مخلوط‌کن» یک کلمه بماند، «می‌خوام» ← «میخوام»).
 const UNIT = "(?:عدد|دونه|دانه|کارتن|جفت|ست|بسته|پیس|piece|pieces|pcs|pc|unit|units)";
 const SCALE = "(?:هزار|k|میلیون)";
 const BUY = /(میخوام|میخواهم|می خوام|می خواهم|لازم دارم|نیاز دارم|میخوایم|می خوایم|سفارش|خرید|بخرم|بخریم|بگیرم|بگیریم|وارد کنم|وارد کنیم|میگیرم|می گیرم|احتیاج)/;
 const PRICE_Q = /(چند|چقدر|قیمت|هزینه|درمیاد|در میاد|میشه|می شه|تموم میشه)/;
 const NOT_QTY = /^\s*(تومان|تومن|ریال|دلار|یوان|درصد|٪|%|روز|هفته|ماه|سال|ساعت|دقیقه|کیلو|گرم|متر|سانت)/;
+const SENTENCE_END = /[:：؟?،,.!؛;\n]/;
+const MAX_GAP_WORDS = 3;
+
+// فعل خرید با حداکثر ۳ کلمه فاصله در همان جمله؟
+function buyVerbNear(rest: string): boolean {
+  const clause = rest.split(SENTENCE_END)[0];
+  const m = BUY.exec(clause);
+  return !!m && clause.slice(0, m.index).trim().split(/\s+/).filter(Boolean).length <= MAX_GAP_WORDS;
+}
 
 export function extractOrderQty(text: string): { qty: number; priceQuestion: boolean } | null {
-  const n = normFa(text)
+  const n = normFa(text.replace(/\u200c/g, ""))
     .replace(/(\d),(?=\d{3}\b)/g, "$1")
     .replace(/٬/g, "");
   // تلفن و کد (۸ رقم یا بیشتر پشت هم) عدد سفارش نیست
@@ -60,13 +74,13 @@ export function extractOrderQty(text: string): { qty: number; priceQuestion: boo
   const re = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(${SCALE})?\\s*(${UNIT}|تا)?(?![\\p{L}])(?=([^\\d]{0,12})(\\d)?)`, "gu");
   let best: number | null = null;
   for (const m of clean.matchAll(re)) {
-    const [, numRaw, scale, unit, after, nextDigit] = m;
+    const [whole, numRaw, scale, unit, after, nextDigit] = m;
     if (!unit && !scale) continue;
+    if (NOT_QTY.test(after ?? "")) continue;
     // «۱۰ تا ۲۰ روز» بازه است، نه تعداد (عدد دوم با واحد خودش جدا خوانده می‌شود)
     if (unit === "تا" && nextDigit && /^\s*$/.test(after ?? "")) continue;
-    if (NOT_QTY.test(after ?? "")) continue;
-    if (unit === "تا" && !BUY.test(clean)) continue;
-    if (!unit && scale && !BUY.test(clean)) continue;
+    const rest = clean.slice((m.index ?? 0) + whole.length);
+    if ((unit === "تا" || (!unit && scale)) && !buyVerbNear(rest)) continue;
     let v = Number(numRaw);
     if (scale === "هزار" || scale === "k") v *= 1000;
     if (scale === "میلیون") v *= 1_000_000;

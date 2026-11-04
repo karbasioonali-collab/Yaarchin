@@ -10,12 +10,12 @@ import { AiCallError } from "./client";
 import { aiConfig } from "./config";
 import { buildContext } from "./context";
 import { cannedReply } from "./canned";
-import { type Decision, parseDecision } from "./decision";
+import { readReply } from "./decision";
 import { checkOutput } from "./guard";
 import { blacklistTerms } from "./guard-terms";
 import { BusyError, withSlot } from "./limiter";
 import { converse, HANDOFF_TEXT, modelHandoffReason, RESTRICTED_TEXT } from "./agent";
-import { signalsFromMessage, signalTag, stripSignals } from "@/lib/leads/signals";
+import { signalsFromMessage, signalTag } from "@/lib/leads/signals";
 import { marketRates } from "@/lib/leads/signals-store";
 import { PROMPT_VERSION } from "./prompt";
 import { extractQty, pleasantry, preRule } from "./rules";
@@ -212,10 +212,10 @@ export async function evaluateQuestion(
     const id = await rec(e instanceof AiCallError && e.kind === "timeout" ? "timeout" : "error", "error", { error: msg.slice(0, 500), model: modelName() });
     return done({ path: "error", source: null, handoff: "error", answer: msg, guardHits: [] }, id);
   }
-  const decision: Decision | null = parseDecision(out.content);
-  const strip = decision ? stripSignals(decision.answer) : { text: "", leaked: false };
+  // answer هر نتیجه = متنی که مشتری در چت واقعی می‌دید (بررسی‌های خودکار فقط روی همین؛ بخش ۴۴).
+  // خروجی خام مدل (با خط handoff و یادداشتش) در meta.raw درخواست است و صفحه‌ی اجرا جدا «فقط برای شما» نشانش می‌دهد.
+  const decision = readReply(out.content);
   if (decision) {
-    decision.answer = strip.text;
     const sig = signalsFromMessage(question, out.content, await marketRates());
     signals = sig.signals.map(signalTag);
   }
@@ -229,20 +229,21 @@ export async function evaluateQuestion(
       cachedTokens: out.usage.cachedTokens ?? 0,
       products: site.products.map((p) => p.slug),
       ...(signals.length ? { signals } : {}),
-      ...(strip.leaked ? { signalsLeak: true } : {}),
-      ...(out.raws.length > 1 || !decision ? { retry: out.raws.length > 1 ? 1 : 0, raw: out.raws.map((r) => r.slice(0, 2000)) } : {}),
+      ...(decision?.clean.leaked ? { signalsLeak: true, cleaned: decision.clean.removed.map((x) => x.slice(0, 300)) } : {}),
+      ...(decision?.handoff?.note ? { handoffNote: decision.handoff.note } : {}),
+      ...(out.raws.length > 1 ? { retry: 1 } : {}),
+      raw: out.raws.map((r) => r.slice(0, 2000)),
     },
   };
   const cost = out.usage.costToman;
   if (!decision) {
     const id = await rec("parse_error", "parse", base);
-    return done({ path: "model", source: null, handoff: "parse", answer: out.content.slice(0, 2000), guardHits: [] }, id, cost);
+    return done({ path: "model", source: null, handoff: "parse", answer: HANDOFF_TEXT, guardHits: [] }, id, cost);
   }
   const reason = modelHandoffReason(decision);
   if (reason) {
     const id = await rec("handoff", reason, base);
-    const note = decision.handoff?.note ? `\n(یادداشت مدل برای کارشناس: ${decision.handoff.note})` : "";
-    return done({ path: "model", source: null, handoff: reason, answer: (reason === "restricted" ? RESTRICTED_TEXT : HANDOFF_TEXT) + note, guardHits: [] }, id, cost);
+    return done({ path: "model", source: null, handoff: reason, answer: reason === "restricted" ? RESTRICTED_TEXT : HANDOFF_TEXT, guardHits: [] }, id, cost);
   }
   const g = checkOutput(decision.answer, ctx.blacklist);
   if (!g.ok) {
