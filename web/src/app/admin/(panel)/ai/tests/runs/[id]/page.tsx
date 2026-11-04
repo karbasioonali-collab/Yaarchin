@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
-import { aiTestResults, aiTestRuns } from "@/db/schema";
+import { aiRequests, aiTestResults, aiTestRuns } from "@/db/schema";
 import { HANDOFF_FA } from "@/lib/ai/rules";
 import type { Check } from "@/lib/ai/test-checks";
 import { SCOPE_FA } from "@/lib/ai/tests";
@@ -26,6 +26,17 @@ export default async function RunPage({ params }: PageProps<"/admin/ai/tests/run
   const [run] = await db.select().from(aiTestRuns).where(eq(aiTestRuns.id, id));
   if (!run) notFound();
   const results = await db.select().from(aiTestResults).where(eq(aiTestResults.runId, id)).orderBy(asc(aiTestResults.position));
+  // خروجی خام مدل هر سؤال (با خط handoff و یادداشت کارشناس) از meta درخواستش؛ «فقط برای شما»، جدا از جوابی که مشتری می‌دید (بخش ۴۴)
+  const reqIds = results.map((r) => r.requestId).filter((x): x is number => x !== null);
+  const rawOf = new Map(
+    (reqIds.length ? await db.select({ id: aiRequests.id, meta: aiRequests.meta }).from(aiRequests).where(inArray(aiRequests.id, reqIds)) : []).map((x) => {
+      const m = (x.meta ?? {}) as { raw?: unknown; cleaned?: unknown };
+      return [
+        x.id,
+        { raws: Array.isArray(m.raw) ? m.raw.filter((y): y is string => typeof y === "string") : [], cleaned: Array.isArray(m.cleaned) ? (m.cleaned as string[]) : [] },
+      ];
+    }),
+  );
   const running = run.status === "running";
   const handled = run.done + run.skipped;
   return (
@@ -109,6 +120,20 @@ export default async function RunPage({ params }: PageProps<"/admin/ai/tests/run
                             {r.handoffReason && ` · ارجاع: ${HANDOFF_FA[r.handoffReason] ?? r.handoffReason}`}
                           </div>
                           {r.answer && <div style={{ whiteSpace: "pre-wrap" }}>{r.answer}</div>}
+                          {r.requestId !== null && (rawOf.get(r.requestId)?.raws.length ?? 0) > 0 && (
+                            <details style={{ fontSize: 12, marginTop: 4 }} data-testid="result-raw">
+                              <summary>خروجی خام مدل (فقط برای شما؛ مشتری نمی‌بیند)</summary>
+                              {rawOf.get(r.requestId)!.raws.map((x, i, all) => (
+                                <div key={i}>
+                                  {all.length > 1 && <div className={styles.muted}>{i === 0 ? "تلاش اول" : "بعد از یادآوری قالب"}</div>}
+                                  <pre dir="auto" style={{ whiteSpace: "pre-wrap", margin: "4px 0", maxHeight: 240, overflow: "auto" }}>
+                                    {x || "(خالی)"}
+                                  </pre>
+                                </div>
+                              ))}
+                              {rawOf.get(r.requestId)!.cleaned.length > 0 && <div className={styles.muted}>از متن مشتری حذف شد: {rawOf.get(r.requestId)!.cleaned.join(" · ")}</div>}
+                            </details>
+                          )}
                           {r.status === "done" && (
                             <div className={styles.muted} style={{ fontSize: 12 }}>
                               {fmtNum(Math.round(Number(r.costToman)))} تومان · {r.latencyMs !== null ? `${fmtNum(Math.round(r.latencyMs / 100) / 10)} ث` : "—"}

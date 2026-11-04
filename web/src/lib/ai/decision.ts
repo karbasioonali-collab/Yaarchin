@@ -11,6 +11,7 @@
 //   شکستن خط یا tab خام داخل رشته (JSON.parse آن را نمی‌پذیرد)؛ اسم دیگر فیلد جواب (reply/response/text/message)؛
 //   handoff به‌شکل رشته‌ی "null" یا فقط اسم دلیل.
 import { SIGNALS_LINE } from "../leads/signals";
+import { cleanAnswer, type CleanResult } from "./clean-answer";
 
 export type Decision = { answer: string; source: string; handoff: { reason: string; note?: string } | null };
 
@@ -104,12 +105,14 @@ export function parseLines(content: string): Decision | null {
   const lines = text.split("\n");
   const si = lines.findIndex((l) => /^\s*\**\s*source\s*\**\s*[:：]/i.test(l));
   if (si < 0) return null;
+  // دستورالعمل یک مقدار می‌خواهد، ولی مدل گاهی چند تا می‌نویسد («product; calculator»، «product, calculator»، «product | calculator»):
+  // اولین مقدار معتبر. منبع ناشناخته همچنان نامعتبر است (بخش ۴۴).
   const source = lines[si]
     .replace(/^[^:：]*[:：]/, "")
-    .replace(/[*`"']/g, "")
-    .trim()
-    .toLowerCase();
-  if (!(SOURCES as readonly string[]).includes(source)) return null;
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .find((x) => (SOURCES as readonly string[]).includes(x));
+  if (!source) return null;
   let handoff: Decision["handoff"] = null;
   let end = si;
   const hi = lines.findIndex((l, i) => i > si && i <= si + 3 && /^\s*\**\s*handoff\s*\**\s*[:：]/i.test(l));
@@ -134,6 +137,16 @@ export function parseLines(content: string): Decision | null {
   return { answer: body, source, handoff };
 }
 
+// جواب آماده‌ی مشتری: خواندن قالب + پاک‌کننده (clean-answer.ts). null = ناخوانا: قالب نادرست، یا جوابی که بعد از پاک‌سازی
+// تقریباً خالی ماند (بدون ارجاع) ← همان رفتار جواب ناخوانا: یک بار یادآوری قالب، بعد ارجاع «parse».
+export function readReply(content: string): (Decision & { clean: CleanResult }) | null {
+  const d = parseDecision(content);
+  if (!d) return null;
+  const clean = cleanAnswer(d.answer);
+  if (clean.tooShort && !d.handoff) return null;
+  return { ...d, answer: clean.text, clean };
+}
+
 export function parseDecision(content: string): Decision | null {
   const lined = parseLines(content);
   if (lined) return lined;
@@ -152,4 +165,4 @@ handoff: <none|restricted|no_source|complaint|discount|final_price|proforma|big_
 signals: <none, or qty=…; budget=…; import=…; channel=…>
 ---
 <reply in Persian>
-source must be one of those five values (general for a greeting or a general definition).`;
+source must be exactly one of those five values (general for a greeting or a general definition). Plain text, no Markdown, no staff notes in the reply.`;

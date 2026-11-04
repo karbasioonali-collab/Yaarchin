@@ -45,7 +45,9 @@ const CANNED_FIELDS: [keyof typeof CANNED_DEFAULTS, string, string][] = [
 
 // وضعیت، تست اتصال، سقف‌ها، لیست سیاه و لاگ درخواست‌های دستیار هوشمند (ai.settings). docs/infoyaarchin.md بخش ۲۹.
 export default async function AiPage() {
-  await requirePermission("ai.settings");
+  const a = await requirePermission("ai.settings");
+  // خروجی خام مدل فقط برای مدیر (بخش ۴۴)
+  const isAdmin = a.user.isAdmin;
   const ready = await aiReady();
   const cfg = aiConfig();
   const zero = { requests: 0, costToman: 0, promptTokens: 0, completionTokens: 0 };
@@ -274,7 +276,7 @@ export default async function AiPage() {
                     {STATUS_FA[r.status] ?? r.status}
                     {r.outcome && <div className={styles.muted}>{SOURCE_FA[r.outcome] ?? HANDOFF_FA[r.outcome] ?? r.outcome}</div>}
                     {r.error && <div style={{ color: "#B3261E", fontSize: 12 }}>{r.error}</div>}
-                    <RawOutput meta={r.meta} />
+                    {isAdmin && <RawOutput meta={r.meta} />}
                   </td>
                   <td className={styles.ltr} style={{ fontSize: 12 }}>
                     {r.model ?? "—"}
@@ -309,7 +311,7 @@ function RawOutput({ meta }: { meta: unknown }) {
   if (!raws.length && !blocked) return null;
   return (
     <details style={{ fontSize: 12, marginTop: 4 }}>
-      <summary>{blocked ? "جواب ردشده" : m.retry ? "خروجی خام مدل (با تلاش دوباره)" : "خروجی خام مدل"}</summary>
+      <summary data-testid="raw-output">{blocked ? "جواب ردشده" : m.retry ? "خروجی خام مدل (با تلاش دوباره؛ فقط مدیر)" : "خروجی خام مدل (فقط مدیر)"}</summary>
       {blocked && <pre style={{ whiteSpace: "pre-wrap", direction: "rtl", margin: "4px 0" }}>{blocked}</pre>}
       {raws.map((x, i) => (
         <div key={i}>
