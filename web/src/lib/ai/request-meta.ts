@@ -1,7 +1,16 @@
 // خواندن meta یک ردیف ai_requests برای نمایش در پنل (بخش ۴۵). خالص.
 import type { CallLog } from "./call-log";
 
-export type RequestMetaView = { raws: string[]; calls: CallLog[]; cleaned: string[]; handoffNote: string | null; blocked: string | null; retry: boolean };
+export type RequestMetaView = {
+  raws: string[];
+  calls: CallLog[];
+  cleaned: string[];
+  handoffNote: string | null;
+  blocked: string | null;
+  retry: boolean;
+  // عددهای مشکوک جواب (بخش ۴۶)
+  suspects: string[];
+};
 
 const strs = (x: unknown) => (Array.isArray(x) ? x.filter((y): y is string => typeof y === "string") : []);
 
@@ -14,6 +23,7 @@ export function readRequestMeta(meta: unknown): RequestMetaView {
     handoffNote: typeof m.handoffNote === "string" ? m.handoffNote : null,
     blocked: typeof m.blocked === "string" ? m.blocked : null,
     retry: !!m.retry,
+    suspects: strs(m.suspectNumbers),
   };
 }
 
@@ -24,6 +34,6 @@ export function callLine(c: CallLog): string {
   if (c.inTok !== undefined) parts.push(`${(c.inTok ?? 0).toLocaleString("fa-IR")} → ${(c.outTok ?? 0).toLocaleString("fa-IR")} توکن`);
   if (c.error) parts.push(`خطا: ${c.error === "timeout" ? "دیر شد" : c.error}`);
   else if (c.finish) parts.push(FINISH_FA[c.finish] ?? c.finish);
-  if (c.reminder) parts.push(c.reminder === "length" ? "بعد از یادآوری «کوتاه‌تر»" : "بعد از یادآوری قالب");
+  if (c.reminder) parts.push(c.reminder === "length" ? "بعد از یادآوری «کوتاه‌تر»" : c.reminder === "numbers" ? "بعد از یادآوری «فقط عدد داده‌ها»" : "بعد از یادآوری قالب");
   return parts.join(" · ");
 }

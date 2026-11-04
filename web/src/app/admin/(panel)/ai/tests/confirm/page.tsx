@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { aiConfig } from "@/lib/ai/config";
 import { casesFor, estimateFor, runningRun, type Scope, type ScopeKind, SCOPE_FA } from "@/lib/ai/tests";
+import { publishedTitles } from "@/lib/ai/price-answer";
 import { ruleCaught } from "@/lib/ai/test-checks";
 import { aiLimits } from "@/lib/ai/usage";
 import { requirePermission } from "@/lib/auth/can";
@@ -23,7 +24,7 @@ export default async function ConfirmPage({ searchParams }: PageProps<"/admin/ai
   const kind: ScopeKind = ids.length ? "selected" : String(sp.scope) in SCOPE_FA ? (String(sp.scope) as ScopeKind) : "all";
   const scope: Scope = { kind, ids };
   const [cases, limits, busy] = await Promise.all([casesFor(scope), aiLimits(), runningRun()]);
-  const est = await estimateFor(cases);
+  const [est, titles] = await Promise.all([estimateFor(cases), publishedTitles(cases.map((c) => c.productSlug).filter((x): x is string => !!x))]);
   const over = est.live && est.toman > est.remainingToman;
   const error = typeof sp.error === "string" ? sp.error : null;
   return (
@@ -94,7 +95,7 @@ export default async function ConfirmPage({ searchParams }: PageProps<"/admin/ai
                 <tr key={c.id}>
                   <td>{c.question}</td>
                   <td style={{ fontSize: 13 }}>{CATEGORY_FA[c.category]}</td>
-                  <td style={{ fontSize: 13 }}>{ruleCaught(c.question, limits.bigOrderQty) ? "رایگان" : "مدل"}</td>
+                  <td style={{ fontSize: 13 }}>{ruleCaught(c.question, limits.bigOrderQty, c.productSlug ? titles.get(c.productSlug) : null) ? "رایگان" : "مدل"}</td>
                 </tr>
               ))}
             </tbody>

@@ -11,6 +11,7 @@ import { aiConfig } from "./config";
 import { buildContext } from "./context";
 import { cannedReply } from "./canned";
 import { readReply } from "./decision";
+import { priceAnswer, publishedTitles } from "./price-answer";
 import { checkOutput } from "./guard";
 import { blacklistTerms } from "./guard-terms";
 import { BusyError, withSlot } from "./limiter";
@@ -20,7 +21,7 @@ import { marketRates } from "@/lib/leads/signals-store";
 import { PROMPT_VERSION } from "./prompt";
 import { extractQty, pleasantry, preRule } from "./rules";
 import { allPass, DEFAULT_AVG_TOMAN, estimateRun, ruleCaught, runChecks, type TestExpect, type TestOutcome } from "./test-checks";
-import { aiLimits, avgModelCost, testLimits, todayUsage } from "./usage";
+import { aiLimits, avgModelCost, blockInventedNumbers, testLimits, todayUsage } from "./usage";
 
 // اجرایی که این مدت ضربان نداشته (سرور وسط کار ری‌استارت شد) ← interrupted
 export const RUN_STALE_MS = 5 * 60_000;
@@ -96,8 +97,9 @@ export async function estimateFor(cases: TestCase[]): Promise<Estimate> {
   const live = testMode() === "live";
   const [limits, tl, avg, used] = await Promise.all([aiLimits(), testLimits(), avgModelCost(), todayUsage("test")]);
   const avgToman = avg ?? DEFAULT_AVG_TOMAN;
+  const titles = await publishedTitles(cases.map((c) => c.productSlug).filter((x): x is string => !!x));
   const e = estimateRun(
-    cases.map((c) => c.question),
+    cases.map((c) => ({ question: c.question, productTitle: c.productSlug ? titles.get(c.productSlug) : null })),
     { bigOrderQty: limits.bigOrderQty, avgToman, live },
   );
   return {
@@ -188,6 +190,9 @@ export async function evaluateQuestion(
   if (kind) return done({ path: "canned", source: "canned", handoff: null, answer: await cannedReply(kind, productId), guardHits: [] });
   const pre = preRule(question, { bigOrderQty: ctx.bigOrderQty });
   if (pre) return done({ path: "rule", source: null, handoff: pre, answer: pre === "restricted" ? RESTRICTED_TEXT : HANDOFF_TEXT, guardHits: [] });
+  // «جواب قیمت با کد» (بخش ۴۶): همان مسیر چت؛ منبع «محصول»، بدون مدل و هزینه
+  const priced = await priceAnswer(productId, question);
+  if (priced) return done({ path: "price", source: "product", handoff: null, answer: priced, guardHits: [] });
 
   const site = await buildContext(question, productId, extractQty(question));
   const rec = (status: string, outcome: string | null, extra: Partial<typeof aiRequests.$inferInsert>) =>
@@ -206,8 +211,9 @@ export async function evaluateQuestion(
       .then((x) => x[0].id);
   let out: Awaited<ReturnType<typeof converse>>;
   const calls: CallLog[] = [];
+  const blockNumbers = await blockInventedNumbers();
   try {
-    out = await withSlot(() => converse(mode, site, [], question, calls));
+    out = await withSlot(() => converse(mode, site, [], question, calls, { blockNumbers }));
   } catch (e) {
     const msg = e instanceof BusyError ? "صف دستیار پر بود" : (e as Error).message;
     const id = await rec(e instanceof AiCallError && e.kind === "timeout" ? "timeout" : "error", "error", { error: msg.slice(0, 500), model: modelName(), meta: { calls } });
@@ -235,6 +241,7 @@ export async function evaluateQuestion(
       ...(out.raws.length > 1 ? { retry: 1 } : {}),
       raw: out.raws.map((r) => r.slice(0, 2000)),
       calls,
+      ...(out.suspects.length ? { suspectNumbers: out.suspects } : {}),
     },
   };
   const cost = out.usage.costToman;
@@ -251,6 +258,11 @@ export async function evaluateQuestion(
     const id = await rec("handoff", reason, base);
     return done({ path: "model", source: null, handoff: reason, answer: reason === "restricted" ? RESTRICTED_TEXT : HANDOFF_TEXT, guardHits: [] }, id, cost);
   }
+  // سوئیچ «جلوگیری از عدد خارج از داده» روشن ← همان ارجاع چت (بخش ۴۶)
+  if (blockNumbers && out.suspects.length) {
+    const id = await rec("number_block", "invented_number", base);
+    return done({ path: "model", source: null, handoff: "invented_number", answer: HANDOFF_TEXT, guardHits: [], suspectNumbers: out.suspects }, id, cost);
+  }
   const g = checkOutput(decision.answer, ctx.blacklist);
   if (!g.ok) {
     const hits = g.hits.map((h) => `${h.type}: ${h.match}`);
@@ -259,7 +271,7 @@ export async function evaluateQuestion(
     return done({ path: "model", source: null, handoff: "leak", answer: decision.answer.trim().slice(0, 2000), guardHits: hits }, id, cost);
   }
   const id = await rec("ok", decision.source, base);
-  return done({ path: "model", source: decision.source, handoff: null, answer: decision.answer.trim().slice(0, 2000), guardHits: [] }, id, cost);
+  return done({ path: "model", source: decision.source, handoff: null, answer: decision.answer.trim().slice(0, 2000), guardHits: [], suspectNumbers: out.suspects }, id, cost);
 }
 
 const runState = (id: string) =>

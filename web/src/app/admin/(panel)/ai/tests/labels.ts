@@ -4,6 +4,7 @@ export const RUN_STATUS_FA: Record<string, string> = { running: "در حال ا�
 export const PATH_FA: Record<string, string> = {
   canned: "جواب آماده",
   rule: "قاعده‌ی کد (رایگان)",
+  price: "جواب قیمت با کد (رایگان)",
   model: "مدل",
   error: "خطا",
   stop: "رد شد (توقف)",
@@ -18,5 +19,6 @@ export const CHECK_FA: Record<string, string> = {
   forbidden: "کلمه‌ی ممنوع",
   mustInclude: "کلمه‌ی لازم",
   signals: "نشانه‌ها",
+  numbers: "عدد خارج از داده",
 };
 export const SOURCE_FA: Record<string, string> = { product: "محصول", calculator: "ماشین‌حساب", knowledge: "پایگاه دانش", general: "عمومی", canned: "جواب آماده" };

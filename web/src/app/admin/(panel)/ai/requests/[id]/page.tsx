@@ -73,6 +73,11 @@ export default async function RequestPage({ params }: { params: Promise<{ id: st
         )}
         {m.handoffNote && <p>یادداشت ارجاع: {m.handoffNote}</p>}
         {m.cleaned.length > 0 && <p className={styles.muted}>از متن مشتری حذف شد: {m.cleaned.join(" · ")}</p>}
+        {m.suspects.length > 0 && (
+          <p style={{ color: "#B3261E" }} data-testid="request-suspects">
+            عدد خارج از داده‌های سایت (مبلغ یا زمان حملی که در داده‌های داده‌شده به دستیار نبود): {m.suspects.join(" · ")}
+          </p>
+        )}
       </div>
     </>
   );

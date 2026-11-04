@@ -137,6 +137,13 @@ let FREE;
   ok(res("می‌خوام ۲۰٬۰۰۰ تا سفارش بدم") === "rule||big_order|true", "big order rule passes");
   if (LIVE) ok(res("FOB یعنی چی؟") === "model|knowledge||false", `live mock: general expected, knowledge given → fail (${res("FOB یعنی چی؟")})`);
   else ok(res("FOB یعنی چی؟") === "model|general||true", `fake model: general definition passes (${res("FOB یعنی چی؟")})`);
+  // بخش ۴۶: سؤال ۱ (قیمت بدون تعداد) ← جواب قیمت با کد، منبع محصول، قبول
+  const Q1 = "قیمت مخلوط‌کن قابل حمل چنده؟";
+  ok(res(Q1) === "price|product||true", `price question → code price answer, passes (${res(Q1)})`);
+  ok(
+    psql(`select answer from ai_test_results where run_id='${FULL}' and question=${q(Q1)}`).endsWith("اگر تعداد را بگویید، دقیق‌تر حساب می‌کنم."),
+    "stored answer ends with the exact sentence",
+  );
   // بخش ۴۴: سؤال‌های ردشده‌ی آزمون واقعی ۲۰۲۶-۱۱-۰۴ (mock همان شکل جواب مدل واقعی را می‌سازد)
   const Q42 = "۲ تا سؤال دارم: حداقل سفارش مخلوط‌کن چنده؟ زمان رسیدنش چقدره؟";
   ok(res(Q42).endsWith("|true"), `«۲ تا سؤال دارم: …» passes, no signal (${res(Q42)})`);

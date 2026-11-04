@@ -29,12 +29,14 @@ import { type Decision, FORMAT_REMINDER, readReply } from "./decision";
 import { normFa } from "./normalize";
 import { LANDED_TOOL, PROMPT_VERSION, SYSTEM_PROMPT } from "./prompt";
 import { cannedReply } from "./canned";
+import { suspectNumbers } from "./number-check";
+import { priceAnswer } from "./price-answer";
 import type { CallLog } from "./call-log";
 import { extractQty, HANDOFF_FA, pleasantry, preRule } from "./rules";
 import { kindForModelHandoff, type SuggestionKind } from "./learn";
 import { addReply, aiStatus, ensureState, getState, resume, setThinking, silence } from "./state";
 import { addSuggestion } from "./suggestions";
-import { aiLimits, customerMessages24h, todayUsage } from "./usage";
+import { aiLimits, blockInventedNumbers, customerMessages24h, todayUsage } from "./usage";
 
 const PRIMARY_TIMEOUT = 25_000;
 const FALLBACK_TIMEOUT = 20_000;
@@ -139,6 +141,17 @@ export async function runAgent(c: RunCtx): Promise<void> {
     if (score >= limits.leadScoreHandoff) return handoff(c, "lead_score", `امتیاز ${score}`, await rec("handoff", "lead_score"));
   }
 
+  // «جواب قیمت با کد» (بخش ۴۶): سؤال فقط قیمت، بدون تعداد، در گفتگوی صفحه‌ی محصول ← همان داده‌های صفحه‌ی محصول، بدون مدل.
+  // مثل جواب آماده فقط وقتی دستیار در این گفتگو فعال است (سوئیچ روشن، بعد از پیام کارشناس ساکت)؛ رایگان، بیرون از سقف هزینه.
+  const priced = await priceAnswer(conv.productId, msg.body);
+  if (priced) {
+    const reqId = await rec("ok", "site_price", { meta: { promptVersion: PROMPT_VERSION, path: "price" } });
+    const m = await postAi(c, priced, { source: "product", kind: "site_price", requestId: reqId });
+    await db.update(aiRequests).set({ replyMessageId: m.id }).where(eq(aiRequests.id, reqId));
+    await addReply(c.conversationId);
+    return void (await setThinking(c.conversationId, false));
+  }
+
   // مدل
   const site = await buildContext(msg.body, conv.productId, extractQty(msg.body));
   let usage: Usage = ZERO_USAGE;
@@ -148,16 +161,19 @@ export async function runAgent(c: RunCtx): Promise<void> {
   let raws: string[] = [];
   let content = "";
   let truncated = false;
+  let suspects: string[] = [];
   const calls: CallLog[] = [];
+  const blockNumbers = await blockInventedNumbers();
   try {
     const prior = (await historyOf(conv.id, msg.id)).slice(0, -1);
-    const out = await withSlot(() => converse(c.mode, site, prior, msg.body, calls));
+    const out = await withSlot(() => converse(c.mode, site, prior, msg.body, calls, { blockNumbers }));
     usage = out.usage;
     modelUsed = out.model;
     fallbackUsed = out.fallbackUsed;
     raws = out.raws;
     content = out.content;
     truncated = out.truncated;
+    suspects = out.suspects;
     decision = truncated ? null : readReply(out.content);
   } catch (e) {
     const kind = e instanceof BusyError ? "busy" : "error";
@@ -204,6 +220,8 @@ export async function runAgent(c: RunCtx): Promise<void> {
       raw: raws.map((r) => r.slice(0, 2000)),
       // زمان و توکن هر تلاش جدا (بخش ۴۵)
       calls,
+      // مبلغ/زمانِ نبوده در داده‌ها (بخش ۴۶؛ همیشه ثبت، جلوگیری فقط با سوئیچ)
+      ...(suspects.length ? { suspectNumbers: suspects } : {}),
     },
   };
   // «پیشنهاد سؤال تازه» (فقط چت زنده؛ بخش ۳۳)
@@ -228,6 +246,10 @@ export async function runAgent(c: RunCtx): Promise<void> {
       return handoff(c, reason, decision.handoff?.note ?? null, reqId, { silentMessage: true });
     }
     return handoff(c, reason, decision.handoff?.note ?? null, reqId);
+  }
+  if (blockNumbers && suspects.length) {
+    await learn("no_answer", `عدد خارج از داده‌ها: ${suspects.join("، ")}`);
+    return handoff(c, "invented_number", suspects.join("، "), await rec("number_block", "invented_number", base));
   }
   const g = checkOutput(decision.answer, await blacklistTerms());
   if (!g.ok) {
@@ -261,8 +283,20 @@ export type { CallLog } from "./call-log";
 // یادآوری وقتی جواب به سقف توکن خورد و بریده شد (finish_reason = length)؛ در کد است، نه در دستورالعمل اصلی
 export const LENGTH_REMINDER = "Your previous reply was cut off because it was too long. Send the full reply again in the same format, much shorter: at most 60 words of Persian.";
 
+// یادآوری وقتی جواب مبلغ یا زمانی دارد که در داده‌ها نیست (بخش ۴۶؛ فقط با سوئیچ ai.block_invented_numbers)
+export const NUMBERS_REMINDER =
+  "Your previous reply contained prices or delivery times that are not in SITE DATA or the landed_cost result. Send the reply again in the same format, copying numbers only from that data; if the number is not there, use handoff no_source.";
+
 // calls (اختیاری): هر تلاش به مدل اینجا اضافه می‌شود، حتی اگر converse خطا بدهد (برای meta.calls)
-export async function converse(mode: Mode, site: SiteContext, prior: { role: "user" | "assistant"; content: string }[], text: string, calls: CallLog[] = []) {
+// opts.blockNumbers: جواب با عدد خارج از داده ← یک بار یادآوری (suspects همیشه برگردانده می‌شود: عددهای مشکوک جواب نهایی)
+export async function converse(
+  mode: Mode,
+  site: SiteContext,
+  prior: { role: "user" | "assistant"; content: string }[],
+  text: string,
+  calls: CallLog[] = [],
+  opts: { blockNumbers?: boolean } = {},
+) {
   const messages: ChatMsg[] = [
     { role: "system", content: SYSTEM_PROMPT },
     ...prior,
@@ -328,13 +362,22 @@ export async function converse(mode: Mode, site: SiteContext, prior: { role: "us
       raws.push(content);
       // جواب بریده (سقف توکن) هرگز به مشتری نمی‌رسد (بخش ۴۵)؛ truncated = بعد از یک تلاش دوباره هم بریده بود
       const truncated = r.finishReason === "length";
-      // قالب نادرست یا جواب بریده ← یک بار یادآوری. (ابزار در درخواست می‌ماند: Claude درخواستی را که در تاریخچه‌اش tool call هست ولی tools ندارد رد می‌کند.)
-      if (raws.length === 1 && (truncated || !readReply(content))) {
-        reminder = truncated ? "length" : "format";
-        msgs.push({ role: "assistant", content: content.trim() || "(خالی)" }, { role: "user", content: truncated ? LENGTH_REMINDER : FORMAT_REMINDER });
+      const d = truncated ? null : readReply(content);
+      // عددهای مشکوک: مبلغ/زمانی که در هیچ‌کدام از پیام‌های فرستاده به مدل (داده‌های سایت، نتیجه‌ی ابزار، گفتگو) نیست (بخش ۴۶)
+      const suspects = d
+        ? suspectNumbers(
+            d.answer,
+            msgs.filter((m) => m.role !== "system").map((m) => (typeof m.content === "string" ? m.content : "")),
+          )
+        : [];
+      // قالب نادرست، جواب بریده یا (با سوئیچ) عدد خارج از داده ← یک بار یادآوری.
+      // (ابزار در درخواست می‌ماند: Claude درخواستی را که در تاریخچه‌اش tool call هست ولی tools ندارد رد می‌کند.)
+      if (raws.length === 1 && (truncated || !d || (opts.blockNumbers && suspects.length))) {
+        reminder = truncated ? "length" : !d ? "format" : "numbers";
+        msgs.push({ role: "assistant", content: content.trim() || "(خالی)" }, { role: "user", content: truncated ? LENGTH_REMINDER : !d ? FORMAT_REMINDER : NUMBERS_REMINDER });
         continue;
       }
-      return { content, usage, model: r.model, raws, truncated };
+      return { content, usage, model: r.model, raws, truncated, suspects };
     }
   };
   try {
@@ -381,7 +424,7 @@ export async function handoff(c: RunCtx, reason: string, note: string | null, re
   });
   await db.insert(conversationFlags).values({
     conversationId: c.conversationId,
-    flag: reason === "leak" || reason === "parse" || reason === "truncated" ? "needs_review" : "needs_expert",
+    flag: reason === "leak" || reason === "parse" || reason === "truncated" || reason === "invented_number" ? "needs_review" : "needs_expert",
     reason: `${test ? "آزمایشی: " : ""}${label}`,
     source: "ai",
   });

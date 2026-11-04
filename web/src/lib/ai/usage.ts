@@ -20,6 +20,11 @@ const int = (v: unknown, def: number, min: number, max: number) => {
   return Number.isFinite(n) && n >= min && n <= max ? Math.round(n) : def;
 };
 
+// «جلوگیری از عدد خارج از داده‌ها» در چت (بخش ۴۶). نبودن تنظیم (قبل از seed) = خاموش
+export async function blockInventedNumbers(): Promise<boolean> {
+  return (await getSetting<boolean>("ai.block_invented_numbers").catch(() => null)) === true;
+}
+
 export async function aiLimits(): Promise<AiLimits> {
   const g = (k: string) => getSetting(k).catch(() => null);
   const [a, b, c, d, e, f, h] = await Promise.all(

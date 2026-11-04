@@ -105,6 +105,8 @@ export function parseLines(content: string): Decision | null {
   const lines = text.split("\n");
   const si = lines.findIndex((l) => /^\s*\**\s*source\s*\**\s*[:：]/i.test(l));
   if (si < 0) return null;
+  // قالب برعکس (اول جواب، بعد سرآیند؛ بخش ۴۶) ناخواناست ← یادآوری قالب. قبل از source فقط خط signals یا خالی مجاز است.
+  if (lines.slice(0, si).some((l) => l.trim() && !SIGNALS_LINE.test(l))) return null;
   // دستورالعمل یک مقدار می‌خواهد، ولی مدل گاهی چند تا می‌نویسد («product; calculator»، «product, calculator»، «product | calculator»):
   // اولین مقدار معتبر. منبع ناشناخته همچنان نامعتبر است (بخش ۴۴).
   const source = lines[si]
@@ -141,6 +143,8 @@ export function parseLines(content: string): Decision | null {
     .join("\n")
     .replace(/^\s*(answer|reply)\s*[:：]\s*/i, "")
     .trim();
+  // متن جواب خالی بدون ارجاع (و منبعی غیر از none) هم ناخواناست، نه «دستیار ارجاع داد»
+  if (!body && !handoff && source !== "none") return null;
   return { answer: body, source, handoff };
 }
 

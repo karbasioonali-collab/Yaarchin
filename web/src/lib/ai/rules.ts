@@ -24,6 +24,7 @@ export const HANDOFF_FA: Record<string, string> = {
   // بخش ۴۵: other در قالب دستورالعمل هست؛ truncated = جواب به سقف توکن خورد و بریده شد (بعد از یک تلاش دوباره)
   other: "دلیل دیگر (به تشخیص دستیار)",
   truncated: "جواب دستیار ناقص بود",
+  invented_number: "عدد خارج از داده‌های سایت",
 };
 
 const RULES: [string, RegExp][] = [
