@@ -39,7 +39,15 @@ const STATUS_FA: Record<string, string> = {
   truncated: "جواب بریده شد",
   skipped: "رد شد",
 };
-const SOURCE_FA: Record<string, string> = { product: "محصول", calculator: "ماشین‌حساب", knowledge: "پایگاه دانش", general: "عمومی", pleasantry: "جواب آماده (احوال‌پرسی/تشکر)" };
+const SOURCE_FA: Record<string, string> = {
+  product: "محصول",
+  calculator: "ماشین‌حساب",
+  knowledge: "پایگاه دانش",
+  general: "عمومی",
+  pleasantry: "جواب آماده (احوال‌پرسی/تشکر)",
+  site_price: "جواب قیمت با کد",
+  site_qty_price: "جواب قیمت با تعداد (کد)",
+};
 const CANNED_FIELDS: [keyof typeof CANNED_DEFAULTS, string, string][] = [
   ["ai.reply_greeting_product", "greetingProduct", "«سلام» در گفتگوی محصول ({product} = اسم محصول)"],
   ["ai.reply_greeting_general", "greetingGeneral", "«سلام» در گفتگوی عمومی"],

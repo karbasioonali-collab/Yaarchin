@@ -373,6 +373,63 @@ const c10 = await newCustomer();
   ok(await waitFor(() => psql("select value from settings where key='ai.block_invented_numbers'") === "false"), "panel switch off again");
 }
 
+// ---------- بخش ۴۷: جواب قیمت با تعداد (کد)، داده‌ی ماشین‌حساب برای مدل ----------
+{
+  const mockN = async () => (await (await fetch("http://127.0.0.1:3399/__log")).json()).length;
+  const END = "برای قیمت قطعی و ثبت سفارش، کارشناس یارچین راهنمایی‌تان می‌کند.";
+  const fa = (x) => x.toLocaleString("fa-IR");
+  const c17 = await newCustomer();
+  const n0 = await mockN();
+  const r1 = await say(c17.p, "portable-blender", "اگه ۱۰۰۰ تا بگیرم چند میشه؟", { isNew: true });
+  const b1 = lastAi(r1.conv);
+  ok((await mockN()) === n0, "qty price: no model call");
+  ok(psql(`select status || '|' || outcome || '|' || cost_toman::float from ai_requests where message_id=${r1.mid}`) === "ok|site_qty_price|0", "logged as site_qty_price, cost 0");
+  ok(
+    b1.startsWith("قیمت تمام‌شده‌ی تخمینی تا ایران برای ۱٬۰۰۰ عدد مخلوط‌کن قابل‌حمل شارژی ۳۸۰ میلی‌لیتر:") && b1.endsWith(END) && b1.includes("این قیمت تخمینی است."),
+    "header + estimate + exact last sentence",
+  );
+  // دقیقاً همان عددهای کارت ماشین‌حساب صفحه‌ی محصول (همان API و همان گرد کردن)
+  const api1000 = (await api(c17.p, "GET", "/api/v1/products/portable-blender/landed?qty=1000")).j.landed;
+  const same = api1000.methods.every((m) =>
+    m.unit === null
+      ? b1.includes(`- ${m.nameFa}: استعلام از کارشناس`)
+      : b1.includes(`- ${m.nameFa}: هر عدد ${fa(m.unit)} تومان، جمع ${fa(m.total)} تومان، `) && m.unit % 10 === 0 && m.total % 1000 === 0,
+  );
+  ok(
+    same && api1000.methods.length > 0,
+    `every method equals the product page card (rounded 10 / 1,000) (${api1000.methods.map((m) => `${m.nameFa}:${m.unit}/${m.total}`).join(" ")})`,
+  );
+  const r2 = await say(c17.p, r1.conv, "۵۰۰ تا چند؟");
+  ok(psql(`select outcome || '|' || (meta->>'qty') from ai_requests where message_id=${r2.mid}`) === "site_qty_price|500", "«۵۰۰ تا چند؟» → code, qty 500");
+  const r3 = await say(c17.p, r1.conv, "قیمت ۲۰۰ عدد");
+  ok(psql(`select outcome from ai_requests where message_id=${r3.mid}`) === "site_qty_price", "«قیمت ۲۰۰ عدد» → code");
+  // کمتر از حداقل سفارش ← همان جمله‌ی کارت
+  const api1 = (await api(c17.p, "GET", "/api/v1/products/portable-blender/landed?qty=1")).j.landed;
+  const r4 = await say(c17.p, r1.conv, "قیمت ۱ عدد");
+  ok(!api1.belowMoq || lastAi(r1.conv).includes(`کمتر از حداقل سفارش کارخانه‌ها (${fa(api1.moq)} عدد)`), `below MOQ note (${api1.belowMoq})`);
+  ok(psql(`select outcome from ai_requests where message_id=${r4.mid}`) === "site_qty_price", "«قیمت ۱ عدد» → code");
+  // پیام ترکیبی ← مدل؛ همان خروجی خام اشتباه ← «عدد خارج از داده»
+  const r5 = await say(c17.p, r1.conv, "اگه ۱۰۰۰ تا بگیرم چند میشه؟ کارت بازرگانی هم لازمه؟ [[x1000]]");
+  ok(psql(`select outcome from ai_requests where message_id=${r5.mid}`) !== "site_qty_price", "composite message → model");
+  ok(psql(`select meta->>'suspectNumbers' from ai_requests where message_id=${r5.mid}`).includes("3507 تومان"), "«۳۵۰۷ تومان» flagged as outside the data");
+  // داده‌ی ماشین‌حساب برای مدل: متن با کاما و «toman»
+  const sent = JSON.stringify((await (await fetch("http://127.0.0.1:3399/__log")).json()).at(-1));
+  ok(/\d{1,3}(,\d{3})+ toman/.test(sent) && !/"unitToman"/.test(sent), "calculator data sent with separators and explicit unit");
+  // سفارش بزرگ ← همان ارجاع قبلی
+  const r6 = await say(c17.p, r1.conv, "اگه ۱۰۰۰۰ تا بگیرم چند میشه؟");
+  ok(psql(`select outcome from ai_requests where message_id=${r6.mid}`) === "big_order", "above big-order threshold → handoff as before");
+  // بدون HS و بدون بسته‌بندی
+  const hs = psql("select hs_code from products where slug='led-bulb-12w'");
+  psql("update products set hs_code=null where slug='led-bulb-12w'");
+  const c18 = await newCustomer();
+  const r7 = await say(c18.p, "led-bulb-12w", "۵۰۰ تا چند؟", { isNew: true });
+  ok(lastAi(r7.conv).startsWith("قیمت تا مرز ایران برای ۵۰۰ عدد") && lastAi(r7.conv).includes("هزینه‌های گمرک، ترخیص و بیمه را کارشناس اعلام می‌کند"), "no HS → border");
+  psql(`update products set hs_code='${hs}' where slug='led-bulb-12w'`);
+  const c19 = await newCustomer();
+  const r8 = await say(c19.p, "smart-led-strip-5m", "۵۰۰ تا چند؟", { isNew: true });
+  ok(lastAi(r8.conv).includes("استعلام از کارشناس") && lastAi(r8.conv).endsWith(END), "no packing → inquiry");
+}
+
 // ---------- تزریق: مشتری خودش قالب نشانه نوشت ----------
 const c3 = await newCustomer();
 {

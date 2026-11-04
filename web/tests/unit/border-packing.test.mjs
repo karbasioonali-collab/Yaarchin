@@ -20,7 +20,7 @@ const ok = (c, m) => {
   const base = { status: "ready", qty: 5000, moq: 2500, belowMoq: false, ratesDate: "2026-11-01" };
   const border = compactLanded({ ...base, borderOnly: true, methods: [{ key: "sea", nameFa: "دریایی", status: "border", unit: 3510, total: 17550000, days: null }] });
   ok(border.goods_and_shipping_to_iran_border_only === true && /customs/.test(border.excludes), "border-only flag + what is excluded");
-  ok(border.methods[0].needsInquiry === false && border.methods[0].unitToman === 3510, "border method has a number, not inquiry");
+  ok(border.methods[0].needsInquiry === false && border.methods[0].unitPrice === "3,510 toman", "border method has a number, not inquiry");
   const full = compactLanded({ ...base, borderOnly: false, methods: [{ key: "sea", nameFa: "دریایی", status: "ok", unit: 5000, total: 25000000, days: null }] });
   ok(!("goods_and_shipping_to_iran_border_only" in full), "full landed: no border flag");
   const inq = compactLanded({ ...base, borderOnly: false, methods: [{ key: "sea", nameFa: "دریایی", status: "inquiry", unit: null, total: null, days: null }] });

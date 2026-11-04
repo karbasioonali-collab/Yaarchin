@@ -145,8 +145,10 @@ export async function runAgent(c: RunCtx): Promise<void> {
   // مثل جواب آماده فقط وقتی دستیار در این گفتگو فعال است (سوئیچ روشن، بعد از پیام کارشناس ساکت)؛ رایگان، بیرون از سقف هزینه.
   const priced = await priceAnswer(conv.productId, msg.body);
   if (priced) {
-    const reqId = await rec("ok", "site_price", { meta: { promptVersion: PROMPT_VERSION, path: "price" } });
-    const m = await postAi(c, priced, { source: "product", kind: "site_price", requestId: reqId });
+    // outcome: site_price (بدون تعداد) | site_qty_price (برای یک تعداد، از ماشین‌حساب؛ بخش ۴۷)
+    const kind = priced.kind === "price" ? "site_price" : "site_qty_price";
+    const reqId = await rec("ok", kind, { meta: { promptVersion: PROMPT_VERSION, path: "price", ...(priced.qty ? { qty: priced.qty } : {}) } });
+    const m = await postAi(c, priced.text, { source: priced.source, kind, requestId: reqId });
     await db.update(aiRequests).set({ replyMessageId: m.id }).where(eq(aiRequests.id, reqId));
     await addReply(c.conversationId);
     return void (await setThinking(c.conversationId, false));

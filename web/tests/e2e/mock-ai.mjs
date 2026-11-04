@@ -96,7 +96,7 @@ http
           cost,
         ),
       );
-    const totals = (t) => (t.available ? t.methods.map((m) => (m.totalToman ?? 0).toLocaleString("en-US")).join(" / ") : "ندارد");
+    const totals = (t) => (t.available ? t.methods.map((m) => (m.total ?? "0 toman").replace(" toman", "")).join(" / ") : "ندارد");
 
     // تست اتصال پنل
     if (sys.includes('{"ok": true')) return out(res, 200, completion(body.model, { content: '{"ok": true, "lang": "fa"}' }, 50));
@@ -151,6 +151,13 @@ http
     if (text.includes("[[newline]]")) return out(res, 200, completion(body.model, { content: '{"answer": "خط اول\nخط دوم", "source": "general", "handoff": null}' }, cost));
     // بخش ۴۶: [[reversed]] ← عین خروجی خام آزمون واقعی ۲۰۲۶-۱۱-۰۶ (اول جواب با ** و عدد ساختگی، بعد سرآیند، بدون ---؛ هر بار)
     //   [[fakenum]] ← قالب درست ولی مبلغ و زمان ساختگی (هر بار)؛ [[fakenum1]] ← فقط بار اول، بعد از یادآوری جواب بدون عدد
+    // بخش ۴۷: [[x1000]] ← عین خروجی خام اشتباه آزمون واقعی ۲۰۲۶-۱۱-۰۷ («هزار» جاافتاده: ۳۵۰۷ تومان به‌جای ~۳٫۵ میلیون)
+    if (text.includes("[[x1000]]"))
+      return json({
+        answer: "هوایی: ۳۵۰۷ تومان/عدد | ۲۹-۳۴ روز\nدریایی: ۲۴۰۷ تومان/عدد\nزمینی: ۲۶۲۷ تومان/عدد\nریلی: ۲۵۴۷ تومان/عدد\nاین قیمت تخمینی است.",
+        source: "calculator",
+        handoff: null,
+      });
     if (text.includes("[[reversed]]"))
       return out(
         res,
