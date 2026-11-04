@@ -129,6 +129,8 @@ ok(JSON.stringify(parseSignalsLine("source: catalog\nhandoff: no\nsignals: none\
   // مبهم
   const u = B(200, "", "toman", "۲۰۰ تومن دارم");
   ok(u.key === "budget_unclear" && u.valueNum === null && u.valueText === "۲۰۰ تومان", `«۲۰۰ تومن» → unclear (${JSON.stringify(u)})`);
+  ok(u.confidence === 0.3, `unclear budget: confidence exactly 0.3 (${u.confidence})`);
+  ok(B(200, "million", "toman", "۲۰۰ میلیون تومن").confidence === 0.8, "clear budget: confidence 0.8");
   ok(B(5, "", "toman", "۵ تومن").key === "budget_unclear", "«۵ تومن» → unclear");
   ok(B(5, "", "rial", "۵ ریال").key === "budget_unclear", "«۵ ریال» → unclear");
   // مدل مقیاسی گذاشته که مشتری نگفته ← مبهم

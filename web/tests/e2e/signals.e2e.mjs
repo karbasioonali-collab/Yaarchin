@@ -58,6 +58,16 @@ const say = async (p, convOrSlug, text, { wait = true, isNew = false } = {}) => 
 const sig = (u) => psql(`select string_agg(key || '=' || coalesce(value_num::float::text, '-') || '/' || source, ',' order by key) from customer_signals where user_id='${u}'`);
 const evN = (u) => psql(`select count(*) from events where user_id='${u}' and type='customer_signal'`);
 const lastAi = (conv) => psql(`select body from chat_messages where conversation_id='${conv}' and sender_type='ai' order by id desc limit 1`);
+// امتیاز جدیت روی صفحه‌ی مشتری (عدد داخل نشان کنار تیتر)
+const scoreOf = async (u) => {
+  await ad.goto(B + `/admin/customers/${u}`);
+  return await ad.locator("h2", { hasText: "امتیاز جدیت" }).locator("span").first().innerText();
+};
+// واحد یک قانون در جدول امتیاز صفحه‌ی مشتری (ستون «واحد»)
+const unitsOf = async (u, label) => {
+  await ad.goto(B + `/admin/customers/${u}`);
+  return (await ad.locator("tr", { hasText: label }).first().locator("td").nth(1).innerText()).trim();
+};
 // متنی که مشتری در گفتگو می‌بیند (API مشتری)
 const customerSees = async (p, conv) => (await api(p, "GET", `/api/v1/chat/${conv}`)).j.messages.map((m) => m.body).join("\n");
 
@@ -100,9 +110,21 @@ const c1 = await newCustomer();
   await ad.goto(B + `/admin/customers/${c1.id}`);
   const t = await ad.locator("main").innerText();
   ok(t.includes("آخرین فعالیت در سایت: —"), "«آخرین فعالیت» ignores signal events");
-  ok(/روزهای ورود به سایت/.test(t), "behavior card still there");
-  const visitDays = psql(`select count(distinct (occurred_at at time zone 'Asia/Tehran')::date) from events where user_id='${c1.id}' and type='site_visit'`);
-  ok(visitDays === "0", "visit days (guest/site visit counting) see no signal events");
+  // این مشتری حالا فقط رویداد نشانه دارد (۶ تا)؛ هر شمارشی که type را فیلتر نکند، عدد غیرصفر نشان می‌دهد
+  ok(Number(evN(c1.id)) >= 6 && psql(`select count(*) from events where user_id='${c1.id}' and type <> 'customer_signal'`) === "0", "setup: only signal events");
+  // کارت «خلاصه‌ی بازدیدها و رفتار»: همه‌ی عددها صفر
+  const stats = await ad.locator("h2", { hasText: "خلاصه‌ی بازدیدها و رفتار" }).locator("xpath=..").locator('[class*="statValue"]').allInnerTexts();
+  ok(stats.length === 8 && stats.every((x) => x.trim() === "۰"), `behavior card: all 8 numbers zero (${stats.join(" ")})`);
+  // فهرست مشتریان: ستون «بازدید ۳۰ روز»
+  await ad.goto(B + `/admin/customers?q=${encodeURIComponent(`sig-${run}-1@`)}`);
+  const heads = (await ad.locator("thead th").allInnerTexts()).map((x) => x.trim());
+  const col = heads.indexOf("بازدید ۳۰ روز");
+  const row = ad.locator("tr", { has: ad.locator(`a[href="/admin/customers/${c1.id}"]`) });
+  ok(col >= 0 && (await row.locator("td").nth(col).innerText()).trim() === "۰", `customers list: «بازدید ۳۰ روز» = ۰ (col ${col})`);
+  // قانون‌های «روزهای بازدید» و «بازدید محصول متفاوت» روشن: واحد صفر
+  psql("update lead_score_rules set enabled=true where key in ('visit_days', 'product_views')");
+  ok((await unitsOf(c1.id, "روزهای بازدید از سایت")) === "۰", "score rule «روزهای بازدید از سایت»: 0 units");
+  ok((await unitsOf(c1.id, "بازدید محصول متفاوت")) === "۰", "score rule «بازدید محصول متفاوت»: 0 units");
   psql(`delete from events where user_id='${c1.id}' and type='customer_signal' and props->>'quote' = 'x'`);
 }
 
@@ -144,17 +166,34 @@ const c4 = await newCustomer();
   ok(lastAi(conv).endsWith("راستی، منظورتان از «۲۰۰ تومان» چه مبلغی است؟ مثلاً ۲۰۰ میلیون تومان؟"), `clarify question appended (${lastAi(conv)})`);
   await say(c4.p, conv, "گفتم که ۲۰۰ تومن [[sigB]]");
   ok(psql(`select count(*) from chat_messages where conversation_id='${conv}' and sender_type='ai' and body like '%منظورتان از%'`) === "1", "asked only once per conversation");
+  ok(psql(`select confidence::float from customer_signals where user_id='${c4.id}' and key='budget_unclear'`) === "0.3", "ambiguous budget: confidence 0.3");
+  // قانون روشن روی «مبهم» (و قانون بودجه‌ی روشن): امتیاز با «۲۰۰ تومن» عوض نمی‌شود
+  const before = await scoreOf(c4.id);
+  psql(
+    `insert into lead_score_rules (key, kind, label_fa, points, cap, enabled, params, source) values ('test_unclear_${run}', 'signal', 'تست مبهم', 50, 50, true, '{"signal":"budget_unclear"}', 'admin')`,
+  );
+  psql("update lead_score_rules set enabled=true where key='signal_budget_mtoman'");
+  const after = await scoreOf(c4.id);
+  ok(before === after && (await unitsOf(c4.id, "تست مبهم")) === "۰", `rule on «مبهم» → score unchanged (${before} → ${after})`);
+  psql(`delete from lead_score_rules where key='test_unclear_${run}'`);
+  psql("update lead_score_rules set enabled=false where key='signal_budget_mtoman'");
   await say(c4.p, conv, "منظورم ۲۰۰ میلیون تومن بود [[sigC]]");
   ok(sig(c4.id) === "budget_mtoman=200/ai", `clear value replaces the ambiguous one (${sig(c4.id)})`);
   ok(evN(c4.id) === "3", "history keeps all three");
 }
 
+// ---------- ریال ← میلیون تومان ----------
+const c6 = await newCustomer();
+{
+  await say(c6.p, SLUG, "۵ میلیارد ریال سرمایه دارم [[sigR]]", { isNew: true });
+  ok(sig(c6.id) === "budget_mtoman=500/ai", `«۵ میلیارد ریال» → 500 million toman (${sig(c6.id)})`);
+  await ad.goto(B + `/admin/customers/${c6.id}`);
+  ok((await ad.getByTestId("signal-budget_mtoman").innerText()).includes("۵۰۰ میلیون تومان"), "panel: ۵۰۰ میلیون تومان");
+}
+
 // ---------- امتیاز: قانون خاموش ← بی‌اثر؛ روشن ← امتیاز و ارجاع ----------
 {
-  const score = async (u) => {
-    await ad.goto(B + `/admin/customers/${u}`);
-    return (await ad.locator("h2", { hasText: "امتیاز جدیت" }).innerText()).replace(/[^۰-۹0-9]/g, "").slice(0, 3);
-  };
+  const score = scoreOf;
   const s0 = await score(c2.id);
   psql("update lead_score_rules set enabled=true, points=80, cap=80 where key='signal_import_experience'");
   const s1 = await score(c2.id);
