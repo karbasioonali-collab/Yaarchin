@@ -3,32 +3,17 @@ import "server-only";
 //   AI_BASE_URL        ← baseUrl پروژه‌ی هوش مصنوعی لیارا (مثل https://ai.liara.ir/api/<id>/v1)
 //   AI_API_KEY         ← کلید API همان پروژه
 //   AI_MODEL           ← مدل اصلی (پیش‌فرض anthropic/claude-haiku-4.5)
-//   AI_FALLBACK_MODEL  ← مدل پشتیبان (اختیاری): اگر مدل اصلی خطا داد یا جواب نداد، یک بار با این مدل
+//   AI_FALLBACK_MODEL  ← مدل پشتیبان (اختیاری): اگر مدل اصلی خطا داد یا جواب نداد، یک بار با این مدل.
+//                        می‌تواند همان AI_MODEL باشد = یک تلاش دوباره با همان مدل (بخش ۴۷؛ تا PR #44 نادیده گرفته می‌شد)
 // هر کدام از AI_BASE_URL یا AI_API_KEY خالی ← «حالت آزمایشی» (مدل ساختگی؛ جواب‌ها فقط در پنل، مشتری مثل قبل به کارشناس).
 //   AI_CATALOG_MODEL   ← (اختیاری) مدل «متن فارسی محصول با AI» (بخش ۴۰)؛ خالی = همان AI_MODEL. پشتیبان همان AI_FALLBACK_MODEL.
 // مدل جدا برای کارهای دیگر (مثلاً تشخیص لوگو) بعداً با متغیر جدا (مثل AI_LOGO_MODEL)، نه تنظیم پنل.
-export const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
+import { type AiConfig, parseAiEnv } from "./config-core";
+export { DEFAULT_MODEL } from "./config-core";
 
-export type AiConfig = { mode: "live" | "test"; baseUrl: string | null; apiKey: string | null; model: string; fallbackModel: string | null };
-
-function validBase(raw: string): string | null {
-  const s = raw.trim().replace(/\/+$/, "");
-  if (!s) return null;
-  try {
-    const u = new URL(s);
-    // http فقط برای سرور ساختگی تست محلی
-    if (u.protocol === "https:" || (u.protocol === "http:" && (u.hostname === "127.0.0.1" || u.hostname === "localhost"))) return s;
-  } catch {}
-  console.warn("AI_BASE_URL نامعتبر است و نادیده گرفته شد.");
-  return null;
-}
-
+export type { AiConfig } from "./config-core";
 export function aiConfig(): AiConfig {
-  const baseUrl = validBase(process.env.AI_BASE_URL ?? "");
-  const apiKey = (process.env.AI_API_KEY ?? "").trim() || null;
-  const model = (process.env.AI_MODEL ?? "").trim() || DEFAULT_MODEL;
-  const fallbackModel = (process.env.AI_FALLBACK_MODEL ?? "").trim() || null;
-  return { mode: baseUrl && apiKey ? "live" : "test", baseUrl, apiKey, model, fallbackModel: fallbackModel === model ? null : fallbackModel };
+  return parseAiEnv(process.env);
 }
 
 // مدل «متن فارسی محصول با AI»: AI_CATALOG_MODEL یا همان مدل اصلی دستیار (بخش ۴۰)

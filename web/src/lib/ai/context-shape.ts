@@ -27,7 +27,8 @@ export type LandedCompact =
       ratesDate: string | null;
       goods_and_shipping_to_iran_border_only?: true;
       excludes?: string;
-      methods: { method: string; unitToman: number | null; totalToman: number | null; days: { min: number; max: number } | null; needsInquiry: boolean }[];
+      // unitPrice/total: متن آماده با جداکننده‌ی هزارگان و واحد صریح («3,507,230 toman»)؛ بخش ۴۷
+      methods: { method: string; unitPrice: string | null; total: string | null; days: { min: number; max: number } | null; needsInquiry: boolean }[];
     };
 
 export type ProductInput = {
@@ -107,6 +108,8 @@ export function titleMention(text: string, title: string, generic: string[]): nu
 }
 
 // خلاصه‌ی کارت «قیمت تمام‌شده» برای مدل (بخش‌های ۲۹ و ۴۱)
+const tomanText = (n: number | null) => (n === null ? null : `${n.toLocaleString("en-US")} toman`);
+
 export function compactLanded(l: LandedCost): LandedCompact {
   if (l.status !== "ready") return { available: false as const };
   return {
@@ -117,6 +120,8 @@ export function compactLanded(l: LandedCost): LandedCompact {
     ratesDate: l.ratesDate,
     // بدون HS: عددها فقط «کالا + حمل تا مرز ایران» است (بخش ۴۱)؛ دستیار باید همین را بگوید، نه «قیمت تمام‌شده»
     ...(l.borderOnly ? { goods_and_shipping_to_iran_border_only: true as const, excludes: "customs, clearance, insurance and other costs (announced by a Yarchin expert)" } : {}),
-    methods: l.methods.map((m) => ({ method: m.nameFa, unitToman: m.unit, totalToman: m.total, days: m.days, needsInquiry: m.status === "inquiry" })),
+    // عدد خام بی‌جداکننده (3507230) را مدل گاهی بد می‌خواند و «هزار» را جا می‌اندازد (۳۵۰۷ تومان؛ آزمون ۲۰۲۶-۱۱-۰۶، بخش ۴۷)
+    // ← متن آماده با کاما و واحد صریح. مدل خودش به فارسی می‌نویسد؛ سنجش عدد (number-check.ts) هر دو شکل را می‌فهمد.
+    methods: l.methods.map((m) => ({ method: m.nameFa, unitPrice: tomanText(m.unit), total: tomanText(m.total), days: m.days, needsInquiry: m.status === "inquiry" })),
   };
 }

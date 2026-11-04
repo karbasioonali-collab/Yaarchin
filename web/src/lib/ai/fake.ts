@@ -25,9 +25,9 @@ const reply = (content: string | null, toolCalls: ToolCall[] = []): ModelReply =
 // همان قالب خطی مدل واقعی (prompt.ts)
 const json = (o: { answer: string; source: string; handoff: { reason: string; note?: string } | null }) =>
   reply(`source: ${o.source}\nhandoff: ${o.handoff ? `${o.handoff.reason}${o.handoff.note ? ` | ${o.handoff.note}` : ""}` : "none"}\n---\n${o.answer}`);
-const landedAnswer = (t: { available?: boolean; goods_and_shipping_to_iran_border_only?: true; methods?: { method: string; totalToman: number | null }[] }) => {
+const landedAnswer = (t: { available?: boolean; goods_and_shipping_to_iran_border_only?: true; methods?: { method: string; total: string | null }[] }) => {
   if (!t.available) return json({ answer: "", source: "none", handoff: { reason: "no_source", note: "ماشین‌حساب قیمت نداشت" } });
-  const lines = (t.methods ?? []).filter((m) => m.totalToman).map((m) => `${m.method}: حدود ${m.totalToman!.toLocaleString("fa-IR")} تومان`);
+  const lines = (t.methods ?? []).filter((m) => m.total).map((m) => `${m.method}: حدود ${Number(m.total!.replace(/\D/g, "")).toLocaleString("fa-IR")} تومان`);
   // بدون HS: فقط کالا و حمل تا مرز (بخش ۴۱)
   const head = t.goods_and_shipping_to_iran_border_only ? "قیمت کالا و حمل تا مرز ایران — " : "";
   const tail = t.goods_and_shipping_to_iran_border_only ? " هزینه‌های گمرک، ترخیص و بیمه را کارشناس اعلام می‌کند." : "";

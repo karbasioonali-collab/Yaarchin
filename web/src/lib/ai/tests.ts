@@ -192,7 +192,7 @@ export async function evaluateQuestion(
   if (pre) return done({ path: "rule", source: null, handoff: pre, answer: pre === "restricted" ? RESTRICTED_TEXT : HANDOFF_TEXT, guardHits: [] });
   // «جواب قیمت با کد» (بخش ۴۶): همان مسیر چت؛ منبع «محصول»، بدون مدل و هزینه
   const priced = await priceAnswer(productId, question);
-  if (priced) return done({ path: "price", source: "product", handoff: null, answer: priced, guardHits: [] });
+  if (priced) return done({ path: "price", source: priced.source, handoff: null, answer: priced.text, guardHits: [] });
 
   const site = await buildContext(question, productId, extractQty(question));
   const rec = (status: string, outcome: string | null, extra: Partial<typeof aiRequests.$inferInsert>) =>

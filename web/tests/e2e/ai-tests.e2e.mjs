@@ -137,6 +137,9 @@ let FREE;
   ok(res("می‌خوام ۲۰٬۰۰۰ تا سفارش بدم") === "rule||big_order|true", "big order rule passes");
   if (LIVE) ok(res("FOB یعنی چی؟") === "model|knowledge||false", `live mock: general expected, knowledge given → fail (${res("FOB یعنی چی؟")})`);
   else ok(res("FOB یعنی چی؟") === "model|general||true", `fake model: general definition passes (${res("FOB یعنی چی؟")})`);
+  // بخش ۴۷: «اگه ۱۰۰۰ تا بگیرم چند میشه؟» ← جواب قیمت با تعداد (کد)، منبع ماشین‌حساب، قبول (نشانه‌ی order_qty=1000 از کد)
+  const Q44 = "اگه ۱۰۰۰ تا بگیرم چند میشه؟";
+  ok(res(Q44) === "price|calculator||true", `qty price question → code, passes (${res(Q44)})`);
   // بخش ۴۶: سؤال ۱ (قیمت بدون تعداد) ← جواب قیمت با کد، منبع محصول، قبول
   const Q1 = "قیمت مخلوط‌کن قابل حمل چنده؟";
   ok(res(Q1) === "price|product||true", `price question → code price answer, passes (${res(Q1)})`);
