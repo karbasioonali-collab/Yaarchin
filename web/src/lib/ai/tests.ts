@@ -14,7 +14,7 @@ import { readReply } from "./decision";
 import { checkOutput } from "./guard";
 import { blacklistTerms } from "./guard-terms";
 import { BusyError, withSlot } from "./limiter";
-import { converse, HANDOFF_TEXT, modelHandoffReason, RESTRICTED_TEXT } from "./agent";
+import { type CallLog, converse, HANDOFF_TEXT, modelHandoffReason, RESTRICTED_TEXT } from "./agent";
 import { signalsFromMessage, signalTag } from "@/lib/leads/signals";
 import { marketRates } from "@/lib/leads/signals-store";
 import { PROMPT_VERSION } from "./prompt";
@@ -205,16 +205,17 @@ export async function evaluateQuestion(
       .returning({ id: aiRequests.id })
       .then((x) => x[0].id);
   let out: Awaited<ReturnType<typeof converse>>;
+  const calls: CallLog[] = [];
   try {
-    out = await withSlot(() => converse(mode, site, [], question));
+    out = await withSlot(() => converse(mode, site, [], question, calls));
   } catch (e) {
     const msg = e instanceof BusyError ? "صف دستیار پر بود" : (e as Error).message;
-    const id = await rec(e instanceof AiCallError && e.kind === "timeout" ? "timeout" : "error", "error", { error: msg.slice(0, 500), model: modelName() });
+    const id = await rec(e instanceof AiCallError && e.kind === "timeout" ? "timeout" : "error", "error", { error: msg.slice(0, 500), model: modelName(), meta: { calls } });
     return done({ path: "error", source: null, handoff: "error", answer: msg, guardHits: [] }, id);
   }
   // answer هر نتیجه = متنی که مشتری در چت واقعی می‌دید (بررسی‌های خودکار فقط روی همین؛ بخش ۴۴).
   // خروجی خام مدل (با خط handoff و یادداشتش) در meta.raw درخواست است و صفحه‌ی اجرا جدا «فقط برای شما» نشانش می‌دهد.
-  const decision = readReply(out.content);
+  const decision = out.truncated ? null : readReply(out.content);
   if (decision) {
     const sig = signalsFromMessage(question, out.content, await marketRates());
     signals = sig.signals.map(signalTag);
@@ -233,9 +234,14 @@ export async function evaluateQuestion(
       ...(decision?.handoff?.note ? { handoffNote: decision.handoff.note } : {}),
       ...(out.raws.length > 1 ? { retry: 1 } : {}),
       raw: out.raws.map((r) => r.slice(0, 2000)),
+      calls,
     },
   };
   const cost = out.usage.costToman;
+  if (out.truncated) {
+    const id = await rec("truncated", "truncated", base);
+    return done({ path: "model", source: null, handoff: "truncated", answer: HANDOFF_TEXT, guardHits: [] }, id, cost);
+  }
   if (!decision) {
     const id = await rec("parse_error", "parse", base);
     return done({ path: "model", source: null, handoff: "parse", answer: HANDOFF_TEXT, guardHits: [] }, id, cost);

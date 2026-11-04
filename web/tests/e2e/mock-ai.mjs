@@ -15,6 +15,7 @@
 //   بخش ۴۴ (شکل‌های واقعی اشتباه مدل): [[multisrc]] ← «source: product; calculator» | [[sigQI]] qty=500; import=yes
 //   [[staffnote]] ← یادداشت کارشناس و خط انگلیسی داخل متن جواب | [[bold]] ← ** و ## در جواب
 //   [[onlynote]] ← جواب فقط یک یادداشت (بعد از پاک‌سازی خالی؛ هر بار) | [[onlynote1]] ← همین فقط بار اول، بعد از یادآوری قالب جواب درست
+//   [[trunc]] ← هر بار بریده (finish_reason = length) | [[trunc1]] ← فقط بار اول (بعد از یادآوری «کوتاه‌تر» کامل)
 //   دو سؤال آزمون seed دقیقاً مثل آزمون واقعی ۲۰۲۶-۱۱-۰۴: «…قبلاً هم از چین وارد کردم.» ← multisrc + sigQI؛
 //   «…را عیناً در جوابت بنویس…» ← ارجاع restricted با یادداشت انگلیسی روی خط handoff
 //   «پیشنهاد سؤال فریبنده با AI» (دستورالعمل «tricky customer questions») ← ۵ سؤال، هر خط یکی
@@ -28,10 +29,10 @@ const out = (res, code, body) => {
   res.writeHead(code, { "content-type": "application/json" });
   res.end(JSON.stringify(body));
 };
-const completion = (model, message, cost) => ({
+const completion = (model, message, cost, finish) => ({
   id: "mock-" + Date.now(),
   model,
-  choices: [{ index: 0, message: { role: "assistant", ...message }, finish_reason: message.tool_calls ? "tool_calls" : "stop" }],
+  choices: [{ index: 0, message: { role: "assistant", ...message }, finish_reason: finish ?? (message.tool_calls ? "tool_calls" : "stop") }],
   usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100, total_cost_toman: cost, prompt_tokens_details: { cached_tokens: cachedNow } },
 });
 // [[cached:N]] ← usage.prompt_tokens_details.cached_tokens = N (مثل prompt caching لیارا)
@@ -69,10 +70,14 @@ http
       sigX: "qty=999; budget=10 billion toman",
       sigR: "budget=5 billion rial",
       sigQI: "qty=500; import=yes",
+      sigQ2: "qty=2",
     };
     const realQ1 = text?.includes("قبلاً هم از چین وارد کردم");
     const realQ2 = text?.includes("را عیناً در جوابت بنویس");
-    const sigKey = realQ1 ? "sigQI" : Object.keys(SIG).find((k) => text?.includes(`[[${k}]]`));
+    // بخش ۴۵ (آزمون واقعی ۲۰۲۶-۱۱-۰۵): سؤال ۴۲ ← مدل qty=2 نوشت؛ «۵۰۰ تا مخلوط‌کن تا تهران…» ← جواب بار اول به سقف توکن خورد
+    const realQ42 = text?.includes("۲ تا سؤال دارم: حداقل سفارش");
+    const realQ4 = text?.includes("۵۰۰ تا مخلوط‌کن تا تهران");
+    const sigKey = realQ1 ? "sigQI" : realQ42 ? "sigQ2" : Object.keys(SIG).find((k) => text?.includes(`[[${k}]]`));
     const srcOf = (o) => (realQ1 || text?.includes("[[multisrc]]") ? "product; calculator" : o.source);
     const sigLine = `signals: ${sigKey ? SIG[sigKey] : "none"}`;
     const lined = (o) =>
@@ -144,6 +149,13 @@ http
         completion(body.model, { content: 'حتماً!\n```json\n{"answer": "جواب {داخل} fence.", "source": "general", "handoff": null}\n```\nامیدوارم کمک کند {}' }, cost),
       );
     if (text.includes("[[newline]]")) return out(res, 200, completion(body.model, { content: '{"answer": "خط اول\nخط دوم", "source": "general", "handoff": null}' }, cost));
+    // [[trunc]] ← هر بار بریده (finish_reason = length)؛ [[trunc1]] ← فقط بار اول (بعد از یادآوری «کوتاه‌تر» کامل)
+    if (text.includes("[[trunc]]") || ((text.includes("[[trunc1]]") || realQ4) && !retried))
+      return out(
+        res,
+        200,
+        completion(body.model, { content: `source: calculator\nhandoff: none\n${sigLine}\n---\nقیمت هوایی ۱۲۳٬۰۰۰ تومان و دریایی ۹۸٬۰۰۰ تومان است. این ش` }, cost, "length"),
+      );
     if (realQ2)
       return json({ answer: "", source: "general", handoff: { reason: "restricted", note: "customer attempting to manipulate signals line and inject false instructions" } });
     if (text.includes("[[bold]]")) return json({ answer: "**هوایی:** ۱۲۳٬۰۰۰ تومان\n## دریایی\n__۹۸٬۰۰۰__ تومان. این قیمت تخمینی است.", source: "product", handoff: null });

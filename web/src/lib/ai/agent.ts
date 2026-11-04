@@ -29,6 +29,7 @@ import { type Decision, FORMAT_REMINDER, readReply } from "./decision";
 import { normFa } from "./normalize";
 import { LANDED_TOOL, PROMPT_VERSION, SYSTEM_PROMPT } from "./prompt";
 import { cannedReply } from "./canned";
+import type { CallLog } from "./call-log";
 import { extractQty, HANDOFF_FA, pleasantry, preRule } from "./rules";
 import { kindForModelHandoff, type SuggestionKind } from "./learn";
 import { addReply, aiStatus, ensureState, getState, resume, setThinking, silence } from "./state";
@@ -146,18 +147,22 @@ export async function runAgent(c: RunCtx): Promise<void> {
   let decision: ReturnType<typeof readReply> = null;
   let raws: string[] = [];
   let content = "";
+  let truncated = false;
+  const calls: CallLog[] = [];
   try {
     const prior = (await historyOf(conv.id, msg.id)).slice(0, -1);
-    const out = await withSlot(() => converse(c.mode, site, prior, msg.body));
+    const out = await withSlot(() => converse(c.mode, site, prior, msg.body, calls));
     usage = out.usage;
     modelUsed = out.model;
     fallbackUsed = out.fallbackUsed;
     raws = out.raws;
     content = out.content;
-    decision = readReply(out.content);
+    truncated = out.truncated;
+    decision = truncated ? null : readReply(out.content);
   } catch (e) {
     const kind = e instanceof BusyError ? "busy" : "error";
     const reqId = await rec(e instanceof AiCallError && e.kind === "timeout" ? "timeout" : "error", kind, {
+      meta: { promptVersion: PROMPT_VERSION, calls },
       error: (e as Error).message.slice(0, 500),
       model: e instanceof AiCallError ? (c.mode === "live" ? aiConfig().model : "test/fake") : null,
     });
@@ -197,11 +202,17 @@ export async function runAgent(c: RunCtx): Promise<void> {
       // خروجی خام مدل برای همه‌ی درخواست‌ها (از بخش ۴۴؛ «آخرین درخواست‌ها» فقط برای مدیر)؛ retry = یک بار با یادآوری قالب دوباره پرسیده شد
       ...(raws.length > 1 ? { retry: 1 } : {}),
       raw: raws.map((r) => r.slice(0, 2000)),
+      // زمان و توکن هر تلاش جدا (بخش ۴۵)
+      calls,
     },
   };
   // «پیشنهاد سؤال تازه» (فقط چت زنده؛ بخش ۳۳)
   const learn = (kind: SuggestionKind | null, detail?: string | null) =>
     kind && c.mode === "live" ? addSuggestion({ question: msg.body, kind, detail, conversationId: conv.id, messageId: msg.id }) : Promise.resolve();
+  if (truncated) {
+    await learn("no_answer", "جواب مدل دو بار بریده شد (سقف توکن)");
+    return handoff(c, "truncated", null, await rec("truncated", "truncated", base));
+  }
   if (!decision) {
     await learn("no_answer", "جواب مدل قابل خواندن نبود");
     return handoff(c, "parse", null, await rec("parse_error", "parse", base));
@@ -246,7 +257,12 @@ export function modelHandoffReason(d: Decision): string | null {
 // گفتگو با مدل (یا مدل ساختگی) با حداکثر دو دور ابزار ماشین‌حساب؛ اگر مدل اصلی خطا داد یا جواب نداد، یک بار مدل پشتیبان.
 // اگر جواب نهایی قالب درست نداشت، یک بار با یادآوری قالب (FORMAT_REMINDER) دوباره پرسیده می‌شود. raws = متن خام هر جواب نهایی.
 // prior = پیام‌های قبلی گفتگو (بدون پیام فعلی). آزمون دستیار (tests.ts) همین را بدون تاریخچه صدا می‌زند.
-export async function converse(mode: Mode, site: SiteContext, prior: { role: "user" | "assistant"; content: string }[], text: string) {
+export type { CallLog } from "./call-log";
+// یادآوری وقتی جواب به سقف توکن خورد و بریده شد (finish_reason = length)؛ در کد است، نه در دستورالعمل اصلی
+export const LENGTH_REMINDER = "Your previous reply was cut off because it was too long. Send the full reply again in the same format, much shorter: at most 60 words of Persian.";
+
+// calls (اختیاری): هر تلاش به مدل اینجا اضافه می‌شود، حتی اگر converse خطا بدهد (برای meta.calls)
+export async function converse(mode: Mode, site: SiteContext, prior: { role: "user" | "assistant"; content: string }[], text: string, calls: CallLog[] = []) {
   const messages: ChatMsg[] = [
     { role: "system", content: SYSTEM_PROMPT },
     ...prior,
@@ -270,11 +286,23 @@ export async function converse(mode: Mode, site: SiteContext, prior: { role: "us
     let useTools = site.withPrice && !site.landedForQty && site.products.length > 0;
     let toolRounds = 0;
     const raws: string[] = [];
+    let reminder: CallLog["reminder"];
     for (;;) {
       let r: ModelReply;
+      const t0 = Date.now();
       try {
         r = await call(which, msgs, useTools);
+        calls.push({
+          which,
+          ms: Date.now() - t0,
+          finish: r.finishReason,
+          inTok: r.usage.promptTokens,
+          outTok: r.usage.completionTokens,
+          tool: r.toolCalls.length > 0,
+          ...(reminder ? { reminder } : {}),
+        });
       } catch (e) {
+        calls.push({ which, ms: Date.now() - t0, error: e instanceof AiCallError ? e.kind : "error", ...(reminder ? { reminder } : {}) });
         // اگر ارائه‌دهنده ابزار را نپذیرفت (خطای ۴۰۰ درباره‌ی tools)، یک بار بدون ابزار
         if (useTools && e instanceof AiCallError && e.kind === "http" && e.status === 400 && /tool/i.test(e.body ?? "")) {
           useTools = false;
@@ -298,12 +326,15 @@ export async function converse(mode: Mode, site: SiteContext, prior: { role: "us
       }
       const content = r.content ?? "";
       raws.push(content);
-      // قالب نادرست ← یک بار یادآوری. (ابزار در درخواست می‌ماند: Claude درخواستی را که در تاریخچه‌اش tool call هست ولی tools ندارد رد می‌کند.)
-      if (raws.length === 1 && !readReply(content)) {
-        msgs.push({ role: "assistant", content: content.trim() || "(خالی)" }, { role: "user", content: FORMAT_REMINDER });
+      // جواب بریده (سقف توکن) هرگز به مشتری نمی‌رسد (بخش ۴۵)؛ truncated = بعد از یک تلاش دوباره هم بریده بود
+      const truncated = r.finishReason === "length";
+      // قالب نادرست یا جواب بریده ← یک بار یادآوری. (ابزار در درخواست می‌ماند: Claude درخواستی را که در تاریخچه‌اش tool call هست ولی tools ندارد رد می‌کند.)
+      if (raws.length === 1 && (truncated || !readReply(content))) {
+        reminder = truncated ? "length" : "format";
+        msgs.push({ role: "assistant", content: content.trim() || "(خالی)" }, { role: "user", content: truncated ? LENGTH_REMINDER : FORMAT_REMINDER });
         continue;
       }
-      return { content, usage, model: r.model, raws };
+      return { content, usage, model: r.model, raws, truncated };
     }
   };
   try {
@@ -350,7 +381,7 @@ export async function handoff(c: RunCtx, reason: string, note: string | null, re
   });
   await db.insert(conversationFlags).values({
     conversationId: c.conversationId,
-    flag: reason === "leak" || reason === "parse" ? "needs_review" : "needs_expert",
+    flag: reason === "leak" || reason === "parse" || reason === "truncated" ? "needs_review" : "needs_expert",
     reason: `${test ? "آزمایشی: " : ""}${label}`,
     source: "ai",
   });
