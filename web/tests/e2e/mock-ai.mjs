@@ -149,6 +149,23 @@ http
         completion(body.model, { content: 'حتماً!\n```json\n{"answer": "جواب {داخل} fence.", "source": "general", "handoff": null}\n```\nامیدوارم کمک کند {}' }, cost),
       );
     if (text.includes("[[newline]]")) return out(res, 200, completion(body.model, { content: '{"answer": "خط اول\nخط دوم", "source": "general", "handoff": null}' }, cost));
+    // بخش ۴۶: [[reversed]] ← عین خروجی خام آزمون واقعی ۲۰۲۶-۱۱-۰۶ (اول جواب با ** و عدد ساختگی، بعد سرآیند، بدون ---؛ هر بار)
+    //   [[fakenum]] ← قالب درست ولی مبلغ و زمان ساختگی (هر بار)؛ [[fakenum1]] ← فقط بار اول، بعد از یادآوری جواب بدون عدد
+    if (text.includes("[[reversed]]"))
+      return out(
+        res,
+        200,
+        completion(
+          body.model,
+          {
+            content:
+              "برای ۱۰۰ عدد:\n**هوایی:** ۴۴۴ میلیون تومان (۱۷ تا ۲۲ روز)\n**دریایی:** ۳۸۱ میلیون تومان\n**زمینی:** ۳۴۰ میلیون تومان\n**ریلی:** ۳۳۶ میلیون تومان\nاین قیمت تخمینی است.\n\nsource: product\nhandoff: none\nsignals: none",
+          },
+          cost,
+        ),
+      );
+    if (text.includes("[[fakenum]]") || (text.includes("[[fakenum1]]") && !retried))
+      return json({ answer: "قیمت تمام‌شده‌ی هوایی برای ۱۰۰ عدد ۴۴۴ میلیون تومان است، ۱۷ تا ۲۲ روز. این قیمت تخمینی است.", source: "calculator", handoff: null });
     // [[trunc]] ← هر بار بریده (finish_reason = length)؛ [[trunc1]] ← فقط بار اول (بعد از یادآوری «کوتاه‌تر» کامل)
     if (text.includes("[[trunc]]") || ((text.includes("[[trunc1]]") || realQ4) && !retried))
       return out(

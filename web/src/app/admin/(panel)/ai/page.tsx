@@ -14,14 +14,14 @@ import { reviewDays } from "@/lib/ai/kb";
 import { PROMPT_VERSION } from "@/lib/ai/prompt";
 import { HANDOFF_FA } from "@/lib/ai/rules";
 import { aiStatus } from "@/lib/ai/state";
-import { aiLimits, catalogLimits, testLimits, todayUsage } from "@/lib/ai/usage";
+import { aiLimits, blockInventedNumbers, catalogLimits, testLimits, todayUsage } from "@/lib/ai/usage";
 import { callLine, readRequestMeta } from "@/lib/ai/request-meta";
 import { requirePermission } from "@/lib/auth/can";
 import { aiReady, aiTestsReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import { getSetting, isEnabled } from "@/lib/settings";
 import styles from "../panel.module.css";
-import { saveAiLimitsAction, saveBlacklistAction, saveCannedAction, saveGenericWordsAction } from "./actions";
+import { saveAiLimitsAction, saveBlacklistAction, saveCannedAction, saveGenericWordsAction, saveNumberCheckAction } from "./actions";
 import { ConnectionTest } from "./ConnectionTest";
 
 import { RawToggle } from "./RawToggle";
@@ -52,6 +52,7 @@ export default async function AiPage() {
   const a = await requirePermission("ai.settings");
   // خروجی خام مدل فقط برای مدیر (بخش ۴۴)
   const isAdmin = a.user.isAdmin;
+  const blockNumbers = await blockInventedNumbers();
   const ready = await aiReady();
   const cfg = aiConfig();
   const zero = { requests: 0, costToman: 0, promptTokens: 0, completionTokens: 0 };
@@ -198,6 +199,21 @@ export default async function AiPage() {
         </div>
       </div>
 
+      <div className={styles.card} style={{ marginTop: 16 }} data-testid="number-check">
+        <h2 className={styles.cardTitle}>عدد خارج از داده‌های سایت</h2>
+        <p className={styles.muted} style={{ marginTop: 0, fontSize: 13 }}>
+          مبلغ‌ها (تومان، دلار، …) و زمان‌های حمل («X تا Y روز») در جواب دستیار با داده‌هایی که به دستیار داده شد مقایسه می‌شوند. عدد مشکوک همیشه در «خروجی خام» ثبت می‌شود و سؤال
+          آزمون را رد می‌کند. با روشن کردن این سوئیچ، در چت مشتری هم جلوی جواب گرفته می‌شود: یک بار دوباره پرسیده می‌شود و اگر باز عدد خارج از داده داشت، گفتگو با برچسب «عدد خارج
+          از داده‌های سایت» به کارشناس می‌رود. قبل از روشن کردن دستیار برای مشتری‌ها درباره‌ی این سوئیچ تصمیم بگیرید.
+        </p>
+        <ActionForm action={saveNumberCheckAction} submitLabel="ذخیره">
+          <label className={ui.field} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" name="blockNumbers" defaultChecked={blockNumbers} />
+            <span>جلوگیری از عدد خارج از داده‌ها در چت مشتری</span>
+          </label>
+        </ActionForm>
+      </div>
+
       <div className={styles.card} style={{ marginTop: 16 }}>
         <h2 className={styles.cardTitle}>کلمه‌های کلی عنوان محصول</h2>
         <p className={styles.muted} style={{ marginTop: 0, fontSize: 13 }}>
@@ -286,6 +302,7 @@ export default async function AiPage() {
                         lines={readRequestMeta(r.meta).calls.map(callLine)}
                         raws={[...(readRequestMeta(r.meta).blocked ? [readRequestMeta(r.meta).blocked!] : []), ...readRequestMeta(r.meta).raws]}
                         cleaned={readRequestMeta(r.meta).cleaned}
+                        suspects={readRequestMeta(r.meta).suspects}
                         href={`/admin/ai/requests/${r.id}`}
                       />
                     )}

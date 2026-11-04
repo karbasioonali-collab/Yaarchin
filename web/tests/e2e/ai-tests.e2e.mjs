@@ -116,7 +116,7 @@ let FREE;
   ok(r[0] === "done" && r[1] === "44" && r[2] === "44" && Number(r[3]) + Number(r[4]) === 44, `full run counts (${r.join("|")})`);
   // سؤال ۲ در حالت زنده یک تلاش دوباره دارد (جواب بریده؛ بخش ۴۵) ← یک درخواست ۴۰۰ تومانی بیشتر
   ok(Number(r[6]) === (LIVE ? (44 - FREE) * 400 + 400 : 0), `full run cost (${r[6]})`);
-  ok(psql(`select count(*) from ai_test_results where run_id='${FULL}' and path in ('rule','canned')`) === String(FREE), "rule/canned cases did not call the model");
+  ok(psql(`select count(*) from ai_test_results where run_id='${FULL}' and path in ('rule','canned','price')`) === String(FREE), "rule/canned/price cases did not call the model");
   ok(
     psql(`select count(*) from ai_requests where purpose='test_run' and mode='${MODE}' and meta->>'testRunId'='${FULL}'`) === String(44 - FREE),
     "one ai_requests row per model case (purpose test_run)",
@@ -137,6 +137,13 @@ let FREE;
   ok(res("می‌خوام ۲۰٬۰۰۰ تا سفارش بدم") === "rule||big_order|true", "big order rule passes");
   if (LIVE) ok(res("FOB یعنی چی؟") === "model|knowledge||false", `live mock: general expected, knowledge given → fail (${res("FOB یعنی چی؟")})`);
   else ok(res("FOB یعنی چی؟") === "model|general||true", `fake model: general definition passes (${res("FOB یعنی چی؟")})`);
+  // بخش ۴۶: سؤال ۱ (قیمت بدون تعداد) ← جواب قیمت با کد، منبع محصول، قبول
+  const Q1 = "قیمت مخلوط‌کن قابل حمل چنده؟";
+  ok(res(Q1) === "price|product||true", `price question → code price answer, passes (${res(Q1)})`);
+  ok(
+    psql(`select answer from ai_test_results where run_id='${FULL}' and question=${q(Q1)}`).endsWith("اگر تعداد را بگویید، دقیق‌تر حساب می‌کنم."),
+    "stored answer ends with the exact sentence",
+  );
   // بخش ۴۴: سؤال‌های ردشده‌ی آزمون واقعی ۲۰۲۶-۱۱-۰۴ (mock همان شکل جواب مدل واقعی را می‌سازد)
   const Q42 = "۲ تا سؤال دارم: حداقل سفارش مخلوط‌کن چنده؟ زمان رسیدنش چقدره؟";
   ok(res(Q42).endsWith("|true"), `«۲ تا سؤال دارم: …» passes, no signal (${res(Q42)})`);

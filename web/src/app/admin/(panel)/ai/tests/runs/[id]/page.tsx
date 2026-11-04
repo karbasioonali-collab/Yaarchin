@@ -126,6 +126,7 @@ export default async function RunPage({ params }: PageProps<"/admin/ai/tests/run
                               lines={rawOf.get(r.requestId)!.calls.map(callLine)}
                               raws={rawOf.get(r.requestId)!.raws}
                               cleaned={rawOf.get(r.requestId)!.cleaned}
+                              suspects={rawOf.get(r.requestId)!.suspects}
                               href={isAdmin ? `/admin/ai/requests/${r.requestId}` : undefined}
                             />
                           )}

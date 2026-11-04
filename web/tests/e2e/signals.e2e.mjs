@@ -271,6 +271,108 @@ const c10 = await newCustomer();
   ok(!psql(`select coalesce(meta->>'signals', '') from ai_requests where message_id=${r.mid}`).includes("order_qty"), "not in request meta either");
 }
 
+// ---------- بخش ۴۶: جواب قیمت با کد، قالب برعکس، عدد خارج از داده ----------
+{
+  const mockN = async () => (await (await fetch("http://127.0.0.1:3399/__log")).json()).length;
+  const END = "اگر تعداد را بگویید، دقیق‌تر حساب می‌کنم.";
+  // سؤال قیمت بدون تعداد ← کد، بدون هیچ درخواستی به مدل
+  const c11 = await newCustomer();
+  const n0 = await mockN();
+  const r1 = await say(c11.p, "portable-blender", "قیمت مخلوط‌کن قابل حمل چنده؟", { isNew: true });
+  const body1 = lastAi(r1.conv);
+  ok((await mockN()) === n0, "price question: no model call");
+  ok(psql(`select status || '|' || outcome || '|' || cost_toman::float from ai_requests where message_id=${r1.mid}`) === "ok|site_price|0", "logged as site_price, cost 0");
+  ok(
+    body1.startsWith("قیمت مخلوط‌کن قابل‌حمل شارژی ۳۸۰ میلی‌لیتر در سایت برای سفارش") && body1.includes("دلار") && body1.includes("حداقل سفارش از"),
+    `site price line (${body1.split("\n")[0]})`,
+  );
+  ok(body1.includes("قیمت تمام‌شده‌ی تخمینی تا ایران برای") && body1.includes("این قیمت تخمینی است.") && body1.endsWith(END), "landed lines + exact last sentence");
+  // همان عددهای کارت صفحه‌ی محصول (API عمومی)
+  const pub = await api(c11.p, "GET", "/api/v1/products/portable-blender/landed");
+  const m0 = pub.j.landed.methods.find((m) => m.unit !== null);
+  ok(m0 && body1.includes(`${m0.nameFa}: هر عدد ${m0.unit.toLocaleString("fa-IR")} تومان`), `same numbers as the product page (${m0?.nameFa} ${m0?.unit})`);
+  // یکسان‌سازی اسم محصول: نیم‌فاصله/فاصله و ي/ك
+  const r2 = await say(c11.p, r1.conv, "قيمت مخلوط كن قابل‌حمل چنده؟");
+  ok(psql(`select outcome from ai_requests where message_id=${r2.mid}`) === "site_price", "«قيمت مخلوط كن قابل‌حمل» (ي/ك، فاصله) → code");
+  // با تعداد یا سؤال دیگر ← مسیر قبلی
+  const r3 = await say(c11.p, r1.conv, "قیمت حمل چنده؟");
+  ok(psql(`select outcome from ai_requests where message_id=${r3.mid}`) !== "site_price", "«قیمت حمل چنده؟» → model, not code");
+  const r4 = await say(c11.p, r1.conv, "۵۰۰ تا چند؟");
+  ok(psql(`select outcome from ai_requests where message_id=${r4.mid}`) !== "site_price", "with quantity → calculator/model");
+  // بدون HS ← «قیمت تا مرز ایران»
+  const hs = psql("select hs_code from products where slug='led-bulb-12w'");
+  psql("update products set hs_code=null where slug='led-bulb-12w'");
+  const c12 = await newCustomer();
+  const r5 = await say(c12.p, "led-bulb-12w", "قیمتش چنده؟", { isNew: true });
+  const b5 = lastAi(r5.conv);
+  ok(b5.includes("قیمت تا مرز ایران برای") && b5.includes("هزینه‌های گمرک، ترخیص و بیمه را کارشناس اعلام می‌کند") && !b5.includes("تمام‌شده‌ی تخمینی"), "no HS → border wording");
+  psql(`update products set hs_code='${hs}' where slug='led-bulb-12w'`);
+  // بدون وزن/کارتن ← استعلام
+  const c13 = await newCustomer();
+  const r6 = await say(c13.p, "smart-led-strip-5m", "قیمتش چنده؟", { isNew: true });
+  ok(lastAi(r6.conv).includes("استعلام از کارشناس") && lastAi(r6.conv).endsWith(END), `no packing → inquiry (${lastAi(r6.conv).split("\n").slice(2, 4).join(" / ")})`);
+  // بعد از پیام کارشناس ساکت؛ با سوئیچ خاموش ساکت
+  await ad.goto(B + `/admin/chats/${r6.conv}`);
+  await ad.getByLabel("پاسخ").fill("سلام، من کارشناس هستم.");
+  await ad.getByLabel("پاسخ").press("Enter");
+  await waitFor(() => psql(`select mode from ai_conversation_state where conversation_id='${r6.conv}'`) === "human");
+  const r7 = await say(c13.p, r6.conv, "قیمتش چنده؟", { wait: false });
+  await sleep(1500);
+  ok(psql(`select count(*) from ai_requests where message_id=${r7.mid}`) === "0", "after staff reply: no code price answer");
+  setS("features.ai_agent", false);
+  const c14 = await newCustomer();
+  const r8 = await say(c14.p, "portable-blender", "قیمتش چنده؟", { isNew: true, wait: false });
+  await sleep(1500);
+  ok(
+    psql(`select count(*) from ai_requests where message_id=${r8.mid}`) === "0" &&
+      psql(`select count(*) from chat_messages where conversation_id='${r8.conv}' and sender_type='ai'`) === "0",
+    "switch off: no code price answer",
+  );
+  setS("features.ai_agent", true);
+
+  // قالب برعکس (عین خروجی خام آزمون واقعی) ← یک تلاش دوباره ← ارجاع «جواب دستیار قابل خواندن نبود»
+  const c15 = await newCustomer();
+  const r9 = await say(c15.p, SLUG, "قیمت برای صد عدد؟ [[reversed]]", { isNew: true });
+  ok(
+    psql(`select status || '|' || outcome || '|' || (meta->>'retry') from ai_requests where message_id=${r9.mid}`) === "parse_error|parse|1",
+    "reversed format → retried once → parse handoff",
+  );
+  ok(lastAi(r9.conv) === "پیام شما به کارشناس یارچین سپرده شد؛ به‌زودی همین‌جا پاسخ می‌دهد.", "customer sees the handoff text, not the invented numbers");
+  ok(psql(`select count(*) from conversation_flags where conversation_id='${r9.conv}' and reason like '%قابل خواندن نبود%'`) === "1", "label «جواب دستیار قابل خواندن نبود»");
+
+  // عدد خارج از داده: سوئیچ خاموش ← فقط ثبت
+  const c16 = await newCustomer();
+  const r10 = await say(c16.p, SLUG, "هزینه‌ی هوایی؟ [[fakenum]]", { isNew: true });
+  ok(psql(`select status from ai_requests where message_id=${r10.mid}`) === "ok" && lastAi(r10.conv).includes("۴۴۴ میلیون"), "switch off: answer delivered (stage 1: log only)");
+  ok(psql(`select meta->>'suspectNumbers' from ai_requests where message_id=${r10.mid}`).includes("444 میلیون تومان"), "suspect numbers logged");
+  const rid10 = psql(`select id from ai_requests where message_id=${r10.mid}`);
+  await ad.goto(B + `/admin/ai/requests/${rid10}`);
+  ok((await ad.getByTestId("request-suspects").innerText()).includes("17 تا 22 روز"), "request page shows suspect numbers");
+  // سوئیچ از پنل
+  await ad.goto(B + "/admin/ai");
+  const box = ad.getByTestId("number-check");
+  await box.locator('input[name="blockNumbers"]').check();
+  await box.getByRole("button", { name: "ذخیره" }).click();
+  ok(await waitFor(() => psql("select value from settings where key='ai.block_invented_numbers'") === "true"), "panel switch turns blocking on");
+  // سوئیچ روشن: یک بار یادآوری ← جواب درست؛ دو بار ← ارجاع
+  const r11 = await say(c16.p, r10.conv, "باز هم هوایی؟ [[fakenum1]]");
+  const calls11 = JSON.parse(psql(`select meta->'calls' from ai_requests where message_id=${r11.mid}`));
+  ok(
+    psql(`select status from ai_requests where message_id=${r11.mid}`) === "ok" && calls11[1]?.reminder === "numbers" && lastAi(r10.conv) === "پاسخ ساختگی مدل اصلی.",
+    "switch on: invented once → numbers reminder → good answer",
+  );
+  const r12 = await say(c16.p, r10.conv, "هوایی؟ [[fakenum]]");
+  ok(psql(`select status || '|' || outcome from ai_requests where message_id=${r12.mid}`) === "number_block|invented_number", "switch on: invented twice → handoff");
+  ok(
+    !lastAi(r10.conv).includes("۴۴۴") && psql(`select count(*) from conversation_flags where conversation_id='${r10.conv}' and reason like '%عدد خارج از داده‌های سایت%'`) === "1",
+    "label «عدد خارج از داده‌های سایت»",
+  );
+  await ad.goto(B + "/admin/ai");
+  await box.locator('input[name="blockNumbers"]').uncheck();
+  await box.getByRole("button", { name: "ذخیره" }).click();
+  ok(await waitFor(() => psql("select value from settings where key='ai.block_invented_numbers'") === "false"), "panel switch off again");
+}
+
 // ---------- تزریق: مشتری خودش قالب نشانه نوشت ----------
 const c3 = await newCustomer();
 {

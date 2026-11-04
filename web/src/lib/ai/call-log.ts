@@ -7,5 +7,5 @@ export type CallLog = {
   outTok?: number;
   tool?: boolean;
   error?: string;
-  reminder?: "format" | "length";
+  reminder?: "format" | "length" | "numbers";
 };

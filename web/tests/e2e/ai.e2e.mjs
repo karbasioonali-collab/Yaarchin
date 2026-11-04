@@ -354,7 +354,7 @@ if (!LIVE) {
       cust.j.messages.filter((m) => m.from === "ai").every((m) => !m.rate),
       "canned replies have no 👍/👎",
     );
-    const q = await say(Q.p, g.conv, "سلام، قیمتش چنده؟");
+    const q = await say(Q.p, g.conv, "سلام، وزنش چقدره؟");
     ok((await mockLog()).length > n0 && req(q.mid).startsWith("ok|knowledge|mock/primary"), "greeting + question → model");
     // متن آماده از پنل
     await ad.goto(B + "/admin/ai");

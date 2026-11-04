@@ -4,7 +4,21 @@
 import Link from "next/link";
 import { useState } from "react";
 
-export function RawToggle({ title, lines, raws, cleaned, href }: { title: string; lines: string[]; raws: string[]; cleaned: string[]; href?: string }) {
+export function RawToggle({
+  title,
+  lines,
+  raws,
+  cleaned,
+  suspects = [],
+  href,
+}: {
+  title: string;
+  lines: string[];
+  raws: string[];
+  cleaned: string[];
+  suspects?: string[];
+  href?: string;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <div style={{ fontSize: 12, marginTop: 4 }} data-testid="raw-toggle">
@@ -35,6 +49,11 @@ export function RawToggle({ title, lines, raws, cleaned, href }: { title: string
             </div>
           ))}
           {cleaned.length > 0 && <div style={{ color: "var(--muted)" }}>از متن مشتری حذف شد: {cleaned.join(" · ")}</div>}
+          {suspects.length > 0 && (
+            <div style={{ color: "#B3261E" }} data-testid="raw-suspects">
+              عدد خارج از داده‌ها: {suspects.join(" · ")}
+            </div>
+          )}
         </div>
       )}
     </div>

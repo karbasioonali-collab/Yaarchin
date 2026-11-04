@@ -34,6 +34,26 @@ const LIMITS: [string, string, number, number][] = [
   ["ai.catalog_daily_cost_toman", "catalogDailyCost", 0, 1_000_000_000],
 ];
 
+// سوئیچ «جلوگیری از عدد خارج از داده‌های سایت» (بخش ۴۶)
+export async function saveNumberCheckAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("ai.settings");
+  const on = fd.get("blockNumbers") === "on";
+  const r = await setSetting("ai.block_invented_numbers", on, a.user.id).catch(() => null);
+  if (!r) return { error: "این تنظیم هنوز در دیتابیس نیست؛ اول در کنسول لیارا npm run db:seed را اجرا کنید." };
+  if (r.before !== on)
+    await logActivity({
+      actorUserId: a.user.id,
+      actingAsUserId: a.session.impersonatingUserId,
+      action: "setting.update",
+      entityType: "setting",
+      entityId: "ai.block_invented_numbers",
+      before: { value: r.before },
+      after: { value: on },
+    });
+  revalidatePath("/admin/ai");
+  return { ok: on ? "روشن شد: عدد خارج از داده‌ها در چت جلوگیری می‌شود." : "خاموش شد: فقط ثبت در لاگ و آزمون." };
+}
+
 export async function saveAiLimitsAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("ai.settings");
   const values: [string, number][] = [];
