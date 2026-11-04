@@ -402,9 +402,9 @@ if (!LIVE) {
     ok(n1 > 0 && psql(`select (cost_toman > 400)::text from ai_requests where message_id=${f4.mid}`) === "true", "retry cost added to request");
     await ad.goto(B + "/admin/ai");
     // بخش ۴۵: دکمه‌ی «خروجی خام مدل» و صفحه‌ی جدای هر درخواست (فقط مدیر)
-    const t = ad.getByTestId("raw-toggle").first();
-    await t.getByTestId("raw-button").click();
-    ok(await vis(t.getByTestId("raw-body")), "panel: raw toggle opens");
+    const rawT = ad.getByTestId("raw-toggle").first();
+    await rawT.getByTestId("raw-button").click();
+    ok(await vis(rawT.getByTestId("raw-body")), "panel: raw toggle opens");
     const rid = psql(`select id from ai_requests where message_id=${f4.mid} order by id desc limit 1`);
     await ad.goto(B + `/admin/ai/requests/${rid}`);
     ok(await vis(ad.getByTestId("request-raw").getByText("سلام! این JSON نیست.").first()), "panel shows raw model output");
