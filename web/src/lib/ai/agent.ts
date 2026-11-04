@@ -363,11 +363,12 @@ export async function converse(
       // جواب بریده (سقف توکن) هرگز به مشتری نمی‌رسد (بخش ۴۵)؛ truncated = بعد از یک تلاش دوباره هم بریده بود
       const truncated = r.finishReason === "length";
       const d = truncated ? null : readReply(content);
-      // عددهای مشکوک: مبلغ/زمانی که در هیچ‌کدام از پیام‌های فرستاده به مدل (داده‌های سایت، نتیجه‌ی ابزار، گفتگو) نیست (بخش ۴۶)
+      // عددهای مشکوک: مبلغ/زمانی که در داده‌های فرستاده به مدل نیست (بخش ۴۶). منبع = پیام‌های user (داده‌های سایت + متن مشتری)
+      // و نتیجه‌ی ابزار؛ جواب‌های قبلی خود دستیار منبع نیستند، وگرنه عدد ساختگیِ یک جواب در پیام بعد «مجاز» می‌شد.
       const suspects = d
         ? suspectNumbers(
             d.answer,
-            msgs.filter((m) => m.role !== "system").map((m) => (typeof m.content === "string" ? m.content : "")),
+            msgs.filter((m) => m.role === "user" || m.role === "tool").map((m) => m.content ?? ""),
           )
         : [];
       // قالب نادرست، جواب بریده یا (با سوئیچ) عدد خارج از داده ← یک بار یادآوری.

@@ -116,7 +116,7 @@ let FREE;
   ok(r[0] === "done" && r[1] === "44" && r[2] === "44" && Number(r[3]) + Number(r[4]) === 44, `full run counts (${r.join("|")})`);
   // سؤال ۲ در حالت زنده یک تلاش دوباره دارد (جواب بریده؛ بخش ۴۵) ← یک درخواست ۴۰۰ تومانی بیشتر
   ok(Number(r[6]) === (LIVE ? (44 - FREE) * 400 + 400 : 0), `full run cost (${r[6]})`);
-  ok(psql(`select count(*) from ai_test_results where run_id='${FULL}' and path in ('rule','canned')`) === String(FREE), "rule/canned cases did not call the model");
+  ok(psql(`select count(*) from ai_test_results where run_id='${FULL}' and path in ('rule','canned','price')`) === String(FREE), "rule/canned/price cases did not call the model");
   ok(
     psql(`select count(*) from ai_requests where purpose='test_run' and mode='${MODE}' and meta->>'testRunId'='${FULL}'`) === String(44 - FREE),
     "one ai_requests row per model case (purpose test_run)",
