@@ -15,6 +15,8 @@ import { checkOutput } from "./guard";
 import { blacklistTerms } from "./guard-terms";
 import { BusyError, withSlot } from "./limiter";
 import { converse, HANDOFF_TEXT, modelHandoffReason, RESTRICTED_TEXT } from "./agent";
+import { signalsFromMessage, signalTag, stripSignals } from "@/lib/leads/signals";
+import { marketRates } from "@/lib/leads/signals-store";
 import { PROMPT_VERSION } from "./prompt";
 import { extractQty, pleasantry, preRule } from "./rules";
 import { allPass, DEFAULT_AVG_TOMAN, estimateRun, ruleCaught, runChecks, type TestExpect, type TestOutcome } from "./test-checks";
@@ -173,7 +175,14 @@ export async function evaluateQuestion(
         .where(and(eq(products.slug, productSlug), eq(products.status, "published")))
     : [];
   const productId = p?.id ?? null;
-  const done = (outcome: TestOutcome, requestId: number | null = null, costToman = 0): Evaluated => ({ outcome, requestId, costToman, latencyMs: Date.now() - t0 });
+  // نشانه‌هایی که این پیام در چت واقعی ثبت می‌کرد (آزمون چیزی ذخیره نمی‌کند؛ بخش ۴۳). بدون جواب مدل = فقط تعداد با کد.
+  let signals = signalsFromMessage(question, null).signals.map(signalTag);
+  const done = (outcome: TestOutcome, requestId: number | null = null, costToman = 0): Evaluated => ({
+    outcome: { ...outcome, signals },
+    requestId,
+    costToman,
+    latencyMs: Date.now() - t0,
+  });
 
   const kind = pleasantry(question);
   if (kind) return done({ path: "canned", source: "canned", handoff: null, answer: await cannedReply(kind, productId), guardHits: [] });
@@ -204,6 +213,12 @@ export async function evaluateQuestion(
     return done({ path: "error", source: null, handoff: "error", answer: msg, guardHits: [] }, id);
   }
   const decision: Decision | null = parseDecision(out.content);
+  const strip = decision ? stripSignals(decision.answer) : { text: "", leaked: false };
+  if (decision) {
+    decision.answer = strip.text;
+    const sig = signalsFromMessage(question, out.content, await marketRates());
+    signals = sig.signals.map(signalTag);
+  }
   const base = {
     model: out.model,
     fallbackUsed: out.fallbackUsed,
@@ -213,6 +228,8 @@ export async function evaluateQuestion(
     meta: {
       cachedTokens: out.usage.cachedTokens ?? 0,
       products: site.products.map((p) => p.slug),
+      ...(signals.length ? { signals } : {}),
+      ...(strip.leaked ? { signalsLeak: true } : {}),
       ...(out.raws.length > 1 || !decision ? { retry: out.raws.length > 1 ? 1 : 0, raw: out.raws.map((r) => r.slice(0, 2000)) } : {}),
     },
   };

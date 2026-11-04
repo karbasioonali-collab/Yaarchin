@@ -9,6 +9,9 @@
 //   [[fenced]] ← JSON داخل ```json با متن قبل و بعد؛ [[newline]] ← شکستن خط خام داخل رشته‌ی JSON
 //   [[slow]] ← ۴ ثانیه مکث (برای دیدن «در حال نوشتن…»)
 //   [[cost:N]] ← total_cost_toman = N (پیش‌فرض ۴۰۰)؛ [[handoff:X]] ← ارجاع مدل با دلیل X
+//   نشانه‌ها (بخش ۴۳؛ هر جواب خطی خط «signals: none» دارد مگر یکی از این‌ها): [[sigA]] import=yes; channel=online
+//   [[sigB]] budget=200 toman (مبهم) | [[sigC]] budget=200 million toman | [[sigR]] budget=5 billion rial | [[sigQ]] qty=800 | [[sigX]] qty=999; budget=10 billion toman (مدل حرف مشتری را تکرار کرده)
+//   [[sigleak]] خط signals بعد از جواب، بدون ---، و «(qty=500)» داخل متن جواب (محافظ باید همه را بردارد)
 //   «پیشنهاد سؤال فریبنده با AI» (دستورالعمل «tricky customer questions») ← ۵ سؤال، هر خط یکی
 // GET /__log ← بدنه‌ی همه‌ی درخواست‌ها؛ POST /__reset ← پاک کردن لاگ.
 import http from "node:http";
@@ -53,6 +56,20 @@ http
     cachedNow = Number(/\[\[cached:(\d+)\]\]/.exec(text ?? "")?.[1] ?? 0);
     const cost = Number(/\[\[cost:(\d+)\]\]/.exec(text)?.[1] ?? 400);
     // جواب به قالب خطی (مثل دستورالعمل از 2026-10-28)؛ [[json]] ← قالب قدیمی JSON (سازگاری)
+    const SIG = {
+      sigA: "import=yes; channel=online",
+      sigB: "budget=200 toman",
+      sigC: "budget=200 million toman",
+      sigQ: "qty=800",
+      sigX: "qty=999; budget=10 billion toman",
+      sigR: "budget=5 billion rial",
+    };
+    const sigKey = Object.keys(SIG).find((k) => text?.includes(`[[${k}]]`));
+    const sigLine = `signals: ${sigKey ? SIG[sigKey] : "none"}`;
+    const lined = (o) =>
+      text.includes("[[sigleak]]")
+        ? `source: ${o.source}\nhandoff: none\n${o.answer} (qty=500)\nsignals: qty=500; import=yes`
+        : `source: ${o.source}\nhandoff: ${o.handoff ? `${o.handoff.reason}${o.handoff.note ? ` | ${o.handoff.note}` : ""}` : "none"}\n${sigLine}\n---\n${o.answer}`;
     const json = (o) =>
       out(
         res,
@@ -60,9 +77,7 @@ http
         completion(
           body.model,
           {
-            content: text.includes("[[json]]")
-              ? JSON.stringify(o)
-              : `source: ${o.source}\nhandoff: ${o.handoff ? `${o.handoff.reason}${o.handoff.note ? ` | ${o.handoff.note}` : ""}` : "none"}\n---\n${o.answer}`,
+            content: text.includes("[[json]]") ? JSON.stringify(o) : lined(o),
           },
           cost,
         ),

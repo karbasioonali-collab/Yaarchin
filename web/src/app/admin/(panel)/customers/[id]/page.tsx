@@ -13,6 +13,8 @@ import { BUSINESS_TYPE_FA, getProfile } from "@/lib/customer/profile";
 import { chatReady, customerReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import { scoreBreakdown } from "@/lib/leads/score";
+import { SIGNAL_FA, type SignalKey } from "@/lib/leads/signals";
+import { customerSignalsView } from "@/lib/leads/signals-store";
 import { startImpersonationAction } from "../../users/actions";
 import { setCustomerStatusAction } from "../actions";
 import styles from "../../panel.module.css";
@@ -35,7 +37,15 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
   const chats = chatSee
     ? (
         await db
-          .select({ id: conversations.id, kind: conversations.kind, subject: conversations.subject, status: conversations.status, assignedTo: conversations.assignedTo, lastMessageAt: conversations.lastMessageAt, productTitle: products.titleFa })
+          .select({
+            id: conversations.id,
+            kind: conversations.kind,
+            subject: conversations.subject,
+            status: conversations.status,
+            assignedTo: conversations.assignedTo,
+            lastMessageAt: conversations.lastMessageAt,
+            productTitle: products.titleFa,
+          })
           .from(conversations)
           .leftJoin(products, eq(products.id, conversations.productId))
           .where(eq(conversations.customerId, id))
@@ -43,7 +53,10 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           .limit(20)
       ).filter((c) => canSee(chatSee, c))
     : [];
-  const [lead, seeRules] = await Promise.all([scoreBreakdown(id), can(a.user, "reports.view")]);
+  const [lead, seeRules, signals] = await Promise.all([scoreBreakdown(id), can(a.user, "reports.view"), customerSignalsView(id)]);
+  const sigLabel = (k: string) => SIGNAL_FA[k as SignalKey] ?? k;
+  const sigValue = (key: string, valueNum: number | string | null, valueText: string | null) =>
+    key === "budget_mtoman" && valueNum !== null ? `${fmtNum(Number(valueNum))} میلیون تومان` : (valueText ?? (valueNum === null ? "—" : fmtNum(Number(valueNum))));
   const [profile, summary, favRows, activeSessions, history, canManage, canImpersonate] = await Promise.all([
     getProfile(id),
     behaviorSummary(id),
@@ -104,7 +117,11 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
                 <td className={styles.muted}>موبایل</td>
                 <td>
                   <span className={styles.ltr}>{u.mobile ?? "—"}</span>
-                  {u.mobileVerifiedAt && <span className={styles.badge} style={{ marginInlineStart: 6 }}>تأییدشده</span>}
+                  {u.mobileVerifiedAt && (
+                    <span className={styles.badge} style={{ marginInlineStart: 6 }}>
+                      تأییدشده
+                    </span>
+                  )}
                 </td>
               </tr>
               <tr>
@@ -165,7 +182,12 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           <div className={styles.card} style={{ gridColumn: "1 / -1" }}>
             <h2 className={styles.cardTitle}>
               امتیاز جدیت: <span className={styles.badge}>{fmtNum(lead.score)}</span>
-              {lead.max !== null && <span className={styles.muted} style={{ fontSize: 13, fontWeight: 400 }}> از {fmtNum(lead.max)}</span>}
+              {lead.max !== null && (
+                <span className={styles.muted} style={{ fontSize: 13, fontWeight: 400 }}>
+                  {" "}
+                  از {fmtNum(lead.max)}
+                </span>
+              )}
             </h2>
             <table className={styles.table}>
               <thead>
@@ -199,6 +221,69 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
           </div>
         )}
 
+        {/* «نشانه‌ها از گفتگو» (بخش ۴۳): آخرین مقدار هر نوع، بعد تاریخچه با جمله‌ی مشتری. این صفحه فقط با customers.view باز می‌شود. */}
+        <div className={styles.card} style={{ gridColumn: "1 / -1" }} data-testid="customer-signals">
+          <h2 className={styles.cardTitle}>نشانه‌ها از گفتگو</h2>
+          {signals.latest.length ? (
+            <div className={styles.stats}>
+              {signals.latest.map((s) => (
+                <div key={s.key} className={styles.stat} data-testid={`signal-${s.key}`}>
+                  <div className={styles.statValue} style={{ fontSize: 18 }}>
+                    {sigValue(s.key, s.valueNum, s.valueText)}
+                  </div>
+                  <div className={styles.statLabel}>
+                    {sigLabel(s.key)}
+                    {s.key === "budget_unclear" && <span className={`${styles.badge} ${styles.badgeWarn}`}>مبهم</span>}
+                  </div>
+                  <div className={styles.muted} style={{ fontSize: 12 }}>
+                    {fmtDateTime(s.updatedAt)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.muted}>هنوز نشانه‌ای از گفتگوهای این مشتری ثبت نشده است.</p>
+          )}
+          {signals.history.length > 0 && (
+            <div className={styles.tableWrap}>
+              <table className={styles.table} data-testid="signal-history">
+                <thead>
+                  <tr>
+                    <th>تاریخ</th>
+                    <th>نشانه</th>
+                    <th>جمله‌ی مشتری</th>
+                    <th>منبع</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {signals.history.map((h) => (
+                    <tr key={h.id}>
+                      <td style={{ whiteSpace: "nowrap" }}>{fmtDateTime(h.at)}</td>
+                      <td>
+                        {sigLabel(h.key)}: {sigValue(h.key, h.valueNum, h.valueText)}{" "}
+                        {h.key === "budget_unclear" && <span className={`${styles.badge} ${styles.badgeWarn}`}>مبهم</span>}
+                        {h.priceQuestion && <span className={`${styles.badge} ${styles.badgeMuted}`}>سؤال قیمت</span>}
+                      </td>
+                      <td>
+                        «{h.quote}»
+                        {chatSee && (
+                          <>
+                            {" "}
+                            <Link href={`/admin/chats/${h.conversationId}`} style={{ fontSize: 12 }}>
+                              گفتگو
+                            </Link>
+                          </>
+                        )}
+                      </td>
+                      <td style={{ whiteSpace: "nowrap" }}>{h.via === "code" ? "تشخیص خودکار تعداد" : "دستیار هوشمند"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
         <div className={styles.card} style={{ gridColumn: "1 / -1" }}>
           <h2 className={styles.cardTitle}>خلاصه‌ی بازدیدها و رفتار</h2>
           <div className={styles.stats}>
@@ -231,7 +316,15 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
                       const p = t.id ? prodOf.get(t.id) : undefined;
                       return (
                         <tr key={t.id}>
-                          <td>{p ? <Link href={`/p/${p.slug}`} target="_blank">{p.titleFa}</Link> : "محصول حذف‌شده"}</td>
+                          <td>
+                            {p ? (
+                              <Link href={`/p/${p.slug}`} target="_blank">
+                                {p.titleFa}
+                              </Link>
+                            ) : (
+                              "محصول حذف‌شده"
+                            )}
+                          </td>
                           <td>{fmtNum(t.n)} بار</td>
                           <td className={styles.muted}>{fmtDateTime(t.last)}</td>
                         </tr>
@@ -254,7 +347,15 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
                       const c = t.id ? catOf.get(t.id) : undefined;
                       return (
                         <tr key={t.id}>
-                          <td>{c ? <Link href={`/c/${c.slug}`} target="_blank">{c.nameFa}</Link> : "دسته‌ی حذف‌شده"}</td>
+                          <td>
+                            {c ? (
+                              <Link href={`/c/${c.slug}`} target="_blank">
+                                {c.nameFa}
+                              </Link>
+                            ) : (
+                              "دسته‌ی حذف‌شده"
+                            )}
+                          </td>
                           <td>{fmtNum(t.n)} بار</td>
                           <td className={styles.muted}>{fmtDateTime(t.last)}</td>
                         </tr>
@@ -280,7 +381,11 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
                       <Link href={`/p/${f.slug}`} target="_blank">
                         {f.titleFa}
                       </Link>
-                      {f.status !== "published" && <span className={`${styles.badge} ${styles.badgeWarn}`} style={{ marginInlineStart: 6 }}>منتشر نشده</span>}
+                      {f.status !== "published" && (
+                        <span className={`${styles.badge} ${styles.badgeWarn}`} style={{ marginInlineStart: 6 }}>
+                          منتشر نشده
+                        </span>
+                      )}
                     </td>
                     <td className={styles.muted}>{fmtDateTime(f.at)}</td>
                   </tr>

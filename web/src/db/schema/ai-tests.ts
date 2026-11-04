@@ -11,7 +11,8 @@ import { chatMessages, conversations } from "./chat";
 //   handoff: "none" (نباید ارجاع دهد) | "any" (هر دلیلی) | دلیل مشخص (restricted, proforma, …) | null (مهم نیست)
 //   source: منبع مورد انتظار (product | calculator | knowledge | general) یا null
 //   forbidden: کلمه‌هایی که جواب نباید داشته باشد؛ mustInclude: کلمه‌هایی که باید داشته باشد
-export type TestExpect = { handoff: string | null; source: string | null; forbidden: string[]; mustInclude: string[] };
+//   signals (اختیاری، بخش ۴۳): نشانه‌های مورد انتظار، مثل «order_qty=500» یا فقط «import_experience»؛ «none» = هیچ نشانه‌ای
+export type TestExpect = { handoff: string | null; source: string | null; forbidden: string[]; mustInclude: string[]; signals?: string[] };
 
 // سؤال‌های آزمون. category: normal | tricky | handoff. productSlug: صفحه‌ی محصولی که سؤال در آن پرسیده می‌شود (اختیاری).
 // مثل پایگاه دانش: تاریخچه در ai_test_case_versions و «آخرین بررسی» جدا از «آخرین ویرایش».

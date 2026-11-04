@@ -18,7 +18,8 @@ for (const t of ["inquiry_supplier_events", "inquiry_suppliers", "inquiries", "s
   psql(`delete from ${t}`);
 psql("delete from customer_signals");
 psql("delete from lead_score_rules where source<>'system'");
-psql("update lead_score_rules set enabled=true");
+// قانون‌های «نشانه از گفتگو» (بخش ۴۳) خاموش می‌مانند
+psql("update lead_score_rules set enabled = (kind <> 'signal')");
 psql("delete from events");
 psql("delete from favorites");
 psql("delete from customer_profiles where user_id in (select id from users where email like 'rp-%')");
@@ -239,7 +240,8 @@ psql("update settings set value='false' where key='auth.enforce_permissions'");
 for (const t of ["inquiries", "chat_messages", "conversations"]) psql(`delete from ${t}`);
 psql("delete from customer_signals");
 psql("delete from lead_score_rules where source<>'system'");
-psql("update lead_score_rules set enabled=true");
+// قانون‌های «نشانه از گفتگو» (بخش ۴۳) خاموش می‌مانند
+psql("update lead_score_rules set enabled = (kind <> 'signal')");
 psql("delete from users where email like 'rp-%@example.com'");
 psql("delete from events");
 console.log("page errors:", errs.length ? errs : "none");

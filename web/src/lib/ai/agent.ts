@@ -15,6 +15,8 @@ import { alertNewChat } from "@/lib/chat/alerts";
 import type { CustomerPostResult } from "@/lib/chat/service";
 import { reportsReady } from "@/lib/db-ready";
 import { scoresFor } from "@/lib/leads/score";
+import { clarifyBudget, signalsFromMessage, stripSignals } from "@/lib/leads/signals";
+import { budgetClarifyAsked, marketRates, recordSignals } from "@/lib/leads/signals-store";
 import { absoluteUrl, siteUrl } from "@/lib/site/url";
 import { addUsage, AiCallError, chatCompletion, type ChatMsg, type ModelReply, type Usage, ZERO_USAGE } from "./client";
 import { aiConfig } from "./config";
@@ -143,6 +145,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
   let fallbackUsed = 0;
   let decision: Decision | null = null;
   let raws: string[] = [];
+  let content = "";
   try {
     const prior = (await historyOf(conv.id, msg.id)).slice(0, -1);
     const out = await withSlot(() => converse(c.mode, site, prior, msg.body));
@@ -150,6 +153,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
     modelUsed = out.model;
     fallbackUsed = out.fallbackUsed;
     raws = out.raws;
+    content = out.content;
     decision = parseDecision(out.content);
   } catch (e) {
     const kind = e instanceof BusyError ? "busy" : "error";
@@ -159,6 +163,22 @@ export async function runAgent(c: RunCtx): Promise<void> {
     });
     return handoff(c, kind, (e as Error).message, reqId);
   }
+  // نشانه‌های جدیت از خط signals مدل (بخش ۴۳). خط signals و هر تکه‌ی جامانده‌اش هرگز به مشتری نمی‌رسد.
+  // تعداد با کد قبلاً در API چت ثبت شده (via=code)؛ اینجا فقط نشانه‌های مدل. ذخیره فقط در حالت زنده.
+  const strip = decision ? stripSignals(decision.answer) : { text: "", leaked: false };
+  if (decision) decision.answer = strip.text;
+  const sig = decision ? signalsFromMessage(msg.body, content, await marketRates()) : null;
+  const modelSigs = sig?.signals.filter((s) => s.via === "ai") ?? [];
+  const saveSigs = (clarifyAsked = false) =>
+    c.mode === "live" && modelSigs.length
+      ? recordSignals({
+          userId: conv.customerId,
+          conversationId: conv.id,
+          messageId: msg.id,
+          quote: msg.body,
+          signals: modelSigs.map((s) => (clarifyAsked && s.key === "budget_unclear" ? { ...s, clarifyAsked: true } : s)),
+        }).catch((e) => console.error("customer signals failed", e))
+      : Promise.resolve();
   const base = {
     model: modelUsed,
     fallbackUsed,
@@ -171,6 +191,9 @@ export async function runAgent(c: RunCtx): Promise<void> {
       cachedTokens: usage.cachedTokens ?? 0,
       ...(site.landedForQty ? { precomputedQty: site.landedForQty.qty } : {}),
       kb: site.kb.map((k) => k.id),
+      ...(modelSigs.length ? { signals: modelSigs.map((s) => `${s.key}=${s.valueNum ?? s.valueText}`) } : {}),
+      ...(sig?.ignoredModel ? { signalsIgnored: true } : {}),
+      ...(strip.leaked ? { signalsLeak: true } : {}),
       products: site.products.map((p) => p.slug),
       // خروجی خام مدل وقتی قالبش نادرست بود (برای «آخرین درخواست‌ها» در پنل)؛ retry = یک بار با یادآوری قالب دوباره پرسیده شد
       ...(raws.length > 1 || !decision ? { retry: raws.length > 1 ? 1 : 0, raw: raws.map((r) => r.slice(0, 2000)) } : {}),
@@ -185,6 +208,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
   }
   const reason = modelHandoffReason(decision);
   if (reason) {
+    await saveSigs();
     const reqId = await rec("handoff", reason, base);
     // detail با کد دلیل شروع می‌شود (تبدیل به آزمون، ارجاع مورد انتظار را از آن برمی‌دارد)
     await learn(kindForModelHandoff(reason), `${reason} · ${HANDOFF_FA[reason] ?? reason}${decision.handoff?.note ? ` — ${decision.handoff.note}` : ""}`);
@@ -196,12 +220,19 @@ export async function runAgent(c: RunCtx): Promise<void> {
   }
   const g = checkOutput(decision.answer, await blacklistTerms());
   if (!g.ok) {
+    await saveSigs();
     const reqId = await rec("guard_block", "leak", { ...base, meta: { ...base.meta, hits: g.hits, blocked: decision.answer.slice(0, 2000) } });
     await learn("leak", g.hits.map((h) => `${h.type}: ${h.match}`).join("، "));
     return handoff(c, "leak", g.hits.map((h) => `${h.type}: ${h.match}`).join("، "), reqId, { replacement: true });
   }
+  // بودجه‌ی مبهم («۲۰۰ تومن»): یک سؤال کوتاه در آخر همین جواب، فقط یک بار در هر گفتگو
+  let answer = decision.answer.trim().slice(0, 2000);
+  const unclear = modelSigs.find((s) => s.key === "budget_unclear");
+  const clarify = !!unclear && c.mode === "live" && !(await budgetClarifyAsked(conv.id));
+  if (clarify) answer = `${answer}\n\n${clarifyBudget(unclear!.valueText)}`;
+  await saveSigs(clarify);
   const reqId = await rec("ok", decision.source, base);
-  const m = await postAi(c, decision.answer.trim().slice(0, 2000), { source: decision.source, requestId: reqId });
+  const m = await postAi(c, answer, { source: decision.source, requestId: reqId, ...(clarify ? { budgetClarify: true } : {}) });
   await db.update(aiRequests).set({ replyMessageId: m.id }).where(eq(aiRequests.id, reqId));
   await addReply(c.conversationId);
 }

@@ -14,6 +14,8 @@ import { db } from "@/db/client";
 import { products } from "@/db/schema";
 import { onCustomerMessage } from "@/lib/ai/agent";
 import { aiStatus } from "@/lib/ai/state";
+import { recordSignals } from "@/lib/leads/signals-store";
+import { signalsFromMessage } from "@/lib/leads/signals";
 import { alertNewChat } from "./alerts";
 import type { CustomerPostResult } from "./service";
 
@@ -28,7 +30,9 @@ export async function chatCustomerGuard(req: Request, opts: { json: boolean }): 
 }
 
 // بعد از هر پیام مشتری: دستیار هوشمند (lib/ai/agent.ts) اگر زنده است جواب می‌دهد؛ وگرنه (یا در حالت آزمایشی) هشدار پیامکی مثل قبل.
+// «تعداد سفارش» با کد از متن مشتری همین‌جا (چت انسانی هم؛ بخش ۴۳) و قبل از دستیار ثبت می‌شود تا امتیاز جدیتِ همین پیام را هم ببیند.
 export async function afterCustomerPost(r: CustomerPostResult, customerName: string): Promise<void> {
+  await recordCodeSignals(r).catch((e) => console.error("customer signals failed", e));
   const ai = await onCustomerMessage(r).catch((e) => {
     console.error("ai onCustomerMessage failed", e);
     return { handled: false };
@@ -55,4 +59,9 @@ export async function queueNewChatAlert(r: CustomerPostResult, customerName: str
       console.error("new chat alert failed", e);
     }
   });
+}
+
+async function recordCodeSignals(r: CustomerPostResult): Promise<void> {
+  const { signals } = signalsFromMessage(r.message.body ?? "", null);
+  await recordSignals({ userId: r.conversation.customerId, conversationId: r.conversation.id, messageId: r.message.id, quote: r.message.body ?? "", signals });
 }

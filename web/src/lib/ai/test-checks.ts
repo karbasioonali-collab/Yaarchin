@@ -2,15 +2,16 @@
 import { compact } from "./normalize";
 import { pleasantry, preRule } from "./rules";
 
-export type TestExpect = { handoff: string | null; source: string | null; forbidden: string[]; mustInclude: string[] };
+export type TestExpect = { handoff: string | null; source: string | null; forbidden: string[]; mustInclude: string[]; signals?: string[] };
 export const EMPTY_EXPECT: TestExpect = { handoff: null, source: null, forbidden: [], mustInclude: [] };
 
 // نتیجه‌ی یک سؤال آزمون از همان مسیر چت
 //   path: canned (جواب آماده) | rule (قاعده‌ی کد، بدون مدل) | model | error
 //   source: منبع جواب (product | calculator | knowledge | general | canned) یا null وقتی ارجاع شد
 //   handoff: دلیل ارجاع یا null      answer: متنی که مشتری می‌دید (یا جواب ردشده‌ی محافظ)      guardHits: یافته‌های محافظ
-export type TestOutcome = { path: "canned" | "rule" | "model" | "error"; source: string | null; handoff: string | null; answer: string; guardHits: string[] };
-export type Check = { check: "error" | "guard" | "handoff" | "source" | "forbidden" | "mustInclude"; ok: boolean; detail: string };
+//   signals: نشانه‌هایی که از این پیام ثبت می‌شد (signalTag؛ بخش ۴۳)
+export type TestOutcome = { path: "canned" | "rule" | "model" | "error"; source: string | null; handoff: string | null; answer: string; guardHits: string[]; signals?: string[] };
+export type Check = { check: "error" | "guard" | "handoff" | "source" | "forbidden" | "mustInclude" | "signals"; ok: boolean; detail: string };
 
 const has = (text: string, word: string) => {
   const w = compact(word);
@@ -42,6 +43,13 @@ export function runChecks(e: TestExpect, o: TestOutcome): Check[] {
   if (e.mustInclude.length && !o.handoff) {
     const miss = e.mustInclude.filter((w) => !has(o.answer, w));
     out.push({ check: "mustInclude", ok: miss.length === 0, detail: miss.length ? `نیست: ${miss.join("، ")}` : "" });
+  }
+  // نشانه‌ها: هر مورد «کلید=مقدار» دقیق، یا فقط «کلید»؛ «none» = هیچ نشانه‌ای
+  const want = e.signals ?? [];
+  if (want.length) {
+    const got = o.signals ?? [];
+    const okSig = want.includes("none") ? got.length === 0 : want.every((w) => (w.includes("=") ? got.includes(w) : got.some((g) => g === w || g.startsWith(`${w}=`))));
+    out.push({ check: "signals", ok: okSig, detail: `انتظار: ${want.join("، ")} · نتیجه: ${got.join("، ") || "none"}` });
   }
   return out;
 }

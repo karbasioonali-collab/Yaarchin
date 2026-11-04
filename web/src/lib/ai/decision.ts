@@ -2,6 +2,7 @@
 // قالب اصلی از نسخه‌ی 2026-10-28 «خطی» است (prompt.ts):
 //   source: product
 //   handoff: none            (یا: handoff: no_source | یادداشت برای کارشناس)
+//   signals: none            (از 2026-11-04: نشانه‌های جدیت، بخش ۴۳؛ اختیاری، هر جای جواب بیاید از متن حذف می‌شود)
 //   ---
 //   <جواب فارسی>
 // JSON قدیمی هم هنوز پذیرفته می‌شود (پایین‌تر).
@@ -9,6 +10,8 @@
 //   ```json … ``` و متن قبل یا بعد از JSON؛ چند شیء پشت هم (اولین شیء معتبر)؛ «}» داخل متن جواب؛
 //   شکستن خط یا tab خام داخل رشته (JSON.parse آن را نمی‌پذیرد)؛ اسم دیگر فیلد جواب (reply/response/text/message)؛
 //   handoff به‌شکل رشته‌ی "null" یا فقط اسم دلیل.
+import { SIGNALS_LINE } from "../leads/signals";
+
 export type Decision = { answer: string; source: string; handoff: { reason: string; note?: string } | null };
 
 export const SOURCES = ["product", "calculator", "knowledge", "general", "none"] as const;
@@ -121,8 +124,10 @@ export function parseLines(content: string): Decision | null {
   }
   // متن جواب: بعد از خط --- (اگر نبود، بعد از خط‌های سرآیند)
   const sep = lines.findIndex((l, i) => i > end && /^\s*-{3,}\s*$/.test(l));
+  // خط signals هرگز جزو جواب نیست (حتی وقتی --- نیامد یا مدل آن را بعد از جواب نوشت)
   const body = lines
     .slice(sep >= 0 ? sep + 1 : end + 1)
+    .filter((l) => !SIGNALS_LINE.test(l))
     .join("\n")
     .replace(/^\s*(answer|reply)\s*[:：]\s*/i, "")
     .trim();
@@ -144,6 +149,7 @@ export function parseDecision(content: string): Decision | null {
 export const FORMAT_REMINDER = `Your previous reply did not follow the output format. Send the same reply again in exactly this format, with no JSON and no code fences:
 source: <product|calculator|knowledge|general|none>
 handoff: <none|restricted|no_source|complaint|discount|final_price|proforma|big_order|other> | <optional note>
+signals: <none, or qty=…; budget=…; import=…; channel=…>
 ---
 <reply in Persian>
 source must be one of those five values (general for a greeting or a general definition).`;

@@ -84,13 +84,14 @@ try {
   }
 
   // قانون‌های پیش‌فرض امتیاز جدیت (migration ۰۰۰۹). فقط قانونی که نیست ساخته می‌شود؛ تغییرهای ادمین در پنل دست نمی‌خورد.
+  // قانون‌های «نشانه از گفتگو» (بخش ۴۳) خاموش ساخته می‌شوند (enabled: false)؛ ادمین از پنل روشنشان می‌کند.
   const has0009 = (await client.query(`select to_regclass('public.lead_score_rules') is not null as ok`)).rows[0].ok;
   if (has0009) {
     for (const r of seed.leadRules) {
       await client.query(
-        `insert into lead_score_rules (key, kind, label_fa, points, cap, window_days, sort_order, source) values ($1,$2,$3,$4,$5,$6,$7,'system')
+        `insert into lead_score_rules (key, kind, label_fa, points, cap, window_days, sort_order, source, enabled, params) values ($1,$2,$3,$4,$5,$6,$7,'system',$8,$9)
          on conflict (key) do nothing`,
-        [r.key, r.kind, r.labelFa, r.points, r.cap, r.windowDays, r.sortOrder],
+        [r.key, r.kind, r.labelFa, r.points, r.cap, r.windowDays, r.sortOrder, r.enabled ?? true, JSON.stringify(r.params ?? {})],
       );
     }
   }
@@ -136,6 +137,20 @@ try {
         ]);
       }
       console.log(`${cases.length} سؤال آزمون دستیار وارد شد.`);
+    } else {
+      // سؤال‌های تازه‌ی بعدی (addIfMissing، مثل نشانه‌ها در بخش ۴۳): اگر همین متن سؤال نیست، اضافه می‌شود.
+      // (سؤالی که ادمین پاک کرده با seed بعدی برمی‌گردد؛ برای کنار گذاشتنش وضعیت «پیش‌نویس» بهتر از حذف است.)
+      const cases = JSON.parse(readFileSync(new URL("../src/db/test-drafts.json", import.meta.url), "utf8")).filter((c) => c.addIfMissing);
+      let added = 0;
+      for (const c of cases) {
+        const r = await client.query(
+          `insert into ai_test_cases (question, expected_answer, category, product_slug, expect, status, source)
+           select $1, $2, $3, $4, $5, 'active', 'seed' where not exists (select 1 from ai_test_cases where question = $1)`,
+          [c.question, c.expectedAnswer, c.category, c.productSlug ?? null, JSON.stringify(c.expect)],
+        );
+        added += r.rowCount;
+      }
+      if (added) console.log(`${added} سؤال آزمون تازه‌ی دستیار اضافه شد.`);
     }
   }
 

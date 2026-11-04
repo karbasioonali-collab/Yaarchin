@@ -259,7 +259,8 @@ for (const k of [
 ])
   ok(SYSTEM_PROMPT.includes(k), `prompt contains: ${k}`);
 ok(
-  SYSTEM_PROMPT.length < 3200 && (SYSTEM_PROMPT.match(/[\u0600-\u06FF]/g) || []).length < 150,
+  // ۳۲۰۰ ← ۳۷۰۰: قاعده‌ی ۱۰ و خط signals (بخش ۴۳، حدود ۱۳۰ توکن)
+  SYSTEM_PROMPT.length < 3700 && (SYSTEM_PROMPT.match(/[\u0600-\u06FF]/g) || []).length < 150,
   `prompt is English (fa chars ${(SYSTEM_PROMPT.match(/[\u0600-\u06FF]/g) || []).length})`,
 );
 
