@@ -46,6 +46,9 @@ function readCase(fd: FormData): { v: CaseInput } | { error: string } {
     .trim()
     .toLowerCase();
   if (slug && !/^[a-z0-9-]{1,120}$/.test(slug)) return { error: "slug محصول نامعتبر است." };
+  const signals = lines(fd.get("signals"))
+    .slice(0, 10)
+    .map((s) => s.replace(/\s+/g, "").toLowerCase().slice(0, 60));
   return {
     v: {
       question,
@@ -63,9 +66,8 @@ function readCase(fd: FormData): { v: CaseInput } | { error: string } {
         mustInclude: lines(fd.get("mustInclude"))
           .slice(0, 30)
           .map((s) => s.slice(0, 100)),
-        signals: lines(fd.get("signals"))
-          .slice(0, 10)
-          .map((s) => s.replace(/\s+/g, "").toLowerCase().slice(0, 60)),
+        // خالی ← کلید ذخیره نمی‌شود (شکل سؤال‌های قبلی عوض نمی‌شود)
+        ...(signals.length ? { signals } : {}),
       },
       status: fd.get("status") === "draft" ? "draft" : "active",
     },

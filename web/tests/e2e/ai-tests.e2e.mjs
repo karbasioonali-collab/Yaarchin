@@ -175,7 +175,7 @@ let FREE;
   await toConfirm("failed");
   ok((await statText("سؤال")) === fa(failedExpected), `scope failed: ${failedExpected} (last result failed or marked wrong)`);
   await toConfirm("tricky");
-  ok((await statText("سؤال")) === fa(20), "scope tricky: 20");
+  ok((await statText("سؤال")) === fa(23), "scope tricky: 23");
   await toConfirm("handoff");
   ok((await statText("سؤال")) === fa(3), "scope handoff: 3");
   await toConfirm("new");
