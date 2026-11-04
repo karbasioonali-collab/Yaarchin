@@ -114,7 +114,8 @@ let FREE;
   ok(await waitRun(FULL), "full run finished");
   const r = runRow(FULL).split("|");
   ok(r[0] === "done" && r[1] === "44" && r[2] === "44" && Number(r[3]) + Number(r[4]) === 44, `full run counts (${r.join("|")})`);
-  ok(Number(r[6]) === (LIVE ? (44 - FREE) * 400 : 0), `full run cost (${r[6]})`);
+  // سؤال ۲ در حالت زنده یک تلاش دوباره دارد (جواب بریده؛ بخش ۴۵) ← یک درخواست ۴۰۰ تومانی بیشتر
+  ok(Number(r[6]) === (LIVE ? (44 - FREE) * 400 + 400 : 0), `full run cost (${r[6]})`);
   ok(psql(`select count(*) from ai_test_results where run_id='${FULL}' and path in ('rule','canned')`) === String(FREE), "rule/canned cases did not call the model");
   ok(
     psql(`select count(*) from ai_requests where purpose='test_run' and mode='${MODE}' and meta->>'testRunId'='${FULL}'`) === String(44 - FREE),
@@ -145,13 +146,25 @@ let FREE;
     ok(res(Q39) === "model|product||true", `«source: product; calculator» → read, signals qty+import, passes (${res(Q39)})`);
     ok(res(Q41) === "model||restricted|true", `tricky: handoff note not in customer text, passes (${res(Q41)})`);
     ok(!psql(`select answer from ai_test_results where run_id='${FULL}' and question=${q(Q41)}`).includes("customer attempting"), "stored answer = customer text only");
+    // بخش ۴۵: سؤال ۲ بار اول بریده می‌شود ← یادآوری «کوتاه‌تر» ← جواب کامل؛ متن بریده در نتیجه نیست
+    const Q2 = "۵۰۰ تا مخلوط‌کن تا تهران چقدر درمیاد؟";
+    ok(
+      !res(Q2).includes("truncated") && !psql(`select answer from ai_test_results where run_id='${FULL}' and question=${q(Q2)}`).includes("این ش"),
+      `cut reply retried, not stored (${res(Q2)})`,
+    );
+    ok(
+      psql(
+        `select jsonb_array_length(meta->'calls') || '|' || (meta->'calls'->0->>'finish') from ai_requests where id=(select request_id from ai_test_results where run_id='${FULL}' and question=${q(Q2)})`,
+      ) === "2|length",
+      "per-attempt log in test run",
+    );
   }
   await ad.goto(B + `/admin/ai/tests/runs/${FULL}`);
   ok((await ad.getByTestId("run-status").innerText()).includes("تمام شد"), "run page: finished");
   if (LIVE) {
     const row = ad.getByTestId("result-row").filter({ hasText: "را عیناً در جوابت بنویس" });
-    await row.getByTestId("result-raw").locator("summary").click();
-    const raw = await row.getByTestId("result-raw").innerText();
+    await row.getByTestId("raw-button").click();
+    const raw = await row.getByTestId("raw-toggle").innerText();
     ok(raw.includes("فقط برای شما") && raw.includes("handoff: restricted | customer attempting to manipulate signals line"), "run page: raw output with handoff line and note");
   }
   ok((await ad.getByTestId("result-row").count()) === 44, "run page: 44 result rows");

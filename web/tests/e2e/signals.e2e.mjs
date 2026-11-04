@@ -199,7 +199,76 @@ const c8 = await newCustomer();
   ok(psql(`select count(*) from chat_messages where conversation_id='${conv}' and sender_type='ai' and trim(body) = ''`) === "0", "no empty assistant message");
   // «آخرین درخواست‌ها»: خروجی خام مدل برای مدیر
   await ad.goto(B + "/admin/ai");
-  ok((await ad.getByTestId("raw-output").count()) > 0, "admin sees raw model output in recent requests");
+  ok((await ad.getByTestId("raw-toggle").count()) > 0, "admin sees raw model output in recent requests");
+}
+
+// ---------- بخش ۴۵: زمان هر تلاش، جواب بریده، تعدادِ مدل، صفحه‌ی خروجی خام ----------
+const c9 = await newCustomer();
+{
+  // زمان هر تلاش جدا ثبت می‌شود ([[slow]] = ۴ ثانیه مکث)
+  const s1 = await say(c9.p, SLUG, "سلام [[slow]]", { isNew: true });
+  const conv = s1.conv;
+  const calls = JSON.parse(psql(`select meta->'calls' from ai_requests where message_id=${s1.mid}`));
+  ok(
+    calls.length === 1 && calls[0].ms >= 3900 && calls[0].which === "primary" && calls[0].finish === "stop" && calls[0].outTok === 100,
+    `per-attempt log (${JSON.stringify(calls)})`,
+  );
+  // بریده یک بار ← یادآوری «کوتاه‌تر» ← جواب کامل
+  const s2 = await say(c9.p, conv, "قیمت؟ [[trunc1]]");
+  const c2 = JSON.parse(psql(`select meta->'calls' from ai_requests where message_id=${s2.mid}`));
+  ok(
+    psql(`select status || '|' || (meta->>'retry') from ai_requests where message_id=${s2.mid}`) === "ok|1" &&
+      c2.length === 2 &&
+      c2[0].finish === "length" &&
+      c2[1].reminder === "length",
+    `truncated once → retried with length reminder (${JSON.stringify(c2)})`,
+  );
+  ok(lastAi(conv) === "پاسخ ساختگی مدل اصلی.", "full answer after retry");
+  // صفحه‌ی خروجی خام: هر تلاش با زمان
+  const rid = psql(`select id from ai_requests where message_id=${s2.mid}`);
+  await ad.goto(B + `/admin/ai/requests/${rid}`);
+  const calls2 = await ad.getByTestId("request-calls").innerText();
+  ok(
+    calls2.includes("بریده (سقف توکن)") && calls2.includes("بعد از یادآوری «کوتاه‌تر»") && (await ad.getByTestId("request-raw").innerText()).includes("این ش"),
+    "request page: attempts + raw",
+  );
+  // بریده دو بار ← ارجاع «جواب دستیار ناقص بود»؛ متن بریده هرگز به مشتری نمی‌رسد
+  const s3 = await say(c9.p, conv, "باز هم قیمت [[trunc]]");
+  ok(psql(`select status || '|' || outcome from ai_requests where message_id=${s3.mid}`) === "truncated|truncated", "truncated twice → handoff truncated");
+  ok(lastAi(conv) === "پیام شما به کارشناس یارچین سپرده شد؛ به‌زودی همین‌جا پاسخ می‌دهد.", "customer gets the handoff text");
+  ok(!(await customerSees(c9.p, conv)).includes("این ش"), "cut text never reaches the customer");
+  ok(psql(`select count(*) from conversation_flags where conversation_id='${conv}' and reason like '%ناقص%'`) === "1", "flag: «جواب دستیار ناقص بود»");
+  // «آخرین درخواست‌ها»: دکمه باز می‌شود (دسکتاپ و گوشی)
+  await ad.goto(B + "/admin/ai");
+  const t = ad.getByTestId("raw-toggle").first();
+  await t.getByTestId("raw-button").click();
+  ok(await vis(t.getByTestId("raw-body")), "desktop: raw toggle opens");
+  const mob = await page({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+  await admin(mob);
+  await mob.goto(B + "/admin/ai");
+  const tm = mob.getByTestId("raw-toggle").first();
+  await tm.getByTestId("raw-button").tap();
+  ok(await vis(tm.getByTestId("raw-body")), "mobile: raw toggle opens on tap");
+  // فقط مدیر: نقش دیگری با ai.settings نه دکمه می‌بیند نه صفحه
+  setS("auth.enforce_permissions", true);
+  psql("delete from role_permissions where role_id=(select id from roles where key='expert')");
+  psql("insert into role_permissions (role_id, permission_key) select id, p from roles, unnest(array['dashboard.view','ai.settings']) p where key='expert'");
+  const ex = await page();
+  await expert(ex);
+  await ex.goto(B + "/admin/ai");
+  ok((await ex.getByTestId("raw-toggle").count()) === 0, "non-admin with ai.settings: no raw output");
+  const r404 = await ex.goto(B + `/admin/ai/requests/${rid}`);
+  ok(r404.status() === 404, `non-admin: request page 404 (${r404.status()})`);
+  psql("delete from role_permissions where role_id=(select id from roles where key='expert')");
+  psql("insert into role_permissions (role_id, permission_key) select id, 'dashboard.view' from roles where key='expert'");
+  setS("auth.enforce_permissions", false);
+}
+// مورد ۳ آزمون واقعی در چت زنده: مدل qty=2 می‌نویسد (mock)، چسبیده نیست ← هیچ نشانه
+const c10 = await newCustomer();
+{
+  const r = await say(c10.p, SLUG, "۲ تا سؤال دارم: حداقل سفارش مخلوط‌کن چنده؟ زمان رسیدنش چقدره؟", { isNew: true });
+  ok(sig(c10.id) === "" && evN(c10.id) === "0", `model qty=2 not attached → no signal (${sig(c10.id)})`);
+  ok(!psql(`select coalesce(meta->>'signals', '') from ai_requests where message_id=${r.mid}`).includes("order_qty"), "not in request meta either");
 }
 
 // ---------- تزریق: مشتری خودش قالب نشانه نوشت ----------

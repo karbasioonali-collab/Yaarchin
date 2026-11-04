@@ -21,6 +21,9 @@ export const HANDOFF_FA: Record<string, string> = {
   busy: "شلوغی دستیار",
   stuck: "پاسخ دستیار دیر شد",
   parse: "جواب دستیار قابل خواندن نبود",
+  // بخش ۴۵: other در قالب دستورالعمل هست؛ truncated = جواب به سقف توکن خورد و بریده شد (بعد از یک تلاش دوباره)
+  other: "دلیل دیگر (به تشخیص دستیار)",
+  truncated: "جواب دستیار ناقص بود",
 };
 
 const RULES: [string, RegExp][] = [

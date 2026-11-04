@@ -33,7 +33,7 @@ export const isRuleGap = (reason: string | null | undefined): boolean => !!reaso
 
 // نوع پیشنهاد برای ارجاعی که «مدل» داد (ارجاع با قاعده‌ی کد، سقف‌ها و خطاها پیشنهاد نمی‌سازند)
 export function kindForModelHandoff(reason: string): SuggestionKind | null {
-  if (reason === "no_source" || reason === "parse") return "no_answer";
+  if (reason === "no_source" || reason === "parse" || reason === "truncated") return "no_answer";
   if (reason === "leak") return "leak";
   if (isRuleGap(reason)) return "rule_gap";
   if (["error", "busy", "stuck", "global_cap", "customer_cap", "long_chat", "lead_score"].includes(reason)) return null;

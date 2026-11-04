@@ -51,9 +51,10 @@ export type Signal = {
 // نیم‌فاصله قبل از normFa حذف می‌شود («مخلوط‌کن» یک کلمه بماند، «می‌خوام» ← «میخوام»).
 const UNIT = "(?:عدد|دونه|دانه|کارتن|جفت|ست|بسته|پیس|piece|pieces|pcs|pc|unit|units)";
 const SCALE = "(?:هزار|k|میلیون)";
-const BUY = /(میخوام|میخواهم|می خوام|می خواهم|لازم دارم|نیاز دارم|میخوایم|می خوایم|سفارش|خرید|بخرم|بخریم|بگیرم|بگیریم|وارد کنم|وارد کنیم|میگیرم|می گیرم|احتیاج)/;
+const BUY =
+  /(میخوام|میخواهم|می خوام|می خواهم|لازم دارم|لازم داریم|لازمه|لازم است|نیاز دارم|نیاز داریم|میخوایم|می خوایم|سفارش|خرید|بخرم|بخریم|بگیرم|بگیریم|وارد کنم|وارد کنیم|میگیرم|می گیرم|احتیاج)/;
 const PRICE_Q = /(چند|چقدر|قیمت|هزینه|درمیاد|در میاد|میشه|می شه|تموم میشه)/;
-const NOT_QTY = /^\s*(تومان|تومن|ریال|دلار|یوان|درصد|٪|%|روز|هفته|ماه|سال|ساعت|دقیقه|کیلو|گرم|متر|سانت)/;
+const NOT_QTY = /^\s*(تومان|تومن|ریال|دلار|یوان|درصد|٪|%|روز|هفته|ماه|سال|ساعت|دقیقه|کیلو|گرم|متر|سانت|بار|دفعه|مرتبه|نفر)/;
 const SENTENCE_END = /[:：؟?،,.!؛;\n]/;
 const MAX_GAP_WORDS = 3;
 
@@ -64,12 +65,39 @@ function buyVerbNear(rest: string): boolean {
   return !!m && clause.slice(0, m.index).trim().split(/\s+/).filter(Boolean).length <= MAX_GAP_WORDS;
 }
 
-export function extractOrderQty(text: string): { qty: number; priceQuestion: boolean } | null {
+// متن یکسان‌شده برای تعداد: نیم‌فاصله حذف، رقم لاتین، بدون جداکننده‌ی هزارگان، بدون تلفن
+function qtyText(text: string): string {
   const n = normFa(text.replace(/\u200c/g, ""))
     .replace(/(\d),(?=\d{3}\b)/g, "$1")
     .replace(/٬/g, "");
+  return n.replace(/\+?\d{8,}/g, " ");
+}
+
+// تعدادِ خط signals مدل فقط وقتی پذیرفته می‌شود که همان عدد در متن مشتری «چسبیده» باشد (بخش ۴۵):
+//   بلافاصله بعدش واحد شمارش، یا بعد از «تا» فعل خرید با حداکثر ۳ کلمه فاصله در همان جمله،
+//   یا خود عدد و بعد فعل خرید با حداکثر ۳ کلمه فاصله («۵۰۰ می‌خوام»؛ فقط برای تأیید عدد مدل — کد خودش این را
+//   نمی‌خواند، چون «ساعت ۵ می‌خوام بیام» را اشتباه می‌گرفت). «۲ تا سؤال دارم: حداقل سفارش …» ← رد.
+export function qtyAttached(customerText: string, qty: number): boolean {
+  const clean = qtyText(customerText);
+  const re = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(${SCALE})?(?![\\d.])`, "gu");
+  for (const m of clean.matchAll(re)) {
+    const [whole, numRaw, scale] = m;
+    let v = Number(numRaw);
+    if (scale === "هزار" || scale === "k") v *= 1000;
+    if (scale === "میلیون") v *= 1_000_000;
+    if (Math.round(v) !== qty) continue;
+    const rest = clean.slice((m.index ?? 0) + whole.length);
+    if (NOT_QTY.test(rest)) continue;
+    if (new RegExp(`^\\s*${UNIT}(?![\\p{L}])`, "u").test(rest)) return true;
+    const ta = /^\s*تا(?![\p{L}])/u.exec(rest);
+    if (buyVerbNear(ta ? rest.slice(ta[0].length) : rest)) return true;
+  }
+  return false;
+}
+
+export function extractOrderQty(text: string): { qty: number; priceQuestion: boolean } | null {
   // تلفن و کد (۸ رقم یا بیشتر پشت هم) عدد سفارش نیست
-  const clean = n.replace(/\+?\d{8,}/g, " ");
+  const clean = qtyText(text);
   // بعد از واحد حرف نیاید («۳ ستاره» ست نیست، «۲ تاکسی» تا نیست)
   const re = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(${SCALE})?\\s*(${UNIT}|تا)?(?![\\p{L}])(?=([^\\d]{0,12})(\\d)?)`, "gu");
   let best: number | null = null;
@@ -234,7 +262,8 @@ export function signalsFromMessage(
   if (looksLikeInjection(customerText)) return { signals: out, ignoredModel: true };
   const raw = parseSignalsLine(modelContent);
   const nums = numbersIn(customerText);
-  if (!q && raw.qty && nums.has(String(raw.qty))) out.push({ key: "order_qty", valueNum: raw.qty, valueText: raw.qty.toLocaleString("fa-IR"), confidence: 0.7, via: "ai" });
+  if (!q && raw.qty && nums.has(String(raw.qty)) && qtyAttached(customerText, raw.qty))
+    out.push({ key: "order_qty", valueNum: raw.qty, valueText: raw.qty.toLocaleString("fa-IR"), confidence: 0.7, via: "ai" });
   if (raw.budget && nums.has(String(raw.budget.amount))) {
     const b = budgetSignal(raw.budget, customerText, rateToman);
     if (b) out.push(b);

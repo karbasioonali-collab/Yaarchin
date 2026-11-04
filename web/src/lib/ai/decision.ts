@@ -119,11 +119,18 @@ export function parseLines(content: string): Decision | null {
   if (hi >= 0) {
     end = hi;
     const [reasonRaw, ...noteParts] = lines[hi].replace(/^[^:：]*[:：]/, "").split("|");
-    const reason = reasonRaw
+    // ملاک اولین کلمه است (بخش ۴۵): «none (price is in the data)»، «none.» یا «**none**» = بدون ارجاع؛
+    // «no_source (not in data)» = no_source و بقیه‌ی متن یادداشت. قبلاً کل متن قبل از | دلیل بود ← دلیل ناشناخته ← «دستیار ارجاع داد».
+    const raw = reasonRaw
       .replace(/[*`"']/g, "")
       .trim()
       .toLowerCase();
-    if (!NO_HANDOFF.test(reason)) handoff = { reason, note: noteParts.join("|").trim().slice(0, 300) || undefined };
+    const first = /[a-z_]+/.exec(raw)?.[0] ?? "";
+    const rest = first ? raw.slice(raw.indexOf(first) + first.length).replace(/^[\s().:,;—-]+|[\s()]+$/g, "") : "";
+    if (first && !NO_HANDOFF.test(first)) {
+      const note = [rest, noteParts.join("|").trim()].filter(Boolean).join(" | ");
+      handoff = { reason: first, note: note.slice(0, 300) || undefined };
+    }
   }
   // متن جواب: بعد از خط --- (اگر نبود، بعد از خط‌های سرآیند)
   const sep = lines.findIndex((l, i) => i > end && /^\s*-{3,}\s*$/.test(l));

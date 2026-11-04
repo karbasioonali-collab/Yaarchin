@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { asc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db/client";
 import { aiRequests, aiTestResults, aiTestRuns } from "@/db/schema";
+import { callLine, readRequestMeta } from "@/lib/ai/request-meta";
 import { HANDOFF_FA } from "@/lib/ai/rules";
 import type { Check } from "@/lib/ai/test-checks";
 import { SCOPE_FA } from "@/lib/ai/tests";
@@ -12,6 +13,7 @@ import { aiTestsReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import styles from "../../../../panel.module.css";
 import { stopRunAction } from "../../actions";
+import { RawToggle } from "../../../RawToggle";
 import { AutoRefresh } from "../../AutoRefresh";
 import { VerdictButtons } from "../../VerdictButtons";
 import { CHECK_FA, PATH_FA, RUN_STATUS_FA, SOURCE_FA } from "../../labels";
@@ -20,7 +22,8 @@ export const metadata: Metadata = { title: "اجرای آزمون" };
 
 // پیشرفت زنده، توقف، نتیجه‌ی هر سؤال (جواب دستیار کنار جواب درست، منبع، دلیل ارجاع، بررسی‌های خودکار، هزینه و زمان) و قضاوت انسان.
 export default async function RunPage({ params }: PageProps<"/admin/ai/tests/runs/[id]">) {
-  await requirePermission("ai.tests");
+  const a = await requirePermission("ai.tests");
+  const isAdmin = a.user.isAdmin;
   const { id } = await params;
   if (!(await aiTestsReady()) || !/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const [run] = await db.select().from(aiTestRuns).where(eq(aiTestRuns.id, id));
@@ -29,13 +32,10 @@ export default async function RunPage({ params }: PageProps<"/admin/ai/tests/run
   // خروجی خام مدل هر سؤال (با خط handoff و یادداشت کارشناس) از meta درخواستش؛ «فقط برای شما»، جدا از جوابی که مشتری می‌دید (بخش ۴۴)
   const reqIds = results.map((r) => r.requestId).filter((x): x is number => x !== null);
   const rawOf = new Map(
-    (reqIds.length ? await db.select({ id: aiRequests.id, meta: aiRequests.meta }).from(aiRequests).where(inArray(aiRequests.id, reqIds)) : []).map((x) => {
-      const m = (x.meta ?? {}) as { raw?: unknown; cleaned?: unknown };
-      return [
-        x.id,
-        { raws: Array.isArray(m.raw) ? m.raw.filter((y): y is string => typeof y === "string") : [], cleaned: Array.isArray(m.cleaned) ? (m.cleaned as string[]) : [] },
-      ];
-    }),
+    (reqIds.length ? await db.select({ id: aiRequests.id, meta: aiRequests.meta }).from(aiRequests).where(inArray(aiRequests.id, reqIds)) : []).map((x) => [
+      x.id,
+      readRequestMeta(x.meta),
+    ]),
   );
   const running = run.status === "running";
   const handled = run.done + run.skipped;
@@ -120,19 +120,14 @@ export default async function RunPage({ params }: PageProps<"/admin/ai/tests/run
                             {r.handoffReason && ` · ارجاع: ${HANDOFF_FA[r.handoffReason] ?? r.handoffReason}`}
                           </div>
                           {r.answer && <div style={{ whiteSpace: "pre-wrap" }}>{r.answer}</div>}
-                          {r.requestId !== null && (rawOf.get(r.requestId)?.raws.length ?? 0) > 0 && (
-                            <details style={{ fontSize: 12, marginTop: 4 }} data-testid="result-raw">
-                              <summary>خروجی خام مدل (فقط برای شما؛ مشتری نمی‌بیند)</summary>
-                              {rawOf.get(r.requestId)!.raws.map((x, i, all) => (
-                                <div key={i}>
-                                  {all.length > 1 && <div className={styles.muted}>{i === 0 ? "تلاش اول" : "بعد از یادآوری قالب"}</div>}
-                                  <pre dir="auto" style={{ whiteSpace: "pre-wrap", margin: "4px 0", maxHeight: 240, overflow: "auto" }}>
-                                    {x || "(خالی)"}
-                                  </pre>
-                                </div>
-                              ))}
-                              {rawOf.get(r.requestId)!.cleaned.length > 0 && <div className={styles.muted}>از متن مشتری حذف شد: {rawOf.get(r.requestId)!.cleaned.join(" · ")}</div>}
-                            </details>
+                          {r.requestId !== null && rawOf.has(r.requestId) && (
+                            <RawToggle
+                              title="خروجی خام مدل (فقط برای شما؛ مشتری نمی‌بیند)"
+                              lines={rawOf.get(r.requestId)!.calls.map(callLine)}
+                              raws={rawOf.get(r.requestId)!.raws}
+                              cleaned={rawOf.get(r.requestId)!.cleaned}
+                              href={isAdmin ? `/admin/ai/requests/${r.requestId}` : undefined}
+                            />
                           )}
                           {r.status === "done" && (
                             <div className={styles.muted} style={{ fontSize: 12 }}>

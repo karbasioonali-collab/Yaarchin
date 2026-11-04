@@ -15,6 +15,7 @@ import { PROMPT_VERSION } from "@/lib/ai/prompt";
 import { HANDOFF_FA } from "@/lib/ai/rules";
 import { aiStatus } from "@/lib/ai/state";
 import { aiLimits, catalogLimits, testLimits, todayUsage } from "@/lib/ai/usage";
+import { callLine, readRequestMeta } from "@/lib/ai/request-meta";
 import { requirePermission } from "@/lib/auth/can";
 import { aiReady, aiTestsReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
@@ -22,6 +23,8 @@ import { getSetting, isEnabled } from "@/lib/settings";
 import styles from "../panel.module.css";
 import { saveAiLimitsAction, saveBlacklistAction, saveCannedAction, saveGenericWordsAction } from "./actions";
 import { ConnectionTest } from "./ConnectionTest";
+
+import { RawToggle } from "./RawToggle";
 
 export const metadata: Metadata = { title: "دستیار هوشمند" };
 
@@ -33,6 +36,7 @@ const STATUS_FA: Record<string, string> = {
   error: "خطا",
   timeout: "دیر شد",
   parse_error: "جواب نامفهوم",
+  truncated: "جواب بریده شد",
   skipped: "رد شد",
 };
 const SOURCE_FA: Record<string, string> = { product: "محصول", calculator: "ماشین‌حساب", knowledge: "پایگاه دانش", general: "عمومی", pleasantry: "جواب آماده (احوال‌پرسی/تشکر)" };
@@ -276,7 +280,15 @@ export default async function AiPage() {
                     {STATUS_FA[r.status] ?? r.status}
                     {r.outcome && <div className={styles.muted}>{SOURCE_FA[r.outcome] ?? HANDOFF_FA[r.outcome] ?? r.outcome}</div>}
                     {r.error && <div style={{ color: "#B3261E", fontSize: 12 }}>{r.error}</div>}
-                    {isAdmin && <RawOutput meta={r.meta} />}
+                    {isAdmin && (
+                      <RawToggle
+                        title={readRequestMeta(r.meta).blocked ? "جواب ردشده و خروجی خام (فقط مدیر)" : "خروجی خام مدل (فقط مدیر)"}
+                        lines={readRequestMeta(r.meta).calls.map(callLine)}
+                        raws={[...(readRequestMeta(r.meta).blocked ? [readRequestMeta(r.meta).blocked!] : []), ...readRequestMeta(r.meta).raws]}
+                        cleaned={readRequestMeta(r.meta).cleaned}
+                        href={`/admin/ai/requests/${r.id}`}
+                      />
+                    )}
                   </td>
                   <td className={styles.ltr} style={{ fontSize: 12 }}>
                     {r.model ?? "—"}
@@ -304,23 +316,3 @@ export default async function AiPage() {
 }
 
 // خروجی خام مدل برای جواب نامفهوم (meta.raw، هر تلاش جدا) و جواب ردشده‌ی محافظ (meta.blocked)
-function RawOutput({ meta }: { meta: unknown }) {
-  const m = (meta ?? {}) as { raw?: unknown; blocked?: unknown; retry?: unknown };
-  const raws = Array.isArray(m.raw) ? m.raw.filter((x): x is string => typeof x === "string") : [];
-  const blocked = typeof m.blocked === "string" ? m.blocked : null;
-  if (!raws.length && !blocked) return null;
-  return (
-    <details style={{ fontSize: 12, marginTop: 4 }}>
-      <summary data-testid="raw-output">{blocked ? "جواب ردشده" : m.retry ? "خروجی خام مدل (با تلاش دوباره؛ فقط مدیر)" : "خروجی خام مدل (فقط مدیر)"}</summary>
-      {blocked && <pre style={{ whiteSpace: "pre-wrap", direction: "rtl", margin: "4px 0" }}>{blocked}</pre>}
-      {raws.map((x, i) => (
-        <div key={i}>
-          {raws.length > 1 && <div className={styles.muted}>{i === 0 ? "تلاش اول" : "بعد از یادآوری قالب"}</div>}
-          <pre dir="auto" style={{ whiteSpace: "pre-wrap", margin: "4px 0", maxHeight: 240, overflow: "auto" }}>
-            {x || "(خالی)"}
-          </pre>
-        </div>
-      ))}
-    </details>
-  );
-}
