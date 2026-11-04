@@ -10,5 +10,13 @@ export const PATH_FA: Record<string, string> = {
   cap: "رد شد (سقف)",
   interrupted: "رد شد (قطع اجرا)",
 };
-export const CHECK_FA: Record<string, string> = { error: "بدون خطا", guard: "محافظ", handoff: "ارجاع", source: "منبع", forbidden: "کلمه‌ی ممنوع", mustInclude: "کلمه‌ی لازم" };
+export const CHECK_FA: Record<string, string> = {
+  error: "بدون خطا",
+  guard: "محافظ",
+  handoff: "ارجاع",
+  source: "منبع",
+  forbidden: "کلمه‌ی ممنوع",
+  mustInclude: "کلمه‌ی لازم",
+  signals: "نشانه‌ها",
+};
 export const SOURCE_FA: Record<string, string> = { product: "محصول", calculator: "ماشین‌حساب", knowledge: "پایگاه دانش", general: "عمومی", canned: "جواب آماده" };

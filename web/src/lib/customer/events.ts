@@ -17,6 +17,10 @@ export const EVENT_TYPES = {
   favorite_remove: "حذف از علاقه‌مندی", // entity: product
 } as const;
 export type EventType = keyof typeof EVENT_TYPES;
+// نوع‌های داخلی که رفتار سایت نیستند و در هیچ شمارش بازدید یا گزارشی حساب نمی‌شوند (همه‌ی شمارش‌ها با type فیلتر می‌شوند؛
+// «آخرین فعالیت» هم فقط نوع‌های EVENT_TYPES). customer_signal = تاریخچه‌ی «نشانه‌ها از گفتگو» (lib/leads/signals-store.ts، بخش ۴۳)
+export const INTERNAL_EVENT_TYPES = ["customer_signal"] as const;
+const SITE_TYPES = Object.keys(EVENT_TYPES) as EventType[];
 
 // رفرش پشت‌سرهمِ همان صفحه در این فاصله دوباره ثبت نمی‌شود (trackView)
 const VIEW_DEDUPE_MS = 10 * 60 * 1000;
@@ -46,13 +50,7 @@ export async function trackEvent(e: {
 // بازدید صفحه‌ی محصول یا دسته. true یعنی ثبت شد.
 // تکرار پشت‌سرهم (رفرش): اگر آخرین بازدیدِ همین نوع در ۱۰ دقیقه‌ی اخیر همین صفحه بوده، دوباره ثبت نمی‌شود.
 // ولی A ← B ← A دوباره ثبت می‌شود تا «بازدیدهای اخیر» ترتیب درست داشته باشد.
-export async function trackView(e: {
-  userId: string;
-  type: "product_view" | "category_view";
-  entityId: string;
-  path: string;
-  referrer: string | null;
-}): Promise<boolean> {
+export async function trackView(e: { userId: string; type: "product_view" | "category_view"; entityId: string; path: string; referrer: string | null }): Promise<boolean> {
   const [last] = await db
     .select({ entityId: events.entityId })
     .from(events)
@@ -70,11 +68,7 @@ export async function trackDailyVisit(userId: string, path: string): Promise<voi
     .select({ n: count() })
     .from(events)
     .where(
-      and(
-        eq(events.userId, userId),
-        eq(events.type, "site_visit"),
-        sql`${events.occurredAt} >= (date_trunc('day', now() at time zone 'Asia/Tehran') at time zone 'Asia/Tehran')`,
-      ),
+      and(eq(events.userId, userId), eq(events.type, "site_visit"), sql`${events.occurredAt} >= (date_trunc('day', now() at time zone 'Asia/Tehran') at time zone 'Asia/Tehran')`),
     );
   if (today.n === 0) await trackEvent({ userId, type: "site_visit", path });
 }
@@ -109,24 +103,26 @@ export async function behaviorSummary(userId: string) {
       .groupBy(events.entityId)
       .orderBy(desc(count()), desc(max(events.occurredAt)))
       .limit(5);
-  const [views7, views30, viewsAll, catViews30, logins, visits30, favAdds, favRemoves, topProducts, topCategories, [last], [distinct]] =
-    await Promise.all([
-      countOf(["product_view"], since(7)),
-      countOf(["product_view"], since(30)),
-      countOf(["product_view"]),
-      countOf(["category_view"], since(30)),
-      countOf(["login"]),
-      countOf(["site_visit"], since(30)),
-      countOf(["favorite_add"]),
-      countOf(["favorite_remove"]),
-      top("product_view"),
-      top("category_view"),
-      db.select({ at: max(events.occurredAt) }).from(events).where(eq(events.userId, userId)),
-      db
-        .select({ n: countDistinct(events.entityId) })
-        .from(events)
-        .where(and(eq(events.userId, userId), eq(events.type, "product_view"))),
-    ]);
+  const [views7, views30, viewsAll, catViews30, logins, visits30, favAdds, favRemoves, topProducts, topCategories, [last], [distinct]] = await Promise.all([
+    countOf(["product_view"], since(7)),
+    countOf(["product_view"], since(30)),
+    countOf(["product_view"]),
+    countOf(["category_view"], since(30)),
+    countOf(["login"]),
+    countOf(["site_visit"], since(30)),
+    countOf(["favorite_add"]),
+    countOf(["favorite_remove"]),
+    top("product_view"),
+    top("category_view"),
+    db
+      .select({ at: max(events.occurredAt) })
+      .from(events)
+      .where(and(eq(events.userId, userId), inArray(events.type, SITE_TYPES))),
+    db
+      .select({ n: countDistinct(events.entityId) })
+      .from(events)
+      .where(and(eq(events.userId, userId), eq(events.type, "product_view"))),
+  ]);
   return {
     views7,
     views30,
@@ -149,13 +145,7 @@ export async function views30For(userIds: string[]): Promise<Map<string, number>
   const rows = await db
     .select({ userId: events.userId, n: count() })
     .from(events)
-    .where(
-      and(
-        inArray(events.userId, userIds),
-        eq(events.type, "product_view"),
-        gt(events.occurredAt, new Date(Date.now() - 30 * 86400 * 1000)),
-      ),
-    )
+    .where(and(inArray(events.userId, userIds), eq(events.type, "product_view"), gt(events.occurredAt, new Date(Date.now() - 30 * 86400 * 1000))))
     .groupBy(events.userId);
   return new Map(rows.map((r) => [r.userId as string, r.n]));
 }

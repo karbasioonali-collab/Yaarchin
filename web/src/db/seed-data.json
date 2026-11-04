@@ -574,6 +574,50 @@
       "cap": 40,
       "windowDays": null,
       "sortOrder": 6
+    },
+    {
+      "key": "signal_order_qty",
+      "kind": "signal",
+      "labelFa": "نشانه از گفتگو: تعداد سفارش (هر عدد)",
+      "points": 0.01,
+      "cap": 20,
+      "windowDays": null,
+      "sortOrder": 7,
+      "enabled": false,
+      "params": { "signal": "order_qty" }
+    },
+    {
+      "key": "signal_budget_mtoman",
+      "kind": "signal",
+      "labelFa": "نشانه از گفتگو: سرمایه (هر میلیون تومان)",
+      "points": 0.1,
+      "cap": 20,
+      "windowDays": null,
+      "sortOrder": 8,
+      "enabled": false,
+      "params": { "signal": "budget_mtoman" }
+    },
+    {
+      "key": "signal_import_experience",
+      "kind": "signal",
+      "labelFa": "نشانه از گفتگو: سابقه‌ی واردات",
+      "points": 10,
+      "cap": 10,
+      "windowDays": null,
+      "sortOrder": 9,
+      "enabled": false,
+      "params": { "signal": "import_experience" }
+    },
+    {
+      "key": "signal_sales_channel",
+      "kind": "signal",
+      "labelFa": "نشانه از گفتگو: کانال فروش مشخص",
+      "points": 5,
+      "cap": 5,
+      "windowDays": null,
+      "sortOrder": 10,
+      "enabled": false,
+      "params": { "signal": "sales_channel" }
     }
   ]
 }

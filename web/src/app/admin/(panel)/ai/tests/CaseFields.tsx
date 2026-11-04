@@ -63,6 +63,13 @@ export function CaseFields({ item }: { item?: TestCase }) {
         <textarea name="mustInclude" className={ui.textarea} rows={2} defaultValue={(e?.mustInclude ?? []).join("\n")} />
       </label>
       <label className={ui.field}>
+        <span className={ui.label}>نشانه‌های مورد انتظار (اختیاری، هر خط یکی)</span>
+        <textarea name="signals" className={ui.textarea} rows={2} dir="ltr" defaultValue={(e?.signals ?? []).join("\n")} />
+        <span className={ui.hint}>
+          مثل order_qty=500، budget_mtoman=200، budget_unclear، import_experience=1، sales_channel=online، یا فقط اسم نشانه. none = هیچ نشانه‌ای نباید ثبت شود.
+        </span>
+      </label>
+      <label className={ui.field}>
         <span className={ui.label}>وضعیت</span>
         <select name="status" defaultValue={item?.status ?? "active"} className={ui.select}>
           <option value="active">فعال (در اجراها)</option>

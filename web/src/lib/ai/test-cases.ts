@@ -7,7 +7,11 @@ import type { TestExpect } from "./test-checks";
 
 // jsonb ترتیب کلیدها را عوض می‌کند؛ مقایسه‌ی فیلدبه‌فیلد
 const sameExpect = (a: TestExpect, b: TestExpect) =>
-  a.handoff === b.handoff && a.source === b.source && a.forbidden.join("\n") === b.forbidden.join("\n") && a.mustInclude.join("\n") === b.mustInclude.join("\n");
+  a.handoff === b.handoff &&
+  a.source === b.source &&
+  a.forbidden.join("\n") === b.forbidden.join("\n") &&
+  a.mustInclude.join("\n") === b.mustInclude.join("\n") &&
+  (a.signals ?? []).join("\n") === (b.signals ?? []).join("\n");
 
 export type CaseInput = {
   question: string;
