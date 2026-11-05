@@ -32,6 +32,8 @@ const NAV: (NavItem & { permission: string | string[]; feature?: string })[] = [
   { href: "/admin/inquiries", label: "درخواست‌های مشتری", permission: ["chats.view_all", "chats.assign"] },
   { href: "/admin/reports", label: "گزارش‌ها", permission: "reports.view", feature: "reports" },
   { href: "/admin/ai", label: "دستیار هوشمند", permission: "ai.settings" },
+  // نمودار هزینه (بخش ۵۲)؛ دسترسی جدا از ai.settings
+  { href: "/admin/ai/costs", label: "هزینه‌ی هوش مصنوعی", permission: "ai.costs" },
   { href: "/admin/ai/knowledge", label: "پایگاه دانش دستیار", permission: "ai.knowledge" },
   { href: "/admin/ai/tests", label: "آزمون دستیار", permission: "ai.tests" },
   { href: "/admin/ai/suggestions", label: "پیشنهاد سؤال تازه", permission: ["ai.knowledge", "ai.tests"] },
