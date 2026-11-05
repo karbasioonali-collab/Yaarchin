@@ -23,7 +23,7 @@ export TEST_DB="$PG_URL/$DB"
 psql "$PG_URL/postgres" -qAtc "select 1" >/dev/null 2>&1 || { echo "Postgres محلی در دسترس نیست؛ اول: service postgresql start" >&2; exit 1; }
 MOCK_ENV=(AI_BASE_URL=http://127.0.0.1:3399/v1 AI_API_KEY=test AI_MODEL=mock/primary AI_FALLBACK_MODEL=mock/fallback)
 # ترتیب لازم: سایت ← محتوای سایت ← امتیاز …؛ کاتالوگ همیشه آخر
-ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live signals alibaba-import alibaba-register catalog-4a border-price guide catalog-text-test catalog-text-live guest "$PRE_TEST" catalog)
+ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live signals insight alibaba-import alibaba-register catalog-4a border-price guide catalog-text-test catalog-text-live guest "$PRE_TEST" catalog)
 
 if [ "$SETUP" = 1 ]; then
   bash tests/e2e/setup-db.sh "$DB" || exit 1
@@ -58,6 +58,7 @@ for t in "${ORDER[@]}"; do
     ai-tests-test) file=tests/e2e/ai-tests.e2e.mjs; env=(AI_E2E=test); serve normal ;;
     ai-tests-live) file=tests/e2e/ai-tests.e2e.mjs; env=(AI_E2E=live); serve live ;;
     signals) serve live; reset_data ;;
+    insight) serve live; reset_data ;;
     catalog-text-test) file=tests/e2e/catalog-text.e2e.mjs; env=(AI_E2E=test); serve normal ;;
     catalog-text-live) file=tests/e2e/catalog-text.e2e.mjs; env=(AI_E2E=live); serve live ;;
     "$PRE_TEST") db="$PG_URL/$PRE_DB"; serve pre ;;

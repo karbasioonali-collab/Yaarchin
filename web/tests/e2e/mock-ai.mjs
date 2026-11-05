@@ -98,6 +98,24 @@ http
       );
     const totals = (t) => (t.available ? t.methods.map((m) => (m.total ?? "0 toman").replace(" toman", "")).join(" / ") : "ندارد");
 
+    // «تحلیل هوشمند» گزارش (بخش ۴۹): نشانه‌گذار داخل اسم یک محصول پربازدید (DATA): [[insfake]] ← یک پیشنهاد با مبلغ ساختگی
+    // و یکی با اسم سایت خرید (هر دو باید حذف شوند) کنار دو پیشنهاد درست؛ [[insnone]] ← فقط پیشنهادهای ردشدنی
+    if (sys.includes("report analyst of the Yarchin admin panel")) {
+      const data = JSON.parse((lastUser.split("DATA:\n")[1] ?? "{}").trim() || "{}");
+      const views = data.product_views?.current ?? "0 views";
+      const good = [
+        `- ${views.replace(" views", "")} بازدید محصول در این بازه ثبت شده؛ روند را با بازه‌ی قبل مقایسه کنید.`,
+        "- محصولات پربازدیدی که گفتگو یا درخواست ندارند را بررسی کنید و توضیحشان را کامل کنید.",
+      ];
+      const bad = ["- با این روند ماهی ۵۰ میلیون تومان فروش بیشتر خواهید داشت.", "- قیمت‌ها را با Alibaba مقایسه کنید."];
+      const txt = JSON.stringify(data);
+      const lines = txt.includes("[[insnone]]")
+        ? bad
+        : txt.includes("[[insfake]]")
+          ? [...good, ...bad]
+          : [...good, "- گفتگوهای بی‌پاسخ را امروز پیگیری کنید.", "- مشتری‌های با امتیاز جدیت بالا را با تماس کارشناس دنبال کنید."];
+      return out(res, 200, completion(body.model, { content: lines.join("\n") }, cost));
+    }
     // تست اتصال پنل
     if (sys.includes('{"ok": true')) return out(res, 200, completion(body.model, { content: '{"ok": true, "lang": "fa"}' }, 50));
     // «متن فارسی محصول با AI» (lib/catalog/text-draft.ts؛ بخش ۴۰): نشانه در اسم انگلیسی لیستینگ

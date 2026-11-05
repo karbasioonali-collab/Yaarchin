@@ -54,6 +54,42 @@ export async function saveNumberCheckAction(_prev: FormState, fd: FormData): Pro
   return { ok: on ? "روشن شد: عدد خارج از داده‌ها در چت جلوگیری می‌شود." : "خاموش شد: فقط ثبت در لاگ و آزمون." };
 }
 
+// «تحلیل هوشمند گزارش» (بخش ۴۹): سوئیچ و سقف هزینه‌ی روزانه‌ی جدا
+export async function saveReportInsightAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("ai.settings");
+  const on = fd.get("reportInsights") === "on";
+  const cap = Number(
+    toLatinDigits(String(fd.get("reportCap") ?? ""))
+      .replace(/[,٬]/g, "")
+      .trim(),
+  );
+  if (!Number.isInteger(cap) || cap < 0 || cap > 1_000_000_000) return { error: "سقف هزینه باید عدد صحیح (تومان) باشد." };
+  const missing: string[] = [];
+  for (const [key, v] of [
+    ["ai.report_insights", on],
+    ["ai.report_daily_cost_toman", cap],
+  ] as const) {
+    const r = await setSetting(key, v, a.user.id).catch(() => null);
+    if (!r) {
+      missing.push(key);
+      continue;
+    }
+    if (r.before !== v)
+      await logActivity({
+        actorUserId: a.user.id,
+        actingAsUserId: a.session.impersonatingUserId,
+        action: "setting.update",
+        entityType: "setting",
+        entityId: key,
+        before: { value: r.before },
+        after: { value: v },
+      });
+  }
+  revalidatePath("/admin", "layout");
+  if (missing.length) return { error: "این تنظیم‌ها هنوز در دیتابیس نیست؛ اول در کنسول لیارا npm run db:seed را اجرا کنید." };
+  return { ok: "ذخیره شد." };
+}
+
 export async function saveAiLimitsAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("ai.settings");
   const values: [string, number][] = [];

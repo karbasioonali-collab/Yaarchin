@@ -8,7 +8,13 @@ import { fmtDate, fmtDateTime, fmtNum } from "@/lib/format";
 import { scoreSource } from "@/lib/leads/score";
 import { delta, PRESET_FA, type Preset, resolveRange } from "@/lib/reports/range";
 import { aiStats, chatNow, counts, fmtDuration, newCustomers, staffPerformance, topCategories, topFavorited, topProducts } from "@/lib/reports/report";
+import { insightReadiness, insightSettings, savedInsight } from "@/lib/reports/insight";
+import { MIN_ACTIVE_DAYS, MIN_CHATS, MIN_PRODUCT_VIEWS } from "@/lib/reports/insight-core";
+import { todayUsage } from "@/lib/ai/usage";
+import { aiReady } from "@/lib/db-ready";
+import { ActionForm } from "@/components/ui/ActionForm";
 import { isEnabled } from "@/lib/settings";
+import { runInsightAction } from "./actions";
 import { tehranDayStart } from "@/lib/tehran-time";
 import { db } from "@/db/client";
 import { sql } from "drizzle-orm";
@@ -69,6 +75,13 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
         )
       : Promise.resolve([]),
   ]);
+
+  // «تحلیل هوشمند» (بخش ۴۹): نتیجه‌ی امروزِ همین بازه از ai_requests؛ باز کردن صفحه هیچ درخواستی به مدل نمی‌فرستد
+  const aiOn = await aiReady();
+  const [insSet, insSaved, insReady, insUsed] = aiOn
+    ? await Promise.all([insightSettings(), savedInsight({ from: range.from, to: range.to }), insightReadiness(cur, prev), todayUsage("report")])
+    : [{ enabled: false, capToman: 0 }, null, { enough: false, activeDays: 0 }, { costToman: 0 }];
+  const insCapLeft = Math.max(0, insSet.capToman - insUsed.costToman);
 
   const label = (d: string) => fmtDate(tehranDayStart(d));
   const span = range.from === range.to ? label(range.from) : `${label(range.from)} تا ${label(range.to)}`;
@@ -315,9 +328,51 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
             <p className={styles.muted}>امتیاز جدیت بعد از اجرای migration ۰۰۰۹ فعال می‌شود.</p>
           )}
         </section>
-        <section className={`${styles.card} ${r.soon}`}>
+        <section className={styles.card} data-testid="insight">
           <h2 className={styles.cardTitle}>تحلیل هوشمند</h2>
-          <p className={styles.muted}>بعد از راه‌اندازی هوش مصنوعی فعال می‌شود.</p>
+          {!insSet.enabled ? (
+            <p className={styles.muted}>
+              خاموش است. از صفحه‌ی <Link href="/admin/ai">دستیار هوشمند</Link> (کارت «تحلیل هوشمند گزارش») روشن می‌شود.
+            </p>
+          ) : (
+            <>
+              {insSaved && (
+                <div data-testid="insight-result">
+                  <ul style={{ margin: "0 0 8px", paddingInlineStart: 20, lineHeight: 1.9 }}>
+                    {insSaved.lines.map((l, i) => (
+                      <li key={i}>{l}</li>
+                    ))}
+                  </ul>
+                  <p className={styles.muted} style={{ fontSize: 12 }} data-testid="insight-meta">
+                    تحلیل {fmtDateTime(insSaved.at)} برای بازه‌ی {span} · هزینه {fmtNum(Math.round(insSaved.costToman))} تومان
+                    {insSaved.dropped.length > 0 && ` · ${fmtNum(insSaved.dropped.length)} پیشنهاد به‌خاطر عدد خارج از داده یا اطلاعات ممنوع حذف شد`}
+                  </p>
+                </div>
+              )}
+              {!insReady.enough ? (
+                <p className={styles.muted} data-testid="insight-not-enough">
+                  داده‌ی کافی برای تحلیل نیست (دست‌کم {fmtNum(MIN_PRODUCT_VIEWS)} بازدید محصول یا {fmtNum(MIN_CHATS)} گفتگو، و {fmtNum(MIN_ACTIVE_DAYS)} روز با فعالیت در این بازه).
+                </p>
+              ) : insCapLeft <= 0 ? (
+                <p className={styles.muted} data-testid="insight-cap">
+                  سقف هزینه‌ی روزانه‌ی تحلیل ({fmtNum(insSet.capToman)} تومان) پر شده است.
+                </p>
+              ) : (
+                <ActionForm action={runInsightAction} submitLabel={insSaved ? "تحلیل دوباره" : "تحلیل کن"}>
+                  <input type="hidden" name="range" value={range.preset} />
+                  <input type="hidden" name="from" value={range.from} />
+                  <input type="hidden" name="to" value={range.to} />
+                  <p className={styles.muted} style={{ fontSize: 12, margin: "0 0 8px" }}>
+                    هر اجرا حدود ۸۰۰ تا ۱٬۵۰۰ تومان هزینه دارد (باقی‌مانده‌ی سقف امروز: {fmtNum(Math.round(insCapLeft))} تومان). نتیجه برای امروز ذخیره می‌شود و دیدن دوباره‌ی آن
+                    هزینه ندارد.
+                  </p>
+                </ActionForm>
+              )}
+            </>
+          )}
+          <h3 className={styles.cardTitle} style={{ fontSize: 15, marginTop: 12 }}>
+            دستیار هوشمند در این بازه
+          </h3>
           <div className={r.kpis} style={{ marginBottom: 0 }}>
             <div className={r.kpi}>
               <span className={r.kpiLabel}>جواب خودکار AI</span>

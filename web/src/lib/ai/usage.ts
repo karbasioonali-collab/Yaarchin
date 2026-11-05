@@ -48,9 +48,19 @@ export async function aiLimits(): Promise<AiLimits> {
 //   test ← آزمون دستیار و «پیشنهاد سؤال فریبنده با AI» (purpose = test_run | suggest؛ سقف ai.test_daily_cost_toman)
 //   catalog ← «متن فارسی محصول با AI» (purpose = catalog_text؛ سقف ai.catalog_daily_cost_toman؛ بخش ۴۰)
 // تست اتصال در هیچ‌کدام حساب نمی‌شود (چند ده تومان). پس آزمون هیچ‌وقت جواب دادن به مشتری را متوقف نمی‌کند.
-export async function todayUsage(scope: "chat" | "test" | "catalog" = "chat"): Promise<{ requests: number; costToman: number; promptTokens: number; completionTokens: number }> {
+export async function todayUsage(
+  scope: "chat" | "test" | "catalog" | "report" = "chat",
+): Promise<{ requests: number; costToman: number; promptTokens: number; completionTokens: number }> {
   const start = tehranDayStart(tehranYmd());
-  const purpose = scope === "chat" ? sql`purpose = 'chat'` : scope === "catalog" ? sql`purpose = 'catalog_text'` : sql`purpose in ('test_run', 'suggest')`;
+  // report ← «تحلیل هوشمند» گزارش‌ها (purpose = report_insight؛ سقف ai.report_daily_cost_toman؛ بخش ۴۹)
+  const purpose =
+    scope === "chat"
+      ? sql`purpose = 'chat'`
+      : scope === "catalog"
+        ? sql`purpose = 'catalog_text'`
+        : scope === "report"
+          ? sql`purpose = 'report_insight'`
+          : sql`purpose in ('test_run', 'suggest')`;
   const r = await db.execute<{ n: string; cost: string; pt: string; ct: string }>(sql`
     select count(*) filter (where model is not null) as n, coalesce(sum(cost_toman), 0) as cost, coalesce(sum(prompt_tokens), 0) as pt, coalesce(sum(completion_tokens), 0) as ct
     from ai_requests where mode = 'live' and ${purpose} and created_at >= ${start}`);
