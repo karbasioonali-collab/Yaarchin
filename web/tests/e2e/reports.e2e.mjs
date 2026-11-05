@@ -98,11 +98,11 @@ k = await kpi(ad, "ثبت‌نام تازه");
 ok(k.includes("۱") && k.includes("قبل: ۱") && k.includes("بدون تغییر"), `signups today 1 vs yesterday 1: ${k}`);
 k = await kpi(ad, "افزودن به علاقه‌مندی");
 ok(k.includes("۲") && k.includes("قبل: ۱"), `favorite adds 2 vs 1: ${k}`);
-k = await kpi(ad, "بازدیدکننده‌ی یکتا (مشتری واردشده)");
-ok(k.startsWith("بازدیدکننده‌ی یکتا (مشتری واردشده) ۱"), `unique visitors today = 1 (A): ${k}`);
+k = await kpi(ad, "بازدیدکننده‌ی یکتا");
+ok(k.startsWith("بازدیدکننده‌ی یکتا ۱"), `unique visitors today = 1 (A): ${k}`);
 await ad.goto(B + "/admin/reports?range=yesterday");
 ok((await kpi(ad, "بازدید محصول")).startsWith("بازدید محصول ۳"), "yesterday views = 3 (23:59 counted in yesterday)");
-ok((await kpi(ad, "بازدیدکننده‌ی یکتا (مشتری واردشده)")).includes("۲"), "yesterday unique visitors = 2");
+ok((await kpi(ad, "بازدیدکننده‌ی یکتا")).includes("۲"), "yesterday unique visitors = 2");
 await ad.goto(B + "/admin/reports?range=7d");
 ok((await kpi(ad, "بازدید محصول")).startsWith("بازدید محصول ۶"), "7 days = 6 views");
 // ---------- ۲. بخش‌ها ----------
