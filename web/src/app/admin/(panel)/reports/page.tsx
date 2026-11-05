@@ -19,12 +19,18 @@ export const metadata: Metadata = { title: "گزارش‌ها" };
 
 // گزارش روزانه در پنل (بدون پیامک یا ایمیل). روزها به وقت تهران. docs/infoyaarchin.md بخش ۲۸.
 // دسترسی: reports.view؛ بخش «عملکرد کارشناس‌ها» جدا با reports.staff. سوئیچ features.reports کل بخش را خاموش می‌کند.
-function Kpi({ title, cur, prev, prevSpan }: { title: string; cur: number; prev: number; prevSpan: string }) {
+// guest: سهم مهمان از cur (بخش ۴۸) ← خط «مشتری X · مهمان Y» زیر عدد جمع
+function Kpi({ title, cur, prev, prevSpan, guest }: { title: string; cur: number; prev: number; prevSpan: string; guest?: number }) {
   const d = delta(cur, prev);
   return (
     <div className={r.kpi}>
       <span className={r.kpiLabel}>{title}</span>
       <span className={r.kpiValue}>{fmtNum(cur)}</span>
+      {guest !== undefined && (
+        <span className={r.prev} data-testid="kpi-split">
+          مشتری {fmtNum(cur - guest)} · مهمان {fmtNum(guest)}
+        </span>
+      )}
       <span className={d.dir === "up" ? r.up : d.dir === "down" ? r.down : r.flat} title={`بازه‌ی قبل: ${prevSpan}`}>
         {d.text} <span className={r.prev}>(قبل: {fmtNum(prev)})</span>
       </span>
@@ -104,8 +110,9 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
       )}
 
       <div className={r.kpis}>
-        <Kpi title="بازدید محصول" cur={c.productViews} prev={p.productViews} prevSpan={prevSpan} />
-        <Kpi title="بازدیدکننده‌ی یکتا (مشتری واردشده)" cur={c.visitors} prev={p.visitors} prevSpan={prevSpan} />
+        <Kpi title="بازدید محصول" cur={c.productViews} prev={p.productViews} prevSpan={prevSpan} guest={c.productViewsGuest} />
+        <Kpi title="بازدیدکننده‌ی یکتا" cur={c.visitors} prev={p.visitors} prevSpan={prevSpan} guest={c.visitorsGuest} />
+        <Kpi title="ورود به سایت (هر نفر یک بار در روز)" cur={c.siteVisits} prev={p.siteVisits} prevSpan={prevSpan} guest={c.siteVisitsGuest} />
         <Kpi title="ثبت‌نام تازه" cur={c.signups} prev={p.signups} prevSpan={prevSpan} />
         <Kpi title="افزودن به علاقه‌مندی" cur={c.favoriteAdds} prev={p.favoriteAdds} prevSpan={prevSpan} />
         <Kpi title="گفتگوی تازه" cur={c.newChats} prev={p.newChats} prevSpan={prevSpan} />
@@ -161,7 +168,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
           </table>
           {!cats.length && <p className={styles.muted}>بازدیدی در این بازه ثبت نشده.</p>}
           <p className={styles.muted} style={{ fontSize: 12 }}>
-            بازدید فقط برای مشتری واردشده ثبت می‌شود؛ بازدید مهمان‌ها شمرده نمی‌شود.
+            بازدید مشتری‌ها و مهمان‌ها (بدون ورود) هر دو شمرده می‌شود؛ هر مرورگر مهمان یک بازدیدکننده است. ربات‌ها و کارمندها شمرده نمی‌شوند.
           </p>
         </section>
       </div>

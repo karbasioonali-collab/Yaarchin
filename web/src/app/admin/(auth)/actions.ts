@@ -10,6 +10,7 @@ import { getAuth } from "@/lib/auth/current";
 import { burnPasswordCheck, verifyPassword } from "@/lib/auth/password";
 import { isLoginBlocked, recordLoginAttempt } from "@/lib/auth/rate-limit";
 import { createSession, destroySession } from "@/lib/auth/session";
+import { markStaffBrowser } from "@/lib/site/guest";
 import { parseIdentifier } from "@/lib/validation";
 
 const GENERIC_ERROR = "موبایل/ایمیل یا رمز اشتباه است.";
@@ -56,6 +57,8 @@ export async function loginAction(_prev: FormState, formData: FormData): Promise
   await recordLoginAttempt({ identifier, userId: user.id, step: "password", success: true });
   await destroySession();
   await createSession(user.id);
+  // این مرورگر دیگر به‌عنوان مهمان شمرده نمی‌شود (بخش ۴۸)
+  await markStaffBrowser().catch((e) => console.error("staff browser mark failed", e));
 
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
   await logActivity({ actorUserId: user.id, action: "auth.login_password", entityType: "user", entityId: user.id });

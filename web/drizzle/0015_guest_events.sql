@@ -1,0 +1,1 @@
+CREATE INDEX "events_anon_idx" ON "events" USING btree ("anon_id","occurred_at") WHERE "events"."anon_id" is not null;

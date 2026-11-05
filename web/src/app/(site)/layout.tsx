@@ -44,7 +44,8 @@ export default async function SiteLayout({ children }: LayoutProps<"/">) {
       {footer.isVisible && <Footer data={footer.data} categories={categories} products={products} />}
       <div className={s.tabSpacer} aria-hidden="true" />
       <MobileTabBar favoritesEnabled={favoritesOn} customer={viewer?.kind === "customer"} />
-      {viewer?.kind === "customer" && <Tracker />}
+      {/* بازدید مشتری و مهمان ثبت می‌شود، کارمند واردشده نه (بخش ۴۸) */}
+      {viewer?.kind !== "staff" && <Tracker />}
     </>
   );
 }

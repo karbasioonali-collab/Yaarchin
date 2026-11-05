@@ -1,4 +1,5 @@
 // تنظیمات، سوئیچ‌ها، لاگ فعالیت و ثبت رفتار.
+import { sql } from "drizzle-orm";
 import { bigserial, index, inet, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 import { createdAt, updatedAt } from "./_common";
 import { users } from "./auth";
@@ -63,5 +64,9 @@ export const events = pgTable(
     index("events_type_idx").on(t.type, t.occurredAt),
     index("events_entity_idx").on(t.entityType, t.entityId),
     index("events_user_idx").on(t.userId, t.occurredAt),
+    // مهمان‌ها (کوکی yid؛ migration ۰۰۱۵، بخش ۴۸): تکراری‌ها، سقف روزانه، وصل شدن به حساب بعد از ورود
+    index("events_anon_idx")
+      .on(t.anonId, t.occurredAt)
+      .where(sql`${t.anonId} is not null`),
   ],
 );

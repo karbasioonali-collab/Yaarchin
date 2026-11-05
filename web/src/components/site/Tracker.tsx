@@ -3,8 +3,9 @@
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 
-// فقط برای مشتری واردشده در قالب سایت رندر می‌شود: بعد از باز شدن هر صفحه، مسیرش را به /api/v1/events می‌فرستد.
-// (بازدید محصول/دسته و «ورود روزانه به سایت»؛ lib/customer/events.ts)
+// برای مشتری و مهمان (نه کارمند واردشده) در قالب سایت رندر می‌شود: بعد از باز شدن هر صفحه، مسیرش را به /api/v1/events می‌فرستد.
+// (بازدید محصول/دسته و «ورود روزانه به سایت»؛ lib/customer/events.ts و lib/site/guest.ts، بخش ۴۸)
+// keepalive و catch: صفحه هیچ‌وقت منتظر یا خراب نمی‌شود.
 export function Tracker() {
   const path = usePathname();
   useEffect(() => {

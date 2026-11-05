@@ -42,7 +42,11 @@ export function formToObject(fd: FormData): Tree {
     let value: unknown;
     if (kind === "b") value = values.includes("1");
     else if (kind === "n") value = Number(values.at(-1));
-    else if (kind === "l") value = (values.at(-1) ?? "").split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+    else if (kind === "l")
+      value = (values.at(-1) ?? "")
+        .split(/\r?\n/)
+        .map((x) => x.trim())
+        .filter(Boolean);
     else value = values.at(-1) ?? "";
     setPath(out, path, value);
   }
