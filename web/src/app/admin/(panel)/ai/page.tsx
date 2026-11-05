@@ -16,7 +16,10 @@ import { HANDOFF_FA } from "@/lib/ai/rules";
 import { aiStatus } from "@/lib/ai/state";
 import { aiLimits, blockInventedNumbers, catalogLimits, testLimits, todayUsage } from "@/lib/ai/usage";
 import { callLine, readRequestMeta } from "@/lib/ai/request-meta";
-import { requirePermission } from "@/lib/auth/can";
+import { can, requirePermission } from "@/lib/auth/can";
+import { costChart, monthTotal } from "@/lib/ai/cost-chart";
+import { dailyCosts } from "@/lib/ai/costs";
+import { tehranYmd } from "@/lib/tehran-time";
 import { aiReady, aiTestsReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import { getSetting, isEnabled } from "@/lib/settings";
@@ -88,6 +91,9 @@ export default async function AiPage() {
       .then((r) => r.rows)
       .catch(() => []),
   ]);
+  // کارت خلاصه‌ی هزینه (بخش ۵۲): فقط با ai.costs؛ نمودار در /admin/ai/costs
+  const costRows = (await can(a.user, "ai.costs")) ? await dailyCosts() : null;
+  const costSum = costRows ? { all: costChart(costRows, "year", tehranYmd()).all, month: monthTotal(costRows, tehranYmd()) } : null;
   const costPct = limits.dailyCostToman ? Math.round((usage.costToman / limits.dailyCostToman) * 100) : 0;
   const ext1 = (n: string) => ext.find((x) => x.name === n);
 
@@ -111,6 +117,17 @@ export default async function AiPage() {
       {!ready && <div className={styles.impersonation}>بخش دستیار بعد از اجرای migration ۰۰۱۰ فعال می‌شود (در کنسول لیارا npm run db:migrate و بعد npm run db:seed).</div>}
 
       <div className={styles.grid}>
+        {costSum && (
+          <div className={styles.card} data-testid="ai-cost-summary">
+            <h2 className={styles.cardTitle}>هزینه‌ی هوش مصنوعی</h2>
+            <p style={{ margin: "0 0 6px" }}>
+              کل از اول: <strong>{fmtNum(Math.round(costSum.all))} تومان</strong> · این ماه (شمسی): <strong>{fmtNum(Math.round(costSum.month))} تومان</strong>
+            </p>
+            <p style={{ margin: 0 }}>
+              <Link href="/admin/ai/costs">نمودار روزانه، هفتگی، ماهانه و سالانه</Link>
+            </p>
+          </div>
+        )}
         <div className={styles.card}>
           <h2 className={styles.cardTitle}>وضعیت</h2>
           <p style={{ margin: "0 0 6px" }}>

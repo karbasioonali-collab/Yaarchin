@@ -319,7 +319,7 @@ export default async function DashboardPage() {
         )}
 
         {cost && (
-          <Card title="هزینه‌ی هوش مصنوعی" icon="chip" testid="dash-ai-cost" href="/admin/ai" hrefLabel="دستیار هوشمند">
+          <Card title="هزینه‌ی هوش مصنوعی" icon="chip" testid="dash-ai-cost" href="/admin/ai/costs" hrefLabel="نمودار">
             <div className={d.pair}>
               <div className={d.kpi}>
                 <span className={d.kpiValue} data-testid="cost-yesterday">

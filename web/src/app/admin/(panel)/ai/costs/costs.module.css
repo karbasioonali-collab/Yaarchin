@@ -1,0 +1,66 @@
+/* نمودار هزینه‌ی هوش مصنوعی (بخش ۵۲). SVG با viewBox تا روی موبایل ۳۶۰ پیکسل در عرض کارت جا شود؛ کروم ۱۰۹. */
+.chartWrap {
+  margin-top: 12px;
+  direction: ltr;
+}
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.grid {
+  stroke: rgba(34, 34, 34, 0.08);
+  stroke-width: 1;
+}
+.axis {
+  font-size: 11px;
+  fill: rgba(34, 34, 34, 0.55);
+  font-family: inherit;
+}
+.hit {
+  fill: transparent;
+}
+.hitSel {
+  fill: rgba(255, 122, 0, 0.08);
+}
+a:hover .hit {
+  fill: rgba(47, 125, 92, 0.06);
+}
+.legend,
+.parts {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 13px;
+}
+.parts {
+  flex-direction: column;
+  gap: 6px;
+}
+.swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 3px;
+  margin-inline-end: 6px;
+  vertical-align: -1px;
+}
+.detail {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.detailTitle {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
+}
+/* صفحه‌ی باریک: SVG تا نصف کوچک می‌شود؛ متن محور به واحد SVG بزرگ‌تر تا روی ۳۶۰ پیکسل حدود ۱۰ پیکسل بماند */
+@media (max-width: 560px) {
+  .axis {
+    font-size: 22px;
+  }
+}
