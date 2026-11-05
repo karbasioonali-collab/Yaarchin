@@ -9,7 +9,7 @@ import { scoreSource } from "@/lib/leads/score";
 import { delta, PRESET_FA, type Preset, resolveRange } from "@/lib/reports/range";
 import { aiStats, chatNow, counts, fmtDuration, newCustomers, staffPerformance, topCategories, topFavorited, topProducts } from "@/lib/reports/report";
 import { insightReadiness, insightSettings, savedInsight } from "@/lib/reports/insight";
-import { MIN_ACTIVE_DAYS, MIN_CHATS, MIN_PRODUCT_VIEWS } from "@/lib/reports/insight-core";
+import { insightMissing } from "@/lib/dashboard/core";
 import { todayUsage } from "@/lib/ai/usage";
 import { aiReady } from "@/lib/db-ready";
 import { ActionForm } from "@/components/ui/ActionForm";
@@ -85,7 +85,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
   const [insSet, insSaved, insReady, insUsed] =
     aiOn && seeInsight
       ? await Promise.all([insightSettings(), savedInsight({ from: range.from, to: range.to }), insightReadiness(cur, prev), todayUsage("report")])
-      : [{ enabled: false, capToman: 0 }, null, { enough: false, activeDays: 0 }, { costToman: 0 }];
+      : [{ enabled: false, capToman: 0, auto: false }, null, { enough: false, activeDays: 0, c: { productViews: 0, newChats: 0 } }, { costToman: 0 }];
   const insCapLeft = Math.max(0, insSet.capToman - insUsed.costToman);
 
   const label = (d: string) => fmtDate(tehranDayStart(d));
@@ -356,46 +356,49 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
             {seeInsight && (
               <div data-testid="insight">
                 <h2 className={styles.cardTitle}>تحلیل هوشمند</h2>
-                {!insSet.enabled ? (
-                  <p className={styles.muted}>
-                    خاموش است. از صفحه‌ی <Link href="/admin/ai">دستیار هوشمند</Link> (کارت «تحلیل هوشمند گزارش») روشن می‌شود.
-                  </p>
-                ) : (
-                  <>
-                    {insSaved && (
-                      <div data-testid="insight-result">
-                        <ul style={{ margin: "0 0 8px", paddingInlineStart: 20, lineHeight: 1.9 }}>
-                          {insSaved.lines.map((l, i) => (
-                            <li key={i}>{l}</li>
-                          ))}
-                        </ul>
-                        <p className={styles.muted} style={{ fontSize: 12 }} data-testid="insight-meta">
-                          تحلیل {fmtDateTime(insSaved.at)} برای بازه‌ی {span} · هزینه {fmtNum(Math.round(insSaved.costToman))} تومان
-                          {insSaved.dropped.length > 0 && ` · ${fmtNum(insSaved.dropped.length)} پیشنهاد به‌خاطر عدد خارج از داده یا اطلاعات ممنوع حذف شد`}
-                        </p>
-                      </div>
-                    )}
-                    {!insReady.enough ? (
-                      <p className={styles.muted} data-testid="insight-not-enough">
-                        داده‌ی کافی برای تحلیل نیست (دست‌کم {fmtNum(MIN_PRODUCT_VIEWS)} بازدید محصول یا {fmtNum(MIN_CHATS)} گفتگو، و {fmtNum(MIN_ACTIVE_DAYS)} روز با فعالیت در این
-                        بازه).
-                      </p>
-                    ) : insCapLeft <= 0 ? (
-                      <p className={styles.muted} data-testid="insight-cap">
-                        سقف هزینه‌ی روزانه‌ی تحلیل ({fmtNum(insSet.capToman)} تومان) پر شده است.
-                      </p>
+                {/* دکمه همیشه دیده می‌شود (بخش ۵۱): غیرفعال با دلیلش، یا فعال */}
+                {insSet.enabled && insSaved && (
+                  <div data-testid="insight-result">
+                    <ul style={{ margin: "0 0 8px", paddingInlineStart: 20, lineHeight: 1.9 }}>
+                      {insSaved.lines.map((l, i) => (
+                        <li key={i}>{l}</li>
+                      ))}
+                    </ul>
+                    <p className={styles.muted} style={{ fontSize: 12 }} data-testid="insight-meta">
+                      تحلیل {fmtDateTime(insSaved.at)} برای بازه‌ی {span} · هزینه {fmtNum(Math.round(insSaved.costToman))} تومان
+                      {insSaved.dropped.length > 0 && ` · ${fmtNum(insSaved.dropped.length)} پیشنهاد به‌خاطر عدد خارج از داده یا اطلاعات ممنوع حذف شد`}
+                    </p>
+                  </div>
+                )}
+                {!insSet.enabled || !insReady.enough || insCapLeft <= 0 ? (
+                  <div className={r.insightOff}>
+                    <button type="button" className={r.btnOff} disabled aria-disabled="true">
+                      {insSaved ? "تحلیل دوباره" : "تحلیل کن"}
+                    </button>
+                    {!insSet.enabled ? (
+                      <span className={styles.muted} data-testid="insight-off">
+                        تحلیل هوشمند خاموش است. روشن کردنش در <Link href="/admin/ai">دستیار هوشمند ← تحلیل هوشمند گزارش</Link>.
+                      </span>
+                    ) : !insReady.enough ? (
+                      <span className={styles.muted} data-testid="insight-not-enough">
+                        داده‌ی کافی برای تحلیل نیست: {insightMissing(insReady.c, insReady.activeDays).join("؛ ")}.
+                      </span>
                     ) : (
-                      <ActionForm action={runInsightAction} submitLabel={insSaved ? "تحلیل دوباره" : "تحلیل کن"}>
-                        <input type="hidden" name="range" value={range.preset} />
-                        <input type="hidden" name="from" value={range.from} />
-                        <input type="hidden" name="to" value={range.to} />
-                        <p className={styles.muted} style={{ fontSize: 12, margin: "0 0 8px" }}>
-                          هر اجرا حدود ۸۰۰ تا ۱٬۵۰۰ تومان هزینه دارد (باقی‌مانده‌ی سقف امروز: {fmtNum(Math.round(insCapLeft))} تومان). نتیجه برای امروز ذخیره می‌شود و دیدن دوباره‌ی
-                          آن هزینه ندارد.
-                        </p>
-                      </ActionForm>
+                      <span className={styles.muted} data-testid="insight-cap">
+                        سقف هزینه‌ی روزانه‌ی تحلیل ({fmtNum(insSet.capToman)} تومان) پر شده است؛ فردا دوباره فعال می‌شود.
+                      </span>
                     )}
-                  </>
+                  </div>
+                ) : (
+                  <ActionForm action={runInsightAction} submitLabel={insSaved ? "تحلیل دوباره" : "تحلیل کن"}>
+                    <input type="hidden" name="range" value={range.preset} />
+                    <input type="hidden" name="from" value={range.from} />
+                    <input type="hidden" name="to" value={range.to} />
+                    <p className={styles.muted} style={{ fontSize: 12, margin: "0 0 8px" }}>
+                      هر اجرا حدود ۸۰۰ تا ۱٬۵۰۰ تومان هزینه دارد (باقی‌مانده‌ی سقف امروز: {fmtNum(Math.round(insCapLeft))} تومان). نتیجه برای امروز ذخیره می‌شود و دیدن دوباره‌ی آن
+                      هزینه ندارد.
+                    </p>
+                  </ActionForm>
                 )}
               </div>
             )}

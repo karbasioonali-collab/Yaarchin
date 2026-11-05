@@ -118,8 +118,11 @@ ok((await kpi(ad, "باز و ارجاع‌نشده")).includes("۱"), "unassigne
 const staffRow = ad.locator("section", { hasText: "عملکرد کارشناس‌ها" }).locator("tr", { hasText: "Test Expert" });
 const st = (await staffRow.innerText()).replace(/\s+/g, " ");
 ok(st.includes("۱۰ دقیقه") && st.includes("۱۰۰٪"), `expert: first response 10 min, conversion 100% (${st})`);
-// کارت «تحلیل هوشمند» (بخش ۴۹): با سوئیچ پیش‌فرض خاموش فقط پیام «خاموش است»، بدون دکمه
-ok((await ad.getByTestId("insight").innerText()).includes("خاموش است") && (await ad.getByTestId("insight").getByRole("button").count()) === 0, "AI insight card: off by default");
+// کارت «تحلیل هوشمند» (بخش ۴۹): با سوئیچ پیش‌فرض خاموش «خاموش است» و دکمه‌ی غیرفعال (بخش ۵۱: دکمه همیشه دیده می‌شود)
+ok(
+  (await ad.getByTestId("insight").innerText()).includes("خاموش است") && (await ad.getByTestId("insight").getByRole("button", { name: "تحلیل کن" }).isDisabled()),
+  "AI insight card: off by default (disabled button)",
+);
 // ---------- ۳. امتیاز جدیت ----------
 // A: علاقه‌مندی ۱۲×۵=۶۰←۲۵، روز بازدید ۲×۳=۶، محصول ۵×۱=۵، پروفایل ۱۰، گفتگو ۱۰، درخواست ۲۰ = ۷۶
 const leads = ad.locator("section", { hasText: "مشتری‌های با امتیاز بالا" });

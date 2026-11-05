@@ -35,13 +35,13 @@ const card = () => ad.getByTestId("insight");
 
 // ---------- خاموش ----------
 await ad.goto(B + "/admin/reports?range=7d");
-ok((await card().innerText()).includes("خاموش است") && (await card().getByRole("button", { name: "تحلیل کن" }).count()) === 0, "switch off → no button");
+ok((await card().innerText()).includes("خاموش است") && (await card().getByRole("button", { name: "تحلیل کن" }).isDisabled()), "switch off → disabled button (section 51)");
 setS("ai.report_insights", true);
 
 // ---------- داده‌ی کم ← بدون مدل ----------
 await ad.goto(B + "/admin/reports?range=custom&from=2026-01-01&to=2026-01-03");
 ok(await vis(ad.getByTestId("insight-not-enough")), "too little data → «داده‌ی کافی برای تحلیل نیست»");
-ok((await card().getByRole("button", { name: "تحلیل کن" }).count()) === 0 && rows() === "0", "no button, no model request");
+ok((await card().getByRole("button", { name: "تحلیل کن" }).isDisabled()) && rows() === "0", "disabled button, no model request");
 
 // ---------- اجرا و ذخیره برای امروز ----------
 await ad.goto(B + "/admin/reports?range=7d");
@@ -101,7 +101,7 @@ psql(`update products set title_fa = replace(title_fa, ' [[insnone]]', '') where
 setS("ai.report_daily_cost_toman", 1000);
 await ad.goto(B + "/admin/reports?range=7d");
 ok(await vis(ad.getByTestId("insight-cap")), "cap reached (3 × 400 ≥ 1,000) → no button");
-ok((await card().getByRole("button", { name: /تحلیل/ }).count()) === 0, "no run button over the cap");
+ok(await card().getByRole("button", { name: /تحلیل/ }).isDisabled(), "run button disabled over the cap");
 
 // ---------- تنظیم از پنل ----------
 await ad.goto(B + "/admin/ai");

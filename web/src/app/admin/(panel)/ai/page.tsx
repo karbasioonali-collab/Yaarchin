@@ -220,6 +220,10 @@ export default async function AiPage() {
             <input type="checkbox" name="reportInsights" defaultChecked={insight.enabled} />
             <span>تحلیل هوشمند گزارش روشن باشد</span>
           </label>
+          <label className={ui.field} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" name="reportInsightsAuto" defaultChecked={insight.auto} />
+            <span>اجرای خودکار تحلیل روزانه: هر روز بعد از ساعت ۶ صبح یک بار «تحلیل ۷ روز تا دیروز» برای داشبورد (فقط وقتی تحلیل هوشمند روشن است)</span>
+          </label>
           <Field
             label="سقف هزینه‌ی روزانه‌ی تحلیل (تومان)"
             name="reportCap"

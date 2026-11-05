@@ -62,3 +62,19 @@
   border: 1.5px dashed rgba(47, 125, 92, 0.35);
   background: rgba(47, 125, 92, 0.04);
 }
+/* دکمه‌ی «تحلیل کن» غیرفعال با دلیلش (بخش ۵۱) */
+.insightOff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.btnOff {
+  background: #d9d9d6;
+  color: #6b6b6b;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  border: 0;
+  cursor: not-allowed;
+}

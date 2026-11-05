@@ -14,7 +14,8 @@ import { BusyError, withSlot } from "@/lib/ai/limiter";
 import { suspectNumbers } from "@/lib/ai/number-check";
 import { todayUsage } from "@/lib/ai/usage";
 import { aiReady, chatReady, followupReady, reportsReady } from "@/lib/db-ready";
-import { tehranYmd } from "@/lib/tehran-time";
+import { autoInsightDue, autoInsightHour, autoInsightRange } from "@/lib/dashboard/core";
+import { addDays, tehranRange, tehranYmd } from "@/lib/tehran-time";
 import { scoreSource } from "@/lib/leads/score";
 import { getSetting } from "@/lib/settings";
 import { enoughData, INSIGHT_SYSTEM, type InsightData, insightInput, insightLines } from "./insight-core";
@@ -23,10 +24,15 @@ import { aiStats, chatNow, counts, topCategories, topProducts, type Win } from "
 const TIMEOUT = 30_000;
 const MAX_TOKENS = 600;
 
-export async function insightSettings(): Promise<{ enabled: boolean; capToman: number }> {
-  const [on, cap] = await Promise.all([getSetting<boolean>("ai.report_insights").catch(() => null), getSetting<number>("ai.report_daily_cost_toman").catch(() => null)]);
+export async function insightSettings(): Promise<{ enabled: boolean; capToman: number; auto: boolean }> {
+  const [on, cap, auto] = await Promise.all([
+    getSetting<boolean>("ai.report_insights").catch(() => null),
+    getSetting<number>("ai.report_daily_cost_toman").catch(() => null),
+    // اجرای خودکار روزانه (بخش ۵۱)؛ قبل از seed این PR ردیفش نیست ← خاموش
+    getSetting<boolean>("ai.report_insights_auto").catch(() => null),
+  ]);
   const n = Number(cap);
-  return { enabled: on === true, capToman: Number.isFinite(n) && n >= 0 ? n : 5000 };
+  return { enabled: on === true, capToman: Number.isFinite(n) && n >= 0 ? n : 5000, auto: auto === true };
 }
 
 export type SavedInsight = { at: Date; lines: string[]; dropped: { line: string; reason: string }[]; costToman: number; from: string; to: string };
@@ -105,7 +111,7 @@ async function buildData(range: { from: string; to: string; days: number }, w: W
 export type RunResult = { ok: true } | { ok: false; error: string };
 
 // اجرا با دکمه‌ی «تحلیل کن». سوئیچ، داده‌ی کافی و سقف هزینه‌ی روزانه قبل از هر درخواست به مدل.
-export async function runInsight(range: { from: string; to: string; days: number }, w: Win, prev: Win): Promise<RunResult> {
+export async function runInsight(range: { from: string; to: string; days: number }, w: Win, prev: Win, opts: { auto?: boolean } = {}): Promise<RunResult> {
   if (!(await aiReady())) return { ok: false, error: "این بخش بعد از اجرای migration ۰۰۱۰ فعال می‌شود." };
   const st = await insightSettings();
   if (!st.enabled) return { ok: false, error: "تحلیل هوشمند گزارش خاموش است (صفحه‌ی «دستیار هوشمند»)." };
@@ -119,7 +125,7 @@ export async function runInsight(range: { from: string; to: string; days: number
   const input = insightInput(data);
   const t0 = Date.now();
   const base = { purpose: "report_insight", mode: "live" as const };
-  const meta = { day: tehranYmd(), rangeFrom: range.from, rangeTo: range.to };
+  const meta = { day: tehranYmd(), rangeFrom: range.from, rangeTo: range.to, ...(opts.auto ? { auto: true } : {}) };
   let reply;
   let model = cfg.model;
   try {
@@ -196,4 +202,51 @@ export async function runInsight(range: { from: string; to: string; days: number
   });
   if (!lines.length) return { ok: false, error: "تحلیل قابل اعتماد نبود (همه‌ی پیشنهادها از محافظ رد شدند)؛ جزئیات در «آخرین درخواست‌ها»." };
   return { ok: true };
+}
+
+// ---------- اجرای خودکار روزانه (بخش ۵۱؛ تصمیم مالک) ----------
+// از زمان‌بند ۶۰ ثانیه‌ای (lib/chat/scheduler.ts) با قفل دیتابیس جدا. شرط‌ها:
+//   سوئیچ ai.report_insights و ai.report_insights_auto هر دو روشن؛ ساعت تهران ≥ AUTO_INSIGHT_HOUR (پیش‌فرض ۶)؛
+//   امروز هنوز اجرای خودکاری ثبت نشده (meta.auto، هر وضعیتی: ناموفق هم همان روز تکرار نمی‌شود تا هزینه تکرار نشود).
+// بازه: «۷ روز تا پایان دیروز». بقیه‌ی شرط‌ها (حالت زنده، داده‌ی کافی، سقف) همان runInsight است. اگر یکی از آن‌ها نبود،
+// ردیفی ثبت نمی‌شود؛ برای اینکه هر دقیقه دوباره شمارش نشود، همان روز در حافظه‌ی پروسه علامت می‌خورد.
+let autoCheckedDay: string | null = null;
+export async function runAutoInsight(now: Date = new Date()): Promise<"off" | "early" | "done-today" | "skipped" | "ran"> {
+  if (!(await aiReady())) return "off";
+  const st = await insightSettings();
+  if (!st.enabled || !st.auto) return "off";
+  if (!autoInsightDue(now, autoInsightHour(process.env.AUTO_INSIGHT_HOUR))) return "early";
+  const day = tehranYmd(now);
+  if (autoCheckedDay === day) return "done-today";
+  const r = await db.execute(sql`select 1 from ai_requests where purpose = 'report_insight' and meta->>'auto' = 'true' and meta->>'day' = ${day} limit 1`);
+  if (r.rows.length) {
+    autoCheckedDay = day;
+    return "done-today";
+  }
+  const range = autoInsightRange(now);
+  const cur = tehranRange(range.from, range.to);
+  const prev = tehranRange(addDays(range.from, -7), addDays(range.from, -1));
+  autoCheckedDay = day;
+  const res = await runInsight(range, cur, prev, { auto: true });
+  return res.ok ? "ran" : "skipped";
+}
+
+// نتیجه‌ی اجرای خودکار امروز برای داشبورد (هر وضعیتی، تا «ناموفق بود» هم دیده شود)
+export async function autoInsightToday(): Promise<{ status: string; at: Date; lines: string[]; dropped: number; costToman: number; from: string; to: string } | null> {
+  if (!(await aiReady())) return null;
+  const r = await db.execute<{ status: string; created_at: Date; meta: Record<string, unknown>; cost_toman: string }>(sql`
+    select status, created_at, meta, cost_toman from ai_requests
+    where purpose = 'report_insight' and meta->>'auto' = 'true' and meta->>'day' = ${tehranYmd()} order by id desc limit 1`);
+  const x = r.rows[0];
+  if (!x) return null;
+  const m = x.meta as { lines?: string[]; dropped?: unknown[]; rangeFrom?: string; rangeTo?: string };
+  return {
+    status: x.status,
+    at: new Date(x.created_at),
+    lines: m.lines ?? [],
+    dropped: m.dropped?.length ?? 0,
+    costToman: Number(x.cost_toman),
+    from: m.rangeFrom ?? "",
+    to: m.rangeTo ?? "",
+  };
 }
