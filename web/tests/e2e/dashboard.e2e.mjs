@@ -26,6 +26,16 @@ setS("ai.report_daily_cost_toman", 5000);
 ok(psql("select value::text from settings where key='ai.report_insights_auto'") === "false", "seed: auto insight switch exists, default off");
 
 // ---------- داده ----------
+const cleanChats = () => {
+  psql("delete from chat_messages where conversation_id in (select id from conversations where subject like 'dash %')");
+  psql("delete from conversation_reads where conversation_id in (select id from conversations where subject like 'dash %')");
+  psql("delete from conversations where subject like 'dash %'");
+};
+// اجرای قبلی همین تست روی همان دیتابیس (--no-setup) عددهای «دیروز» را دو برابر نکند
+cleanChats();
+// فهرست «الان» حداکثر ۸ تا (قدیمی‌ترین اول) است؛ گفتگوهای باز تست‌های قبلی موقتاً بسته و در پایان دوباره باز می‌شوند
+const otherOpen = psql("select coalesce(string_agg(id::text, ','), '') from conversations where status='open'");
+if (otherOpen) psql(`update conversations set status='closed' where id in ('${otherOpen.split(",").join("','")}')`);
 const cust = (i) => {
   const email = `dash-${run}-${i}@example.com`;
   psql(`insert into users (full_name, email) values ('DashCust${run} ${i}', '${email}')`);
@@ -77,7 +87,7 @@ psql(`insert into ai_requests (purpose, mode, model, status, cost_toman, created
 // آزمون کامل همین حالا با همین مدل و دستورالعمل (تازه‌تر از آزمون‌های تست ai-tests که قبل از این اجرا شدند)
 const PV = readFileSync(new URL("../../src/lib/ai/prompt.ts", import.meta.url), "utf8").match(/PROMPT_VERSION = "([^"]+)"/)[1];
 psql(
-  `insert into ai_test_runs (status, mode, scope, model, prompt_version, total, done, passed, failed, started_at, finished_at) values ('done', 'live', '{"kind":"all"}', 'mock/primary', '${PV}', 40, 40, 37, 3, now() - interval '5 minutes', now())`,
+  `insert into ai_test_runs (status, mode, scope, model, prompt_version, total, done, passed, failed, started_at, finished_at) values ('done', 'live', '{"kind":"all"}', 'mock/primary', '${PV}', 40, 40, 37, 3, now(), now())`,
 );
 
 const { b, errs, page } = await launch();
@@ -276,7 +286,8 @@ psql("update lead_score_rules set enabled=false, points=0.01, cap=20 where key='
 psql(`delete from exchange_rates where note='dash-${run}'`);
 psql(`delete from events where anon_id like 'dash-${run}-%' or anon_id like 'dashins-%' or user_id in ('${C.join("','")}')`);
 psql(`delete from customer_signals where user_id in ('${C.join("','")}')`);
-psql(`update conversations set status='closed' where subject='dash ${run}'`);
+cleanChats();
+if (otherOpen) psql(`update conversations set status='open' where id in ('${otherOpen.split(",").join("','")}')`);
 await sleep(100);
 ok(errs.length === 0, `no page errors (${errs.slice(0, 3).join(" | ")})`);
 await b.close();
