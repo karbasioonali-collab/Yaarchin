@@ -21,9 +21,10 @@ import { aiReady, aiTestsReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import { getSetting, isEnabled } from "@/lib/settings";
 import styles from "../panel.module.css";
-import { saveAiLimitsAction, saveBlacklistAction, saveCannedAction, saveGenericWordsAction, saveNumberCheckAction } from "./actions";
+import { saveAiLimitsAction, saveBlacklistAction, saveCannedAction, saveGenericWordsAction, saveNumberCheckAction, saveReportInsightAction } from "./actions";
 import { ConnectionTest } from "./ConnectionTest";
 
+import { insightSettings } from "@/lib/reports/insight";
 import { RawToggle } from "./RawToggle";
 
 export const metadata: Metadata = { title: "دستیار هوشمند" };
@@ -61,6 +62,7 @@ export default async function AiPage() {
   // خروجی خام مدل فقط برای مدیر (بخش ۴۴)
   const isAdmin = a.user.isAdmin;
   const blockNumbers = await blockInventedNumbers();
+  const [insight, insightUsed] = await Promise.all([insightSettings(), aiReady().then((ok) => (ok ? todayUsage("report") : { costToman: 0 }))]);
   const ready = await aiReady();
   const cfg = aiConfig();
   const zero = { requests: 0, costToman: 0, promptTokens: 0, completionTokens: 0 };
@@ -205,6 +207,28 @@ export default async function AiPage() {
             </label>
           </ActionForm>
         </div>
+      </div>
+
+      <div className={styles.card} style={{ marginTop: 16 }} data-testid="report-insight-settings">
+        <h2 className={styles.cardTitle}>تحلیل هوشمند گزارش</h2>
+        <p className={styles.muted} style={{ marginTop: 0, fontSize: 13 }}>
+          در «گزارش‌ها» با دکمه‌ی «تحلیل کن»، ۳ تا ۵ پیشنهاد کوتاه از عددهای همان گزارش ساخته می‌شود (فقط برای کسی که گزارش‌ها را می‌بیند). هر اجرا حدود ۸۰۰ تا ۱٬۵۰۰ تومان؛ نتیجه
+          برای همان روز ذخیره می‌شود. مصرف امروز: {fmtNum(Math.round(insightUsed.costToman))} تومان.
+        </p>
+        <ActionForm action={saveReportInsightAction} submitLabel="ذخیره">
+          <label className={ui.field} style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input type="checkbox" name="reportInsights" defaultChecked={insight.enabled} />
+            <span>تحلیل هوشمند گزارش روشن باشد</span>
+          </label>
+          <Field
+            label="سقف هزینه‌ی روزانه‌ی تحلیل (تومان)"
+            name="reportCap"
+            defaultValue={String(insight.capToman)}
+            inputMode="numeric"
+            ltr
+            hint="جدا از سقف چت، آزمون و متن محصول"
+          />
+        </ActionForm>
       </div>
 
       <div className={styles.card} style={{ marginTop: 16 }} data-testid="number-check">
