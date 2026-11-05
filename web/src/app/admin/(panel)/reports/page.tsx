@@ -53,18 +53,22 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
   const cur = { start: range.start, end: range.end };
   const prev = { start: range.prev.start, end: range.prev.end };
   const [seeStaff, leadsOn] = await Promise.all([can(a.user, "reports.staff"), reportsReady()]);
+  // هر بخش با دسترسی خودش (بخش ۵۰). مدیر همه را دارد؛ با auth.enforce_permissions خاموش، can برای همه‌ی کارمندها true است (مثل قبل).
+  const [seeVisits, seeProducts, seeChats, seeCustomers, seeInsight] = await Promise.all(
+    ["reports.visits", "reports.products", "reports.chats", "reports.customers", "reports.insight"].map((k) => can(a.user, k)),
+  );
 
   const [c, p, prods, cats, signups, favs, chats, staff, ai, leads] = await Promise.all([
     counts(cur),
     counts(prev),
-    topProducts(cur),
-    topCategories(cur),
-    newCustomers(cur),
-    topFavorited(cur),
-    chatNow(),
+    seeProducts ? topProducts(cur) : Promise.resolve([]),
+    seeProducts ? topCategories(cur) : Promise.resolve([]),
+    seeCustomers ? newCustomers(cur) : Promise.resolve([]),
+    seeProducts ? topFavorited(cur) : Promise.resolve([]),
+    seeChats ? chatNow() : Promise.resolve({ unanswered: [], unansweredCount: 0, unassigned: 0 }),
     seeStaff ? staffPerformance(cur) : Promise.resolve([]),
-    aiStats(cur),
-    leadsOn
+    seeChats ? aiStats(cur) : Promise.resolve({ autoReplyPct: null, referralPct: null, thumbsDown: null }),
+    leadsOn && seeCustomers
       ? scoreSource().then(
           async ({ sql: src }) =>
             (
@@ -78,9 +82,10 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
 
   // «تحلیل هوشمند» (بخش ۴۹): نتیجه‌ی امروزِ همین بازه از ai_requests؛ باز کردن صفحه هیچ درخواستی به مدل نمی‌فرستد
   const aiOn = await aiReady();
-  const [insSet, insSaved, insReady, insUsed] = aiOn
-    ? await Promise.all([insightSettings(), savedInsight({ from: range.from, to: range.to }), insightReadiness(cur, prev), todayUsage("report")])
-    : [{ enabled: false, capToman: 0 }, null, { enough: false, activeDays: 0 }, { costToman: 0 }];
+  const [insSet, insSaved, insReady, insUsed] =
+    aiOn && seeInsight
+      ? await Promise.all([insightSettings(), savedInsight({ from: range.from, to: range.to }), insightReadiness(cur, prev), todayUsage("report")])
+      : [{ enabled: false, capToman: 0 }, null, { enough: false, activeDays: 0 }, { costToman: 0 }];
   const insCapLeft = Math.max(0, insSet.capToman - insUsed.costToman);
 
   const label = (d: string) => fmtDate(tehranDayStart(d));
@@ -123,145 +128,161 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
       )}
 
       <div className={r.kpis}>
-        <Kpi title="بازدید محصول" cur={c.productViews} prev={p.productViews} prevSpan={prevSpan} guest={c.productViewsGuest} />
-        <Kpi title="بازدیدکننده‌ی یکتا" cur={c.visitors} prev={p.visitors} prevSpan={prevSpan} guest={c.visitorsGuest} />
-        <Kpi title="ورود به سایت (هر نفر یک بار در روز)" cur={c.siteVisits} prev={p.siteVisits} prevSpan={prevSpan} guest={c.siteVisitsGuest} />
-        <Kpi title="ثبت‌نام تازه" cur={c.signups} prev={p.signups} prevSpan={prevSpan} />
-        <Kpi title="افزودن به علاقه‌مندی" cur={c.favoriteAdds} prev={p.favoriteAdds} prevSpan={prevSpan} />
-        <Kpi title="گفتگوی تازه" cur={c.newChats} prev={p.newChats} prevSpan={prevSpan} />
-        <Kpi title="درخواست مشتری" cur={c.inquiries} prev={p.inquiries} prevSpan={prevSpan} />
-      </div>
-
-      <div className={r.cols}>
-        <section className={styles.card}>
-          <h2 className={styles.cardTitle}>پربازدیدترین محصولات</h2>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>محصول</th>
-                <th>بازدید</th>
-                <th>بازدیدکننده</th>
-              </tr>
-            </thead>
-            <tbody>
-              {prods.map((x) => (
-                <tr key={x.id}>
-                  <td>
-                    <Link href={`/admin/products/${x.id}`}>{x.title}</Link>
-                  </td>
-                  <td>{fmtNum(x.views)}</td>
-                  <td>{fmtNum(x.visitors)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!prods.length && <p className={styles.muted}>بازدیدی در این بازه ثبت نشده.</p>}
-        </section>
-        <section className={styles.card}>
-          <h2 className={styles.cardTitle}>پربازدیدترین دسته‌ها</h2>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>دسته</th>
-                <th>بازدید</th>
-                <th>بازدیدکننده</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cats.map((x) => (
-                <tr key={x.id}>
-                  <td>
-                    <Link href={`/admin/categories/${x.id}`}>{x.name}</Link>
-                  </td>
-                  <td>{fmtNum(x.views)}</td>
-                  <td>{fmtNum(x.visitors)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!cats.length && <p className={styles.muted}>بازدیدی در این بازه ثبت نشده.</p>}
-          <p className={styles.muted} style={{ fontSize: 12 }}>
-            بازدید مشتری‌ها و مهمان‌ها (بدون ورود) هر دو شمرده می‌شود؛ هر مرورگر مهمان یک بازدیدکننده است. ربات‌ها و کارمندها شمرده نمی‌شوند.
-          </p>
-        </section>
-      </div>
-
-      <div className={r.cols}>
-        <section className={styles.card}>
-          <h2 className={styles.cardTitle}>مشتری‌های تازه ({fmtNum(c.signups)})</h2>
-          <table className={styles.table}>
-            <tbody>
-              {signups.map((u) => (
-                <tr key={u.id}>
-                  <td>
-                    <Link href={`/admin/customers/${u.id}`}>{u.full_name}</Link>
-                    <div className={`${styles.muted} ${styles.ltr}`} style={{ fontSize: 12 }}>
-                      {u.mobile ?? u.email ?? ""}
-                    </div>
-                  </td>
-                  <td className={styles.muted}>{fmtDateTime(u.created_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!signups.length && <p className={styles.muted}>ثبت‌نامی در این بازه نبود.</p>}
-        </section>
-        <section className={styles.card}>
-          <h2 className={styles.cardTitle}>بیشترین علاقه‌مندی</h2>
-          <table className={styles.table}>
-            <tbody>
-              {favs.map((x) => (
-                <tr key={x.id}>
-                  <td>
-                    <Link href={`/admin/products/${x.id}`}>{x.title}</Link>
-                  </td>
-                  <td>{fmtNum(x.adds)} بار</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {!favs.length && <p className={styles.muted}>علاقه‌مندی تازه‌ای در این بازه نبود.</p>}
-        </section>
-      </div>
-
-      <section className={styles.card} style={{ marginBottom: 16 }}>
-        <h2 className={styles.cardTitle}>گفتگوها (وضعیت همین حالا)</h2>
-        <div className={r.kpis}>
-          <div className={r.kpi}>
-            <span className={r.kpiLabel}>بی‌پاسخ (آخرین پیام از مشتری)</span>
-            <span className={r.kpiValue}>{fmtNum(chats.unansweredCount)}</span>
-          </div>
-          <div className={r.kpi}>
-            <span className={r.kpiLabel}>باز و ارجاع‌نشده</span>
-            <span className={r.kpiValue}>{fmtNum(chats.unassigned)}</span>
-            <Link href="/admin/chats?tab=unassigned" style={{ fontSize: 12 }}>
-              صف ارجاع‌نشده
-            </Link>
-          </div>
-        </div>
-        {chats.unanswered.length > 0 && (
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>مشتری</th>
-                <th>منتظر از</th>
-                <th>کارشناس</th>
-              </tr>
-            </thead>
-            <tbody>
-              {chats.unanswered.map((x) => (
-                <tr key={x.id}>
-                  <td>
-                    <Link href={`/admin/chats/${x.id}`}>{x.customer}</Link>
-                  </td>
-                  <td className={styles.muted}>{fmtDateTime(x.since)}</td>
-                  <td>{x.assignee ?? <span className={`${styles.badge} ${styles.badgeWarn}`}>ارجاع‌نشده</span>}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {seeVisits && (
+          <>
+            <Kpi title="بازدید محصول" cur={c.productViews} prev={p.productViews} prevSpan={prevSpan} guest={c.productViewsGuest} />
+            <Kpi title="بازدیدکننده‌ی یکتا" cur={c.visitors} prev={p.visitors} prevSpan={prevSpan} guest={c.visitorsGuest} />
+            <Kpi title="ورود به سایت (هر نفر یک بار در روز)" cur={c.siteVisits} prev={p.siteVisits} prevSpan={prevSpan} guest={c.siteVisitsGuest} />
+          </>
         )}
-      </section>
+        {seeCustomers && <Kpi title="ثبت‌نام تازه" cur={c.signups} prev={p.signups} prevSpan={prevSpan} />}
+        {seeProducts && <Kpi title="افزودن به علاقه‌مندی" cur={c.favoriteAdds} prev={p.favoriteAdds} prevSpan={prevSpan} />}
+        {seeChats && (
+          <>
+            <Kpi title="گفتگوی تازه" cur={c.newChats} prev={p.newChats} prevSpan={prevSpan} />
+            <Kpi title="درخواست مشتری" cur={c.inquiries} prev={p.inquiries} prevSpan={prevSpan} />
+          </>
+        )}
+      </div>
+
+      {seeProducts && (
+        <div className={r.cols} data-testid="sec-products">
+          <section className={styles.card}>
+            <h2 className={styles.cardTitle}>پربازدیدترین محصولات</h2>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>محصول</th>
+                  <th>بازدید</th>
+                  <th>بازدیدکننده</th>
+                </tr>
+              </thead>
+              <tbody>
+                {prods.map((x) => (
+                  <tr key={x.id}>
+                    <td>
+                      <Link href={`/admin/products/${x.id}`}>{x.title}</Link>
+                    </td>
+                    <td>{fmtNum(x.views)}</td>
+                    <td>{fmtNum(x.visitors)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!prods.length && <p className={styles.muted}>بازدیدی در این بازه ثبت نشده.</p>}
+          </section>
+          <section className={styles.card}>
+            <h2 className={styles.cardTitle}>پربازدیدترین دسته‌ها</h2>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>دسته</th>
+                  <th>بازدید</th>
+                  <th>بازدیدکننده</th>
+                </tr>
+              </thead>
+              <tbody>
+                {cats.map((x) => (
+                  <tr key={x.id}>
+                    <td>
+                      <Link href={`/admin/categories/${x.id}`}>{x.name}</Link>
+                    </td>
+                    <td>{fmtNum(x.views)}</td>
+                    <td>{fmtNum(x.visitors)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!cats.length && <p className={styles.muted}>بازدیدی در این بازه ثبت نشده.</p>}
+            <p className={styles.muted} style={{ fontSize: 12 }}>
+              بازدید مشتری‌ها و مهمان‌ها (بدون ورود) هر دو شمرده می‌شود؛ هر مرورگر مهمان یک بازدیدکننده است. ربات‌ها و کارمندها شمرده نمی‌شوند.
+            </p>
+          </section>
+        </div>
+      )}
+
+      <div className={r.cols}>
+        {seeCustomers && (
+          <section className={styles.card} data-testid="sec-signups">
+            <h2 className={styles.cardTitle}>مشتری‌های تازه ({fmtNum(c.signups)})</h2>
+            <table className={styles.table}>
+              <tbody>
+                {signups.map((u) => (
+                  <tr key={u.id}>
+                    <td>
+                      <Link href={`/admin/customers/${u.id}`}>{u.full_name}</Link>
+                      <div className={`${styles.muted} ${styles.ltr}`} style={{ fontSize: 12 }}>
+                        {u.mobile ?? u.email ?? ""}
+                      </div>
+                    </td>
+                    <td className={styles.muted}>{fmtDateTime(u.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!signups.length && <p className={styles.muted}>ثبت‌نامی در این بازه نبود.</p>}
+          </section>
+        )}
+        {seeProducts && (
+          <section className={styles.card} data-testid="sec-favorites">
+            <h2 className={styles.cardTitle}>بیشترین علاقه‌مندی</h2>
+            <table className={styles.table}>
+              <tbody>
+                {favs.map((x) => (
+                  <tr key={x.id}>
+                    <td>
+                      <Link href={`/admin/products/${x.id}`}>{x.title}</Link>
+                    </td>
+                    <td>{fmtNum(x.adds)} بار</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {!favs.length && <p className={styles.muted}>علاقه‌مندی تازه‌ای در این بازه نبود.</p>}
+          </section>
+        )}
+      </div>
+
+      {seeChats && (
+        <section className={styles.card} style={{ marginBottom: 16 }} data-testid="sec-chats">
+          <h2 className={styles.cardTitle}>گفتگوها (وضعیت همین حالا)</h2>
+          <div className={r.kpis}>
+            <div className={r.kpi}>
+              <span className={r.kpiLabel}>بی‌پاسخ (آخرین پیام از مشتری)</span>
+              <span className={r.kpiValue}>{fmtNum(chats.unansweredCount)}</span>
+            </div>
+            <div className={r.kpi}>
+              <span className={r.kpiLabel}>باز و ارجاع‌نشده</span>
+              <span className={r.kpiValue}>{fmtNum(chats.unassigned)}</span>
+              <Link href="/admin/chats?tab=unassigned" style={{ fontSize: 12 }}>
+                صف ارجاع‌نشده
+              </Link>
+            </div>
+          </div>
+          {chats.unanswered.length > 0 && (
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th>مشتری</th>
+                  <th>منتظر از</th>
+                  <th>کارشناس</th>
+                </tr>
+              </thead>
+              <tbody>
+                {chats.unanswered.map((x) => (
+                  <tr key={x.id}>
+                    <td>
+                      <Link href={`/admin/chats/${x.id}`}>{x.customer}</Link>
+                    </td>
+                    <td className={styles.muted}>{fmtDateTime(x.since)}</td>
+                    <td>{x.assignee ?? <span className={`${styles.badge} ${styles.badgeWarn}`}>ارجاع‌نشده</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+      )}
 
       {seeStaff && (
         <section className={styles.card} style={{ marginBottom: 16 }}>
@@ -301,93 +322,106 @@ export default async function ReportsPage({ searchParams }: PageProps<"/admin/re
       )}
 
       <div className={r.cols}>
-        <section className={styles.card}>
-          <h2 className={styles.cardTitle}>مشتری‌های با امتیاز بالا</h2>
-          {leadsOn ? (
-            <>
-              <table className={styles.table}>
-                <tbody>
-                  {leads.map((x) => (
-                    <tr key={x.user_id}>
-                      <td>
-                        <Link href={`/admin/customers/${x.user_id}`}>{x.full_name}</Link>
-                      </td>
-                      <td>
-                        <span className={styles.badge}>{fmtNum(Number(x.score))}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {!leads.length && <p className={styles.muted}>هنوز مشتری‌ای امتیاز نگرفته.</p>}
-              <p style={{ fontSize: 13 }}>
-                <Link href="/admin/customers?sort=score">همه‌ی مشتری‌ها به ترتیب امتیاز</Link> · <Link href="/admin/reports/scoring">قانون‌های امتیاز جدیت</Link>
-              </p>
-            </>
-          ) : (
-            <p className={styles.muted}>امتیاز جدیت بعد از اجرای migration ۰۰۰۹ فعال می‌شود.</p>
-          )}
-        </section>
-        <section className={styles.card} data-testid="insight">
-          <h2 className={styles.cardTitle}>تحلیل هوشمند</h2>
-          {!insSet.enabled ? (
-            <p className={styles.muted}>
-              خاموش است. از صفحه‌ی <Link href="/admin/ai">دستیار هوشمند</Link> (کارت «تحلیل هوشمند گزارش») روشن می‌شود.
-            </p>
-          ) : (
-            <>
-              {insSaved && (
-                <div data-testid="insight-result">
-                  <ul style={{ margin: "0 0 8px", paddingInlineStart: 20, lineHeight: 1.9 }}>
-                    {insSaved.lines.map((l, i) => (
-                      <li key={i}>{l}</li>
+        {seeCustomers && (
+          <section className={styles.card} data-testid="sec-leads">
+            <h2 className={styles.cardTitle}>مشتری‌های با امتیاز بالا</h2>
+            {leadsOn ? (
+              <>
+                <table className={styles.table}>
+                  <tbody>
+                    {leads.map((x) => (
+                      <tr key={x.user_id}>
+                        <td>
+                          <Link href={`/admin/customers/${x.user_id}`}>{x.full_name}</Link>
+                        </td>
+                        <td>
+                          <span className={styles.badge}>{fmtNum(Number(x.score))}</span>
+                        </td>
+                      </tr>
                     ))}
-                  </ul>
-                  <p className={styles.muted} style={{ fontSize: 12 }} data-testid="insight-meta">
-                    تحلیل {fmtDateTime(insSaved.at)} برای بازه‌ی {span} · هزینه {fmtNum(Math.round(insSaved.costToman))} تومان
-                    {insSaved.dropped.length > 0 && ` · ${fmtNum(insSaved.dropped.length)} پیشنهاد به‌خاطر عدد خارج از داده یا اطلاعات ممنوع حذف شد`}
+                  </tbody>
+                </table>
+                {!leads.length && <p className={styles.muted}>هنوز مشتری‌ای امتیاز نگرفته.</p>}
+                <p style={{ fontSize: 13 }}>
+                  <Link href="/admin/customers?sort=score">همه‌ی مشتری‌ها به ترتیب امتیاز</Link> · <Link href="/admin/reports/scoring">قانون‌های امتیاز جدیت</Link>
+                </p>
+              </>
+            ) : (
+              <p className={styles.muted}>امتیاز جدیت بعد از اجرای migration ۰۰۰۹ فعال می‌شود.</p>
+            )}
+          </section>
+        )}
+        {(seeInsight || seeChats) && (
+          <section className={styles.card}>
+            {seeInsight && (
+              <div data-testid="insight">
+                <h2 className={styles.cardTitle}>تحلیل هوشمند</h2>
+                {!insSet.enabled ? (
+                  <p className={styles.muted}>
+                    خاموش است. از صفحه‌ی <Link href="/admin/ai">دستیار هوشمند</Link> (کارت «تحلیل هوشمند گزارش») روشن می‌شود.
                   </p>
+                ) : (
+                  <>
+                    {insSaved && (
+                      <div data-testid="insight-result">
+                        <ul style={{ margin: "0 0 8px", paddingInlineStart: 20, lineHeight: 1.9 }}>
+                          {insSaved.lines.map((l, i) => (
+                            <li key={i}>{l}</li>
+                          ))}
+                        </ul>
+                        <p className={styles.muted} style={{ fontSize: 12 }} data-testid="insight-meta">
+                          تحلیل {fmtDateTime(insSaved.at)} برای بازه‌ی {span} · هزینه {fmtNum(Math.round(insSaved.costToman))} تومان
+                          {insSaved.dropped.length > 0 && ` · ${fmtNum(insSaved.dropped.length)} پیشنهاد به‌خاطر عدد خارج از داده یا اطلاعات ممنوع حذف شد`}
+                        </p>
+                      </div>
+                    )}
+                    {!insReady.enough ? (
+                      <p className={styles.muted} data-testid="insight-not-enough">
+                        داده‌ی کافی برای تحلیل نیست (دست‌کم {fmtNum(MIN_PRODUCT_VIEWS)} بازدید محصول یا {fmtNum(MIN_CHATS)} گفتگو، و {fmtNum(MIN_ACTIVE_DAYS)} روز با فعالیت در این
+                        بازه).
+                      </p>
+                    ) : insCapLeft <= 0 ? (
+                      <p className={styles.muted} data-testid="insight-cap">
+                        سقف هزینه‌ی روزانه‌ی تحلیل ({fmtNum(insSet.capToman)} تومان) پر شده است.
+                      </p>
+                    ) : (
+                      <ActionForm action={runInsightAction} submitLabel={insSaved ? "تحلیل دوباره" : "تحلیل کن"}>
+                        <input type="hidden" name="range" value={range.preset} />
+                        <input type="hidden" name="from" value={range.from} />
+                        <input type="hidden" name="to" value={range.to} />
+                        <p className={styles.muted} style={{ fontSize: 12, margin: "0 0 8px" }}>
+                          هر اجرا حدود ۸۰۰ تا ۱٬۵۰۰ تومان هزینه دارد (باقی‌مانده‌ی سقف امروز: {fmtNum(Math.round(insCapLeft))} تومان). نتیجه برای امروز ذخیره می‌شود و دیدن دوباره‌ی
+                          آن هزینه ندارد.
+                        </p>
+                      </ActionForm>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+            {seeChats && (
+              <div data-testid="sec-ai-stats">
+                <h3 className={styles.cardTitle} style={{ fontSize: 15, marginTop: 12 }}>
+                  دستیار هوشمند در این بازه
+                </h3>
+                <div className={r.kpis} style={{ marginBottom: 0 }}>
+                  <div className={r.kpi}>
+                    <span className={r.kpiLabel}>جواب خودکار AI</span>
+                    <span className={r.kpiValue}>{ai.autoReplyPct === null ? "—" : `${fmtNum(ai.autoReplyPct)}٪`}</span>
+                  </div>
+                  <div className={r.kpi}>
+                    <span className={r.kpiLabel}>ارجاع به کارشناس</span>
+                    <span className={r.kpiValue}>{ai.referralPct === null ? "—" : `${fmtNum(ai.referralPct)}٪`}</span>
+                  </div>
+                  <div className={r.kpi}>
+                    <span className={r.kpiLabel}>👎 بازخورد منفی</span>
+                    <span className={r.kpiValue}>{ai.thumbsDown === null ? "—" : fmtNum(ai.thumbsDown)}</span>
+                  </div>
                 </div>
-              )}
-              {!insReady.enough ? (
-                <p className={styles.muted} data-testid="insight-not-enough">
-                  داده‌ی کافی برای تحلیل نیست (دست‌کم {fmtNum(MIN_PRODUCT_VIEWS)} بازدید محصول یا {fmtNum(MIN_CHATS)} گفتگو، و {fmtNum(MIN_ACTIVE_DAYS)} روز با فعالیت در این بازه).
-                </p>
-              ) : insCapLeft <= 0 ? (
-                <p className={styles.muted} data-testid="insight-cap">
-                  سقف هزینه‌ی روزانه‌ی تحلیل ({fmtNum(insSet.capToman)} تومان) پر شده است.
-                </p>
-              ) : (
-                <ActionForm action={runInsightAction} submitLabel={insSaved ? "تحلیل دوباره" : "تحلیل کن"}>
-                  <input type="hidden" name="range" value={range.preset} />
-                  <input type="hidden" name="from" value={range.from} />
-                  <input type="hidden" name="to" value={range.to} />
-                  <p className={styles.muted} style={{ fontSize: 12, margin: "0 0 8px" }}>
-                    هر اجرا حدود ۸۰۰ تا ۱٬۵۰۰ تومان هزینه دارد (باقی‌مانده‌ی سقف امروز: {fmtNum(Math.round(insCapLeft))} تومان). نتیجه برای امروز ذخیره می‌شود و دیدن دوباره‌ی آن
-                    هزینه ندارد.
-                  </p>
-                </ActionForm>
-              )}
-            </>
-          )}
-          <h3 className={styles.cardTitle} style={{ fontSize: 15, marginTop: 12 }}>
-            دستیار هوشمند در این بازه
-          </h3>
-          <div className={r.kpis} style={{ marginBottom: 0 }}>
-            <div className={r.kpi}>
-              <span className={r.kpiLabel}>جواب خودکار AI</span>
-              <span className={r.kpiValue}>{ai.autoReplyPct === null ? "—" : `${fmtNum(ai.autoReplyPct)}٪`}</span>
-            </div>
-            <div className={r.kpi}>
-              <span className={r.kpiLabel}>ارجاع به کارشناس</span>
-              <span className={r.kpiValue}>{ai.referralPct === null ? "—" : `${fmtNum(ai.referralPct)}٪`}</span>
-            </div>
-            <div className={r.kpi}>
-              <span className={r.kpiLabel}>👎 بازخورد منفی</span>
-              <span className={r.kpiValue}>{ai.thumbsDown === null ? "—" : fmtNum(ai.thumbsDown)}</span>
-            </div>
-          </div>
-        </section>
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </>
   );

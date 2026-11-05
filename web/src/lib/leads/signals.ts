@@ -280,3 +280,22 @@ export function clarifyBudget(label: string): string {
 
 // خلاصه‌ی نشانه برای آزمون دستیار: «order_qty=500»، «sales_channel=online»، «budget_unclear»
 export const signalTag = (s: Signal) => (s.key === "sales_channel" && s.channel ? `${s.key}=${s.channel}` : s.valueNum === null ? s.key : `${s.key}=${s.valueNum}`);
+
+// متن کوتاه آخرین نشانه برای ستون فهرست مشتریان (بخش ۵۰): «۵۰۰ عدد»، «بودجه ۲۰۰ میلیون تومان»، «بودجه: مبهم»، …
+export function signalShort(key: string, valueNum: number | string | null, valueText: string | null): string {
+  const n = valueNum === null || valueNum === "" ? null : Number(valueNum);
+  switch (key) {
+    case "order_qty":
+      return n !== null ? `${n.toLocaleString("fa-IR")} عدد` : "تعداد سفارش";
+    case "budget_mtoman":
+      return n !== null ? `بودجه ${n.toLocaleString("fa-IR")} میلیون تومان` : "بودجه";
+    case "budget_unclear":
+      return "بودجه: مبهم";
+    case "import_experience":
+      return `سابقه‌ی واردات: ${n === 1 ? "دارد" : "ندارد"}`;
+    case "sales_channel":
+      return `کانال: ${valueText ?? "—"}`;
+    default:
+      return valueText ?? (n !== null ? n.toLocaleString("fa-IR") : key);
+  }
+}
