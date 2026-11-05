@@ -5,6 +5,7 @@ import { db } from "@/db/client";
 import { roles, userRoles, users } from "@/db/schema";
 import { type AuthState, type CurrentUser, getAuth } from "@/lib/auth/current";
 import { createSession, destroySession } from "@/lib/auth/session";
+import { mergeGuestInto } from "@/lib/site/guest";
 import { getSetting } from "@/lib/settings";
 import { trackEvent } from "./events";
 
@@ -41,11 +42,7 @@ export async function findUserByIdentifier(p: { kind: "mobile" | "email"; value:
 }
 
 export async function hasCustomerRole(userId: string): Promise<boolean> {
-  const rows = await db
-    .select({ key: roles.key, isStaff: roles.isStaff })
-    .from(userRoles)
-    .innerJoin(roles, eq(roles.id, userRoles.roleId))
-    .where(eq(userRoles.userId, userId));
+  const rows = await db.select({ key: roles.key, isStaff: roles.isStaff }).from(userRoles).innerJoin(roles, eq(roles.id, userRoles.roleId)).where(eq(userRoles.userId, userId));
   return !rows.some((r) => r.isStaff) && rows.some((r) => r.key === "customer");
 }
 
@@ -58,4 +55,6 @@ export async function signInCustomer(userId: string, method: "password" | "sms" 
   await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, userId));
   if (method === "signup") await trackEvent({ userId, type: "signup" });
   await trackEvent({ userId, type: "login", props: { method } });
+  // بازدیدهای مهمانِ همین مرورگر (۹۰ روز اخیر) به حساب وصل می‌شود (بخش ۴۸)؛ خطایش ورود را نمی‌شکند
+  await mergeGuestInto(userId).catch((e) => console.error("guest merge failed", e));
 }

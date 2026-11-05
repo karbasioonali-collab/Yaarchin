@@ -22,12 +22,7 @@ export async function getBlock<K extends BlockKey>(key: K): Promise<Block<K>> {
   return { data: normalize[key](row?.data), isVisible: row?.isVisible ?? true, updatedAt: row?.updatedAt ?? null };
 }
 
-export async function saveBlock<K extends BlockKey>(
-  key: K,
-  data: BlockMap[K],
-  isVisible: boolean,
-  userId: string,
-): Promise<{ before: unknown }> {
+export async function saveBlock<K extends BlockKey>(key: K, data: BlockMap[K], isVisible: boolean, userId: string): Promise<{ before: unknown }> {
   const [existing] = await db.select().from(siteBlocks).where(eq(siteBlocks.key, key));
   await db
     .insert(siteBlocks)

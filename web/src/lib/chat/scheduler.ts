@@ -9,6 +9,7 @@ import { siteUrl } from "@/lib/site/url";
 import { sweepStuck } from "@/lib/ai/agent";
 import { sweepRuns } from "@/lib/ai/tests";
 import { aiReady, aiTestsReady } from "@/lib/db-ready";
+import { cleanupGuestEvents } from "@/lib/site/guest";
 import { runReminders } from "./alerts";
 
 const EVERY_MS = 60_000;
@@ -31,6 +32,8 @@ async function tick() {
     // قبل از migrate یا قطعی کوتاه دیتابیس: فقط لاگ، دور بعد دوباره
     console.error("chat reminder tick failed:", e instanceof Error ? e.message : e);
   }
+  // رویدادهای مهمانِ وصل‌نشده‌ی قدیمی‌تر از ۱۸۰ روز (بخش ۴۸)؛ جدا از تراکنش بالا تا خطای یکی دیگری را نگیرد
+  await cleanupGuestEvents().catch((e) => console.error("guest cleanup failed:", e instanceof Error ? e.message : e));
 }
 
 export function startChatScheduler() {

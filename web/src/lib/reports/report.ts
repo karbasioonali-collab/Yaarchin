@@ -1,7 +1,8 @@
 import "server-only";
 // محاسبه‌های صفحه‌ی «گزارش‌ها». همه داخل Postgres (GROUP BY) و فقط نتیجه‌ی کوچک به برنامه می‌آید. docs/infoyaarchin.md بخش ۲۸.
 // بازه = [start, end) به لحظه‌ی UTC که از روزهای تهران ساخته شده (src/lib/reports/range.ts).
-// «بازدید» فقط برای مشتری واردشده ثبت می‌شود (جدول events)؛ مهمان‌ها شمرده نمی‌شوند (کار آینده، بخش ۲۸).
+// «بازدید» برای مشتری واردشده (user_id) و از بخش ۴۸ برای مهمان (anon_id، user_id خالی) ثبت می‌شود؛ گزارش هر دو را جدا و جمع می‌دهد.
+// هر شمارش با type فیلتر می‌شود، پس رویدادهای داخلی (customer_signal، بخش ۴۳) هرگز حساب نمی‌شوند.
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
 import { aiReady, chatReady, followupReady } from "@/lib/db-ready";
@@ -12,14 +13,31 @@ const n = (v: unknown) => Number(v ?? 0);
 const isCustomer = (col: string) => sql`exists (select 1 from user_roles ur join roles ro on ro.id = ur.role_id where ur.user_id = ${sql.raw(col)} and ro.key = 'customer')`;
 
 // ---------- اعداد قابل مقایسه با بازه‌ی قبل ----------
-export type Counts = { productViews: number; visitors: number; signups: number; favoriteAdds: number; newChats: number; inquiries: number };
+// productViews/visitors/siteVisits = جمع؛ *Guest = سهم مهمان؛ مشتری = جمع − مهمان
+//   visitors: هر حساب یک نفر + هر مرورگر مهمان (anon_id) یک نفر؛ siteVisits: «ورود به سایت» (یکی در هر روز برای هر نفر)
+export type Counts = {
+  productViews: number;
+  productViewsGuest: number;
+  visitors: number;
+  visitorsGuest: number;
+  siteVisits: number;
+  siteVisitsGuest: number;
+  signups: number;
+  favoriteAdds: number;
+  newChats: number;
+  inquiries: number;
+};
 
 export async function counts(w: Win): Promise<Counts> {
   const [chat, followup] = [await chatReady(), await followupReady()];
   const r = await db.execute<Record<string, string>>(sql`
     select
       (select count(*) from events where type = 'product_view' and ${inWin("occurred_at", w)}) as product_views,
-      (select count(distinct user_id) from events where type in ('site_visit', 'product_view', 'category_view') and user_id is not null and ${inWin("occurred_at", w)}) as visitors,
+      (select count(*) from events where type = 'product_view' and user_id is null and anon_id is not null and ${inWin("occurred_at", w)}) as product_views_g,
+      (select count(distinct user_id) from events where type in ('site_visit', 'product_view', 'category_view') and user_id is not null and ${inWin("occurred_at", w)}) as visitors_c,
+      (select count(distinct anon_id) from events where type in ('site_visit', 'product_view', 'category_view') and user_id is null and anon_id is not null and ${inWin("occurred_at", w)}) as visitors_g,
+      (select count(*) from events where type = 'site_visit' and ${inWin("occurred_at", w)}) as site_visits,
+      (select count(*) from events where type = 'site_visit' and user_id is null and anon_id is not null and ${inWin("occurred_at", w)}) as site_visits_g,
       (select count(*) from users u where ${inWin("u.created_at", w)} and ${isCustomer("u.id")}) as signups,
       (select count(*) from events where type = 'favorite_add' and ${inWin("occurred_at", w)}) as favorite_adds,
       ${chat ? sql`(select count(*) from conversations where ${inWin("created_at", w)})` : sql`0`} as new_chats,
@@ -27,7 +45,11 @@ export async function counts(w: Win): Promise<Counts> {
   const x = r.rows[0];
   return {
     productViews: n(x.product_views),
-    visitors: n(x.visitors),
+    productViewsGuest: n(x.product_views_g),
+    visitors: n(x.visitors_c) + n(x.visitors_g),
+    visitorsGuest: n(x.visitors_g),
+    siteVisits: n(x.site_visits),
+    siteVisitsGuest: n(x.site_visits_g),
     signups: n(x.signups),
     favoriteAdds: n(x.favorite_adds),
     newChats: n(x.new_chats),
@@ -38,7 +60,7 @@ export async function counts(w: Win): Promise<Counts> {
 // ---------- بازدید ----------
 export async function topProducts(w: Win, limit = 10) {
   const r = await db.execute<{ id: string; slug: string; title: string; views: string; visitors: string }>(sql`
-    select p.id, p.slug, p.title_fa as title, count(*) as views, count(distinct e.user_id) as visitors
+    select p.id, p.slug, p.title_fa as title, count(*) as views, count(distinct coalesce(e.user_id::text, 'g:' || e.anon_id)) as visitors
     from events e join products p on p.id::text = e.entity_id
     where e.type = 'product_view' and ${inWin("e.occurred_at", w)}
     group by p.id order by views desc, visitors desc limit ${limit}`);
@@ -47,7 +69,7 @@ export async function topProducts(w: Win, limit = 10) {
 
 export async function topCategories(w: Win, limit = 10) {
   const r = await db.execute<{ id: string; slug: string; name: string; views: string; visitors: string }>(sql`
-    select c.id, c.slug, c.name_fa as name, count(*) as views, count(distinct e.user_id) as visitors
+    select c.id, c.slug, c.name_fa as name, count(*) as views, count(distinct coalesce(e.user_id::text, 'g:' || e.anon_id)) as visitors
     from events e join categories c on c.id::text = e.entity_id
     where e.type = 'category_view' and ${inWin("e.occurred_at", w)}
     group by c.id order by views desc, visitors desc limit ${limit}`);

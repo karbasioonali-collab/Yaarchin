@@ -334,7 +334,10 @@ export const normalize: { [K in BlockKey]: (v: unknown) => BlockMap[K] } = {
     const d = DEFAULTS["page.contact"];
     const o = isObj(v) ? v : {};
     const subjects = Array.isArray(o.subjects)
-      ? o.subjects.map((s) => str(s, "", 60)).filter(Boolean).slice(0, 10)
+      ? o.subjects
+          .map((s) => str(s, "", 60))
+          .filter(Boolean)
+          .slice(0, 10)
       : d.subjects;
     return {
       title: str(o.title, d.title, 100) || d.title,
