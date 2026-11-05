@@ -4,11 +4,14 @@ import { and, count, desc, eq, ilike, inArray, or, sql, type SQL } from "drizzle
 import { db } from "@/db/client";
 import { customerProfiles, roles, userRoles, users } from "@/db/schema";
 import { can, requirePermission } from "@/lib/auth/can";
-import { views30For } from "@/lib/customer/events";
+import { lastActivityFor, views30For } from "@/lib/customer/events";
 import { favoriteCounts } from "@/lib/customer/favorites";
 import { BUSINESS_TYPE_FA, toBusinessType } from "@/lib/customer/profile";
 import { customerReady, reportsReady } from "@/lib/db-ready";
 import { scoreSource, scoresFor } from "@/lib/leads/score";
+import { SCORE_TONE_STYLE, scoreTone } from "@/lib/leads/score-tone";
+import { signalShort } from "@/lib/leads/signals";
+import { lastSignalsFor } from "@/lib/leads/signals-store";
 import { fmtDateTime, fmtNum } from "@/lib/format";
 import { toLatinDigits } from "@/lib/validation";
 import styles from "../panel.module.css";
@@ -24,31 +27,46 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
   const q = typeof sp.q === "string" ? sp.q.trim().slice(0, 80) : "";
   const status = sp.status === "active" || sp.status === "disabled" ? sp.status : "";
   const page = Math.max(1, Number(sp.page) || 1);
-  const [ready, scoring, seeRules] = await Promise.all([customerReady(), reportsReady(), can(a.user, "reports.view")]);
-  // امتیاز جدیت: مرتب‌سازی و فیلتر روی «همه‌ی» مشتری‌ها، داخل دیتابیس (lib/leads/score.ts؛ docs بخش ۲۸)
-  const sort = scoring && sp.sort === "score" ? "score" : "new";
+  const [ready, leadsOn, seeScore, seeRules] = await Promise.all([customerReady(), reportsReady(), can(a.user, "reports.customers"), can(a.user, "reports.view")]);
+  // امتیاز جدیت و نشانه‌ها فقط با reports.customers (بخش ۵۰)؛ با auth.enforce_permissions خاموش برای همه‌ی کارمندها مثل قبل
+  const scoring = leadsOn && seeScore;
+  // امتیاز جدیت: مرتب‌سازی و فیلتر روی «همه‌ی» مشتری‌ها، داخل دیتابیس (lib/leads/score.ts؛ docs بخش ۲۸).
+  // پیش‌فرض (بخش ۵۰): بیشترین امتیاز اول؛ «جدیدترین» با sort=new
+  const sort = scoring && sp.sort !== "new" ? "score" : "new";
   const minRaw = typeof sp.minScore === "string" ? Number(toLatinDigits(sp.minScore)) : NaN;
   const minScore = scoring && Number.isFinite(minRaw) && minRaw > 0 ? minRaw : null;
 
-  const customerIds = db
-    .select({ id: userRoles.userId })
-    .from(userRoles)
-    .innerJoin(roles, eq(roles.id, userRoles.roleId))
-    .where(eq(roles.key, "customer"));
+  const customerIds = db.select({ id: userRoles.userId }).from(userRoles).innerJoin(roles, eq(roles.id, userRoles.roleId)).where(eq(roles.key, "customer"));
   const conds: SQL[] = [inArray(users.id, customerIds)];
   if (q) {
     const like = `%${toLatinDigits(q)}%`;
     const byText = [ilike(users.fullName, `%${q}%`), ilike(users.mobile, like), ilike(users.email, like)];
     // جستجوی شهر فقط بعد از migration ۰۰۰۳
     if (ready) {
-      byText.push(inArray(users.id, db.select({ id: customerProfiles.userId }).from(customerProfiles).where(ilike(customerProfiles.city, `%${q}%`))));
+      byText.push(
+        inArray(
+          users.id,
+          db
+            .select({ id: customerProfiles.userId })
+            .from(customerProfiles)
+            .where(ilike(customerProfiles.city, `%${q}%`)),
+        ),
+      );
     }
     conds.push(or(...byText)!);
   }
   if (status) conds.push(eq(users.status, status));
   const where = and(...conds);
 
-  const cols = { id: users.id, fullName: users.fullName, mobile: users.mobile, email: users.email, status: users.status, createdAt: users.createdAt, lastLoginAt: users.lastLoginAt };
+  const cols = {
+    id: users.id,
+    fullName: users.fullName,
+    mobile: users.mobile,
+    email: users.email,
+    status: users.status,
+    createdAt: users.createdAt,
+    lastLoginAt: users.lastLoginAt,
+  };
   let total: number;
   let rows: { id: string; fullName: string; mobile: string | null; email: string | null; status: string; createdAt: Date; lastLoginAt: Date | null }[];
   let scoreOf: Map<string, number>;
@@ -78,17 +96,25 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
     scoreOf = scoring ? await scoresFor(rows.map((r) => r.id)) : new Map();
   }
   const ids = rows.map((r) => r.id);
-  const [profiles, favs, views] = await Promise.all([
+  const [profiles, favs, views, lastSig, lastAct] = await Promise.all([
     ready && ids.length
-      ? db.select({ userId: customerProfiles.userId, businessType: customerProfiles.businessType, city: customerProfiles.city }).from(customerProfiles).where(inArray(customerProfiles.userId, ids))
+      ? db
+          .select({ userId: customerProfiles.userId, businessType: customerProfiles.businessType, city: customerProfiles.city })
+          .from(customerProfiles)
+          .where(inArray(customerProfiles.userId, ids))
       : Promise.resolve([]),
     favoriteCounts(ids),
     views30For(ids),
+    scoring ? lastSignalsFor(ids) : Promise.resolve(new Map()),
+    lastActivityFor(ids),
   ]);
   const profileOf = new Map(profiles.map((p) => [p.userId, p]));
   const pages = Math.ceil(total / PAGE_SIZE);
   const qs = (p: number) =>
-    `?${new URLSearchParams({ ...(q && { q }), ...(status && { status }), ...(sort === "score" && { sort }), ...(minScore !== null && { minScore: String(minScore) }), page: String(p) })}`;
+    `?${new URLSearchParams({ ...(q && { q }), ...(status && { status }), ...(sort === "new" && scoring && { sort }), ...(minScore !== null && { minScore: String(minScore) }), page: String(p) })}`;
+  // فیلتر سریع امتیاز (بخش ۵۰): همه، بالای ۵۰، بالای ۸۰
+  const quick = (m: number | null) =>
+    `?${new URLSearchParams({ ...(q && { q }), ...(status && { status }), ...(sort === "new" && { sort }), ...(m !== null && { minScore: String(m) }) })}`;
 
   return (
     <>
@@ -108,6 +134,21 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
       </div>
 
       <div className={styles.card}>
+        {scoring && (
+          <div className={styles.tabs} style={{ marginBottom: 12 }} data-testid="score-filters">
+            {(
+              [
+                [null, "همه"],
+                [50, "بالای ۵۰"],
+                [80, "بالای ۸۰"],
+              ] as const
+            ).map(([m, label]) => (
+              <Link key={label} href={quick(m)} className={`${styles.tab} ${minScore === m ? styles.tabActive : ""}`}>
+                {label}
+              </Link>
+            ))}
+          </div>
+        )}
         <form className={styles.toolbar}>
           <input name="q" defaultValue={q} placeholder="جستجو: نام، موبایل، ایمیل، شهر" />
           <select name="status" defaultValue={status}>
@@ -118,8 +159,8 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
           {scoring && (
             <>
               <select name="sort" defaultValue={sort} aria-label="مرتب‌سازی">
-                <option value="new">جدیدترین</option>
                 <option value="score">بیشترین امتیاز جدیت</option>
+                <option value="new">جدیدترین</option>
               </select>
               <input name="minScore" defaultValue={minScore ?? ""} placeholder="امتیاز حداقل" inputMode="numeric" aria-label="امتیاز حداقل" style={{ width: 120 }} />
             </>
@@ -135,11 +176,13 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
               <tr>
                 <th>نام</th>
                 {scoring && <th>امتیاز جدیت</th>}
+                {scoring && <th>آخرین نشانه</th>}
                 <th>موبایل / ایمیل</th>
                 <th>فعالیت و شهر</th>
                 <th>علاقه‌مندی</th>
                 <th>بازدید ۳۰ روز</th>
                 <th>ثبت‌نام</th>
+                <th>آخرین فعالیت</th>
                 <th>آخرین ورود</th>
               </tr>
             </thead>
@@ -151,11 +194,31 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
                   <tr key={u.id}>
                     <td>
                       <Link href={`/admin/customers/${u.id}`}>{u.fullName}</Link>
-                      {u.status !== "active" && <span className={`${styles.badge} ${styles.badgeWarn}`} style={{ marginInlineStart: 6 }}>غیرفعال</span>}
+                      {u.status !== "active" && (
+                        <span className={`${styles.badge} ${styles.badgeWarn}`} style={{ marginInlineStart: 6 }}>
+                          غیرفعال
+                        </span>
+                      )}
                     </td>
                     {scoring && (
                       <td>
-                        <span className={styles.badge}>{fmtNum(scoreOf.get(u.id) ?? 0)}</span>
+                        <span
+                          className={styles.badge}
+                          data-testid="score"
+                          data-tone={scoreTone(scoreOf.get(u.id) ?? 0)}
+                          style={{ ...SCORE_TONE_STYLE[scoreTone(scoreOf.get(u.id) ?? 0)], fontWeight: 700 }}
+                        >
+                          {fmtNum(scoreOf.get(u.id) ?? 0)}
+                        </span>
+                      </td>
+                    )}
+                    {scoring && (
+                      <td data-testid="last-signal">
+                        {lastSig.get(u.id) ? (
+                          signalShort(lastSig.get(u.id)!.key, lastSig.get(u.id)!.valueNum, lastSig.get(u.id)!.valueText)
+                        ) : (
+                          <span className={styles.muted}>—</span>
+                        )}
                       </td>
                     )}
                     <td>
@@ -169,13 +232,16 @@ export default async function CustomersPage({ searchParams }: PageProps<"/admin/
                     <td>{fmtNum(favs.get(u.id) ?? 0)}</td>
                     <td>{fmtNum(views.get(u.id) ?? 0)}</td>
                     <td className={styles.muted}>{fmtDateTime(u.createdAt)}</td>
+                    <td className={styles.muted} data-testid="last-activity">
+                      {fmtDateTime(lastAct.get(u.id) ?? null)}
+                    </td>
                     <td className={styles.muted}>{fmtDateTime(u.lastLoginAt)}</td>
                   </tr>
                 );
               })}
               {!rows.length && (
                 <tr>
-                  <td colSpan={scoring ? 8 : 7} className={styles.muted}>
+                  <td colSpan={scoring ? 10 : 8} className={styles.muted}>
                     مشتری‌ای پیدا نشد.
                   </td>
                 </tr>

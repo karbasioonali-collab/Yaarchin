@@ -149,3 +149,14 @@ export async function views30For(userIds: string[]): Promise<Map<string, number>
     .groupBy(events.userId);
   return new Map(rows.map((r) => [r.userId as string, r.n]));
 }
+
+// آخرین فعالیت واقعی سایت (نوع‌های EVENT_TYPES؛ بدون رویدادهای داخلی مثل customer_signal) برای چند مشتری (بخش ۵۰)
+export async function lastActivityFor(userIds: string[]): Promise<Map<string, Date>> {
+  if (!userIds.length) return new Map();
+  const rows = await db
+    .select({ userId: events.userId, at: max(events.occurredAt) })
+    .from(events)
+    .where(and(inArray(events.userId, userIds), inArray(events.type, SITE_TYPES)))
+    .groupBy(events.userId);
+  return new Map(rows.filter((r) => r.at).map((r) => [r.userId as string, r.at as Date]));
+}

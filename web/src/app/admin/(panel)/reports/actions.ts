@@ -8,6 +8,8 @@ import { runInsight } from "@/lib/reports/insight";
 
 export async function runInsightAction(_prev: FormState, fd: FormData): Promise<FormState> {
   await requirePermission("reports.view");
+  // تحلیل هوشمند دسترسی جدای خودش را دارد (بخش ۵۰)
+  await requirePermission("reports.insight");
   const s = (k: string) => {
     const v = fd.get(k);
     return typeof v === "string" && v ? v : undefined;

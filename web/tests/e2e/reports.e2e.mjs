@@ -135,9 +135,9 @@ ok(bd.includes("۷۶") && bd.includes("سقف ۲۵") && bd.includes("از ۱۴۰
 // لیست مشتریان: مرتب‌سازی روی همه
 await ad.goto(B + "/admin/customers");
 ok((await ad.getByRole("columnheader", { name: "امتیاز جدیت" }).count()) === 1, "customers list: score column");
-ok((await ad.getByRole("link", { name: "RP Alpha" }).count()) === 0, "default sort (newest): A not on page 1");
-await ad.goto(B + "/admin/customers?sort=score");
-ok((await ad.locator("tbody tr").first().innerText()).includes("RP Alpha"), "sort by score over ALL customers: A first on page 1");
+ok((await ad.locator("tbody tr").first().innerText()).includes("RP Alpha"), "default sort = score over ALL customers (section 50): A first on page 1");
+await ad.goto(B + "/admin/customers?sort=new");
+ok((await ad.getByRole("link", { name: "RP Alpha" }).count()) === 0, "sort=new (newest): A not on page 1");
 await ad.goto(B + "/admin/customers?minScore=30");
 ok((await ad.locator("tbody tr").count()) === 1 && (await ad.getByText("با امتیاز ۳۰ یا بیشتر").count()) === 1, "minScore filter (only A)");
 // ویرایش قانون: خاموش کردن «درخواست» ← ۵۶
@@ -221,7 +221,10 @@ await ex.goto(B + "/admin/reports");
 ok(ex.url().includes("/admin/forbidden"), "expert without reports.view: forbidden");
 psql(`insert into role_permissions (role_id, permission_key) values ('${expertRole}', 'reports.view')`);
 await ex.goto(B + "/admin/reports?range=today");
-ok((await ex.getByText("بازدید محصول", { exact: true }).count()) === 1, "reports.view: report visible");
+ok((await ex.getByText("بازدید محصول", { exact: true }).count()) === 0, "reports.view alone: page opens, no visit section (section 50)");
+psql(`insert into role_permissions (role_id, permission_key) values ('${expertRole}', 'reports.visits')`);
+await ex.goto(B + "/admin/reports?range=today");
+ok((await ex.getByText("بازدید محصول", { exact: true }).count()) === 1, "reports.view + reports.visits: report visible");
 ok((await ex.getByRole("heading", { name: "عملکرد کارشناس‌ها" }).count()) === 0, "without reports.staff: no staff section");
 await ex.goto(B + "/admin/reports/scoring");
 ok((await ex.getByRole("button", { name: "ذخیره" }).count()) === 0 && (await vis(ex.getByText("دسترسی «تنظیمات و سوئیچ‌ها»"))), "rules read-only without settings.manage");

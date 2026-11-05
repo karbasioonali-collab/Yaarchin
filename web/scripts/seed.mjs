@@ -31,6 +31,25 @@ try {
     );
   }
 
+  // دسترسی‌های ریز گزارش‌ها (بخش ۵۰): یک بار به نقش‌هایی که reports.view دارند داده می‌شود تا با روشن بودن
+  // auth.enforce_permissions رفتارشان عوض نشود. نشانه‌ی «یک بار» یک ردیف لاگ فعالیت است؛ اگر بعداً از نقشی برداشته شود، seed دوباره نمی‌دهد.
+  // reports.insight و ai.costs به هیچ نقش غیرمدیری داده نمی‌شوند.
+  {
+    const done = await client.query(`select 1 from activity_log where action = 'seed.grant_report_sections' limit 1`);
+    if (!done.rowCount) {
+      const r = await client.query(
+        `insert into role_permissions (role_id, permission_key)
+         select rp.role_id, k from role_permissions rp
+           join roles ro on ro.id = rp.role_id and ro.key <> 'admin'
+           cross join unnest(array['reports.visits', 'reports.products', 'reports.chats', 'reports.customers']) k
+         where rp.permission_key = 'reports.view'
+         on conflict do nothing`,
+      );
+      await client.query(`insert into activity_log (action, entity_type, after) values ('seed.grant_report_sections', 'role', $1)`, [JSON.stringify({ granted: r.rowCount })]);
+      console.log(`دسترسی‌های بخش‌های گزارش به ${r.rowCount} ردیف نقش داده شد (یک بار).`);
+    }
+  }
+
   // فقط برای نقش‌هایی که هنوز هیچ دسترسی‌ای ندارند (تا تنظیمات دستی ادمین پاک نشود)
   for (const [roleKey, perms] of Object.entries(seed.rolePermissions)) {
     const { rows } = await client.query(

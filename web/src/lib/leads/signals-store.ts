@@ -104,3 +104,16 @@ export async function customerSignalsView(userId: string) {
     .limit(50);
   return { latest, history: history.map((h) => ({ id: h.id, at: h.at, ...(h.props as SignalEventProps) })) };
 }
+
+// آخرین نشانه‌ی هر مشتری (برای ستون فهرست مشتریان؛ یک کوئری برای همه‌ی ردیف‌های صفحه)
+export async function lastSignalsFor(userIds: string[]): Promise<Map<string, { key: string; valueNum: string | null; valueText: string | null; at: Date }>> {
+  if (!userIds.length || !(await reportsReady())) return new Map();
+  const r = await db.execute<{ user_id: string; key: string; value_num: string | null; value_text: string | null; updated_at: Date }>(sql`
+    select distinct on (user_id) user_id, key, value_num, value_text, updated_at from customer_signals
+    where user_id in (${sql.join(
+      userIds.map((u) => sql`${u}`),
+      sql`, `,
+    )})
+    order by user_id, updated_at desc`);
+  return new Map(r.rows.map((x) => [x.user_id, { key: x.key, valueNum: x.value_num, valueText: x.value_text, at: new Date(x.updated_at) }]));
+}
