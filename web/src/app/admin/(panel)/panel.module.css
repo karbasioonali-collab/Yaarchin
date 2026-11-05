@@ -6,6 +6,8 @@
   padding: 20px 14px;
   display: flex; flex-direction: column; gap: 18px;
   position: sticky; top: 0; height: 100dvh;
+  /* منوی بلندتر از صفحه: خودش اسکرول می‌خورد، وگرنه آیتم‌های پایین (آموزش، خروج) روی صفحه‌ی کوتاه دیده نمی‌شوند (بخش ۵۱) */
+  overflow-y: auto;
 }
 .brand { display: flex; justify-content: center; padding-bottom: 6px; }
 .nav { display: flex; flex-direction: column; gap: 2px; }
