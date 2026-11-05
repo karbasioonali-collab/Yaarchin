@@ -9,6 +9,7 @@ import { siteUrl } from "@/lib/site/url";
 import { sweepStuck } from "@/lib/ai/agent";
 import { sweepRuns } from "@/lib/ai/tests";
 import { aiReady, aiTestsReady } from "@/lib/db-ready";
+import { runAutoInsight } from "@/lib/reports/insight";
 import { cleanupGuestEvents } from "@/lib/site/guest";
 import { runReminders } from "./alerts";
 
@@ -34,6 +35,13 @@ async function tick() {
   }
   // رویدادهای مهمانِ وصل‌نشده‌ی قدیمی‌تر از ۱۸۰ روز (بخش ۴۸)؛ جدا از تراکنش بالا تا خطای یکی دیگری را نگیرد
   await cleanupGuestEvents().catch((e) => console.error("guest cleanup failed:", e instanceof Error ? e.message : e));
+  // تحلیل هوشمند خودکار روزانه (بخش ۵۱): قفل جدا تا اجرای چندثانیه‌ای مدل جلوی یادآوری‌ها را نگیرد؛ چند نسخه ← فقط یکی
+  await db
+    .transaction(async (tx) => {
+      const r = await tx.execute<{ ok: boolean }>(sql`select pg_try_advisory_xact_lock(hashtext('yc_auto_insight')) as ok`);
+      if (r.rows[0]?.ok) await runAutoInsight();
+    })
+    .catch((e) => console.error("auto insight failed:", e instanceof Error ? e.message : e));
 }
 
 export function startChatScheduler() {

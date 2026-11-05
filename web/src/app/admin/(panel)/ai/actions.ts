@@ -58,6 +58,7 @@ export async function saveNumberCheckAction(_prev: FormState, fd: FormData): Pro
 export async function saveReportInsightAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("ai.settings");
   const on = fd.get("reportInsights") === "on";
+  const auto = fd.get("reportInsightsAuto") === "on";
   const cap = Number(
     toLatinDigits(String(fd.get("reportCap") ?? ""))
       .replace(/[,٬]/g, "")
@@ -68,6 +69,7 @@ export async function saveReportInsightAction(_prev: FormState, fd: FormData): P
   for (const [key, v] of [
     ["ai.report_insights", on],
     ["ai.report_daily_cost_toman", cap],
+    ["ai.report_insights_auto", auto],
   ] as const) {
     const r = await setSetting(key, v, a.user.id).catch(() => null);
     if (!r) {

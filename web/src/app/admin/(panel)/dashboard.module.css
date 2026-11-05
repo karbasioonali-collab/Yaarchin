@@ -1,0 +1,256 @@
+/* داشبورد (بخش ۵۱): کارت‌ها با نوار رنگی بالا و آیکون. سبز #2F7D5C، نارنجی #FF7A00، قرمز. کروم ۱۰۹ و موبایل ۳۶۰ پیکسل:
+   بدون :has و container query؛ شبکه با min() تا روی صفحه‌ی باریک یک ستون شود. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+}
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px 18px;
+  border-top: 4px solid var(--green);
+  min-width: 0;
+}
+.toneOrange {
+  border-top-color: var(--orange);
+}
+.toneRed {
+  border-top-color: #c62828;
+}
+.toneGray {
+  border-top-color: #b5b5b0;
+}
+.wide {
+  grid-column: 1 / -1;
+}
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+.icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  background: rgba(47, 125, 92, 0.12);
+  color: var(--green);
+}
+.toneOrange .icon {
+  background: rgba(255, 122, 0, 0.14);
+  color: #c25e00;
+}
+.toneRed .icon {
+  background: rgba(198, 40, 40, 0.12);
+  color: #c62828;
+}
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  flex: 1 1 auto;
+}
+.headLink {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.big {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--green-dark);
+  line-height: 1.25;
+}
+.sub {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.split {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 13px;
+  margin-top: 4px;
+}
+.split b {
+  font-weight: 700;
+}
+.note {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 10px 0 0;
+  line-height: 1.7;
+}
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 420px) {
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+.kpi {
+  background: var(--bg);
+  border-radius: 10px;
+  padding: 8px 8px 6px;
+  text-align: center;
+  min-width: 0;
+}
+.kpiValue {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+}
+.kpiLabel {
+  display: block;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.kpiAi .kpiValue {
+  color: var(--green-dark);
+}
+.kpiStaff .kpiValue {
+  color: #c25e00;
+}
+.kpiBad .kpiValue {
+  color: #c62828;
+}
+
+.spark {
+  display: block;
+  width: 100%;
+  max-width: 160px;
+  height: 36px;
+}
+.sparkLine {
+  fill: none;
+  stroke: var(--green);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.sparkArea {
+  fill: rgba(47, 125, 92, 0.12);
+  stroke: none;
+}
+.sparkDot {
+  fill: var(--green);
+}
+.sparkOrange .sparkLine {
+  stroke: var(--orange);
+}
+.sparkOrange .sparkArea {
+  fill: rgba(255, 122, 0, 0.12);
+}
+.sparkOrange .sparkDot {
+  fill: var(--orange);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+  min-width: 0;
+}
+.list li:last-child {
+  border-bottom: 0;
+}
+.list a {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pill {
+  display: inline-block;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.pillWait {
+  background: rgba(255, 122, 0, 0.14);
+  color: #b85400;
+}
+.pillLate {
+  background: rgba(198, 40, 40, 0.12);
+  color: #c62828;
+}
+.pillMuted {
+  background: rgba(34, 34, 34, 0.06);
+  color: var(--muted);
+}
+.pillOk {
+  background: rgba(47, 125, 92, 0.12);
+  color: var(--green-dark);
+}
+
+.subTitle {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 14px 0 6px;
+}
+.pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.rateRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13.5px;
+}
+.rateRow:last-child {
+  border-bottom: 0;
+}
+.up {
+  color: #c62828;
+}
+.down {
+  color: var(--green-dark);
+}
+
+.insight ul {
+  margin: 0 0 8px;
+  padding-inline-start: 20px;
+  line-height: 1.9;
+}
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin-top: 18px;
+  font-size: 13px;
+}
