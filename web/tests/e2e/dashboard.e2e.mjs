@@ -65,18 +65,19 @@ msg(E, "ai", at(YDAY, "14:01"), { visible: false, meta: { source: "model", test:
 // بازدید: ۳ مهمان و ۲ مشتری در ۲۴ ساعت؛ مشتری اول امتیاز ۹۰ (نشانه‌ی تعداد سفارش)
 psql(`insert into events (anon_id, type, occurred_at) select 'dash-${run}-' || g, 'site_visit', now() - interval '1 hour' from generate_series(1, 3) g`);
 psql(`insert into events (user_id, type, occurred_at) values ('${C[0]}', 'site_visit', now() - interval '2 hours'), ('${C[1]}', 'site_visit', now() - interval '3 hours')`);
-psql("update lead_score_rules set enabled=true, points=1, cap=100 where key='signal_order_qty'");
-psql(`insert into customer_signals (user_id, key, value_num, source) values ('${C[0]}', 'order_qty', 90, 'chat_code'), ('${C[2]}', 'order_qty', 70, 'chat_code')`);
+// سقف بالا تا مشتری‌های امتیازدار تست‌های قبلی جلوی این را در «۵ تای اول» نگیرند
+psql("update lead_score_rules set enabled=true, points=1, cap=100000 where key='signal_order_qty'");
+psql(`insert into customer_signals (user_id, key, value_num, source) values ('${C[0]}', 'order_qty', 99999, 'chat_code'), ('${C[2]}', 'order_qty', 70, 'chat_code')`);
 // نرخ: دیروز و امروز دلار (در پایان پاک می‌شود تا قیمت تست‌های بعدی عوض نشود)
 psql(
   `insert into exchange_rates (currency_code, kind, rate_toman, rate_date, note) values ('USD', 'market', 100000, '${YDAY}', 'dash-${run}'), ('USD', 'market', 101000, '${TODAY}', 'dash-${run}')`,
 );
 // هزینه: یک درخواست زنده‌ی دیروز
 psql(`insert into ai_requests (purpose, mode, model, status, cost_toman, created_at) values ('chat', 'live', 'mock/primary', 'ok', 1234, ${at(YDAY, "09:00")})`);
-// آزمون کامل ۳ روز پیش با همین مدل و دستورالعمل
+// آزمون کامل همین حالا با همین مدل و دستورالعمل (تازه‌تر از آزمون‌های تست ai-tests که قبل از این اجرا شدند)
 const PV = readFileSync(new URL("../../src/lib/ai/prompt.ts", import.meta.url), "utf8").match(/PROMPT_VERSION = "([^"]+)"/)[1];
 psql(
-  `insert into ai_test_runs (status, mode, scope, model, prompt_version, total, done, passed, failed, started_at, finished_at) values ('done', 'live', '{"kind":"all"}', 'mock/primary', '${PV}', 40, 40, 37, 3, now() - interval '3 days', now() - interval '3 days' + interval '5 minutes')`,
+  `insert into ai_test_runs (status, mode, scope, model, prompt_version, total, done, passed, failed, started_at, finished_at) values ('done', 'live', '{"kind":"all"}', 'mock/primary', '${PV}', 40, 40, 37, 3, now() - interval '5 minutes', now())`,
 );
 
 const { b, errs, page } = await launch();
@@ -156,7 +157,7 @@ ok((await ad.getByTestId("cost-all").innerText()).trim() === fa(psql("select rou
 const lastTxt = await ad.getByTestId("test-last").innerText();
 ok(lastTxt.includes(`${fa(37)} قبول`) && lastTxt.includes(`${fa(3)} رد از ${fa(40)}`), `last full test (${lastTxt})`);
 ok((await ad.getByTestId("test-next").innerText()).includes("تا "), "next test due date (last + stale days)");
-psql(`update ai_test_runs set prompt_version='old' where prompt_version='${PV}' and started_at > now() - interval '4 days' and total=40 and passed=37`);
+psql(`update ai_test_runs set prompt_version='old' where prompt_version='${PV}' and started_at > now() - interval '1 hour' and total=40 and passed=37`);
 await ad.reload();
 ok((await ad.getByTestId("test-next").innerText()).includes("همین حالا لازم است (مدل یا دستورالعمل عوض شده)"), "prompt changed → needed now");
 
