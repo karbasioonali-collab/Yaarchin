@@ -95,7 +95,9 @@ export type MethodResult = {
   vat: number | null;
   total: number | null;
   unit: number | null;
+  // days = زمان رسیدن کل (آماده‌سازی + حمل)؛ فقط وقتی هر دو ثبت شده‌اند. transit = فقط زمان حمل همین روش (بخش ۵۴)
   days: { min: number; max: number } | null;
+  transit: { min: number; max: number } | null;
   lines: { section: "goods" | "shipping" | "costs" | "duty" | "vat" | "total"; line: Line }[];
 };
 export type LandedResult = {
@@ -133,7 +135,11 @@ const bagText = (b: Bag, names: RateSnapshot["currencies"]) =>
 class Converter {
   used = new Map<string, { currency: string; kind: "market" | "customs"; rate: number; date: string }>();
   fallback = new Set<string>();
-  constructor(private s: RateSnapshot) {}
+  // فیلد صریح (نه «constructor(private s)»): node --experimental-strip-types در تست واحد آن را نمی‌فهمد (بخش ۴۸ و ۵۴)
+  private s: RateSnapshot;
+  constructor(s: RateSnapshot) {
+    this.s = s;
+  }
   rate(cur: string, kind: "market" | "customs"): number | null {
     if (cur === BASE) return 1;
     if (kind === "customs") {
@@ -387,7 +393,9 @@ export function computeLanded(input: LandedInput, s: RateSnapshot): LandedResult
           ? { label: "جمع تا مرز ایران", formula: `کالا + حمل (${borderOnly}؛ گمرک، ترخیص، بیمه و هزینه‌های دیگر حساب نشد)`, toman: total }
           : { label: "جمع کل", formula: "کالا + حمل + بیمه و هزینه‌ها + حقوق ورودی + ارزش افزوده", toman: total },
       });
-    const days = leadDays !== null && m.transitMinDays !== null ? { min: leadDays + m.transitMinDays, max: leadDays + (m.transitMaxDays ?? m.transitMinDays) } : null;
+    // زمان رسیدن = آماده‌سازی (یک عدد مشترک، بالا) + حمل همین روش. آماده‌سازی ثبت نشده ← فقط transit (بخش ۵۴)
+    const transit = m.transitMinDays !== null ? { min: m.transitMinDays, max: Math.max(m.transitMinDays, m.transitMaxDays ?? m.transitMinDays) } : null;
+    const days = leadDays !== null && transit ? { min: leadDays + transit.min, max: leadDays + transit.max } : null;
     methods.push({
       key: m.key,
       nameFa: m.nameFa,
@@ -402,6 +410,7 @@ export function computeLanded(input: LandedInput, s: RateSnapshot): LandedResult
       total,
       unit: total === null ? null : total / qty,
       days,
+      transit,
       lines,
     });
   }
@@ -508,7 +517,17 @@ export type PublicLanded = {
   ratesDate: string | null;
   // borderOnly: عددها فقط «کالا + حمل تا مرز ایران» است، نه قیمت تمام‌شده‌ی کامل (بخش ۴۱)
   borderOnly: boolean;
-  methods: { key: string; nameFa: string; status: "ok" | "border" | "inquiry"; unit: number | null; total: number | null; days: { min: number; max: number } | null }[];
+  // زمان آماده‌سازی کارخانه (روز؛ مشترک همه‌ی روش‌ها) و برای هر روش زمان حمل جدا؛ days = جمع هر دو (بخش ۵۴)
+  leadDays: number | null;
+  methods: {
+    key: string;
+    nameFa: string;
+    status: "ok" | "border" | "inquiry";
+    unit: number | null;
+    total: number | null;
+    days: { min: number; max: number } | null;
+    transit: { min: number; max: number } | null;
+  }[];
 };
 
 export function toPublic(r: LandedResult): PublicLanded {
@@ -518,6 +537,7 @@ export function toPublic(r: LandedResult): PublicLanded {
     belowMoq: r.belowMoq,
     borderOnly: r.borderOnly !== null,
     ratesDate: r.ratesDate,
+    leadDays: r.leadDays,
     methods: r.methods
       .filter((m) => m.isActive)
       .map((m) => ({
@@ -527,6 +547,7 @@ export function toPublic(r: LandedResult): PublicLanded {
         unit: m.unit === null ? null : round10(m.unit),
         total: m.total === null ? null : round1000(m.total),
         days: m.days,
+        transit: m.transit,
       })),
   };
 }

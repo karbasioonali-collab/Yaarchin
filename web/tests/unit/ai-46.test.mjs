@@ -63,16 +63,17 @@ const ok = (c, m) => {
     toman: { avg: 234567, rateDate: "2026-11-06", isToday: true },
   };
   const methods = [
-    { key: "air", nameFa: "هوایی", status: "ok", unit: 3712000, total: 371200000, days: { min: 22, max: 27 } },
-    { key: "sea", nameFa: "دریایی", status: "ok", unit: 2100000, total: 210000000, days: { min: 45, max: 45 } },
+    // بخش ۵۴: آماده‌سازی ۱۵ روز (مشترک) + حمل هر روش
+    { key: "air", nameFa: "هوایی", status: "ok", unit: 3712000, total: 371200000, days: { min: 22, max: 27 }, transit: { min: 7, max: 12 } },
+    { key: "sea", nameFa: "دریایی", status: "ok", unit: 2100000, total: 210000000, days: { min: 45, max: 45 }, transit: { min: 30, max: 30 } },
   ];
-  const full = buildPriceReply({ ...base, landed: { status: "ready", qty: 100, moq: 50, belowMoq: false, ratesDate: null, borderOnly: false, methods } });
+  const full = buildPriceReply({ ...base, landed: { status: "ready", qty: 100, moq: 50, belowMoq: false, ratesDate: null, borderOnly: false, leadDays: 15, methods } });
   ok(full.includes("قیمت مخلوط‌کن قابل حمل در سایت برای سفارش ۱۰۰ عدد: هر عدد ۲٫۳۵ دلار (معادل ۲۳۴٬۵۷۰ تومان با نرخ امروز دلار)."), `site price + toman (${full.split("\n")[0]})`);
   ok(full.includes("حداقل سفارش از ۵۰ عدد | قیمت از ۲٫۱۰ تا ۲٫۶۰ دلار، بسته به تعداد."), "moq + range");
   ok(
     full.includes("قیمت تمام‌شده‌ی تخمینی تا ایران برای ۱۰۰ عدد:") &&
-      full.includes("- هوایی: هر عدد ۳٬۷۱۲٬۰۰۰ تومان، ۲۲ تا ۲۷ روز") &&
-      full.includes("- دریایی: هر عدد ۲٬۱۰۰٬۰۰۰ تومان، حدود ۴۵ روز"),
+      full.includes("- هوایی: هر عدد ۳٬۷۱۲٬۰۰۰ تومان، حدود ۲۲ تا ۲۷ روز (۱۵ روز آماده‌سازی کارخانه + ۷ تا ۱۲ روز حمل)") &&
+      full.includes("- دریایی: هر عدد ۲٬۱۰۰٬۰۰۰ تومان، حدود ۴۵ روز (۱۵ روز آماده‌سازی کارخانه + ۳۰ روز حمل)"),
     "all methods like the product page",
   );
   ok(

@@ -33,7 +33,16 @@ export type LandedCompact =
       goods_and_shipping_to_iran_border_only?: true;
       excludes?: string;
       // unitPrice/total: متن آماده با جداکننده‌ی هزارگان و واحد صریح («3,507,230 toman»)؛ بخش ۴۷
-      methods: { method: string; unitPrice: string | null; total: string | null; days: { min: number; max: number } | null; needsInquiry: boolean }[];
+      // زمان رسیدن با دو بخش (بخش ۵۴): total_days = آماده‌سازی + حمل (null اگر آماده‌سازی ثبت نشده)، factory_preparation_days، shipping_days
+      methods: {
+        method: string;
+        unitPrice: string | null;
+        total: string | null;
+        total_days: { min: number; max: number } | null;
+        factory_preparation_days: number | null;
+        shipping_days: { min: number; max: number } | null;
+        needsInquiry: boolean;
+      }[];
     };
 
 export type ProductInput = {
@@ -58,7 +67,9 @@ export function shapeProduct(p: ProductInput, withPrice: boolean, withDays = fal
   if (p.leadTimeDays) out.leadTimeDays = p.leadTimeDays;
   if (withPrice) out.landedAtMoq = p.landedAtMoq;
   else if (withDays && p.landedAtMoq.available) {
-    const days = p.landedAtMoq.methods.filter((m) => m.days).map((m) => ({ method: m.method, days: m.days }));
+    const days = p.landedAtMoq.methods
+      .filter((m) => m.shipping_days)
+      .map((m) => ({ method: m.method, total_days: m.total_days, factory_preparation_days: m.factory_preparation_days, shipping_days: m.shipping_days }));
     if (days.length) out.shippingDays = days;
   }
   return out;
@@ -132,6 +143,14 @@ export function compactLanded(l: LandedCost): LandedCompact {
     ...(l.borderOnly ? { goods_and_shipping_to_iran_border_only: true as const, excludes: "customs, clearance, insurance and other costs (announced by a Yarchin expert)" } : {}),
     // عدد خام بی‌جداکننده (3507230) را مدل گاهی بد می‌خواند و «هزار» را جا می‌اندازد (۳۵۰۷ تومان؛ آزمون ۲۰۲۶-۱۱-۰۶، بخش ۴۷)
     // ← متن آماده با کاما و واحد صریح. مدل خودش به فارسی می‌نویسد؛ سنجش عدد (number-check.ts) هر دو شکل را می‌فهمد.
-    methods: l.methods.map((m) => ({ method: m.nameFa, unitPrice: tomanText(m.unit), total: tomanText(m.total), days: m.days, needsInquiry: m.status === "inquiry" })),
+    methods: l.methods.map((m) => ({
+      method: m.nameFa,
+      unitPrice: tomanText(m.unit),
+      total: tomanText(m.total),
+      total_days: m.days,
+      factory_preparation_days: m.transit ? l.leadDays : null,
+      shipping_days: m.transit,
+      needsInquiry: m.status === "inquiry",
+    })),
   };
 }

@@ -48,16 +48,20 @@ const T = "مخلوط‌کن قابل‌حمل شارژی ۳۸۰ میلی‌لی
 // ---------- متن جواب ----------
 {
   const methods = [
-    { key: "air", nameFa: "هوایی", status: "ok", unit: 3507230, total: 3507230000, days: { min: 29, max: 34 } },
-    { key: "sea", nameFa: "دریایی", status: "ok", unit: 2407230, total: 2407230000, days: { min: 45, max: 45 } },
-    { key: "rail", nameFa: "ریلی", status: "ok", unit: 2547230, total: 2547230000, days: null },
+    // بخش ۵۴: آماده‌سازی ۱۵ روز + حمل هر روش؛ ریلی بدون زمان حمل
+    { key: "air", nameFa: "هوایی", status: "ok", unit: 3507230, total: 3507230000, days: { min: 29, max: 34 }, transit: { min: 14, max: 19 } },
+    { key: "sea", nameFa: "دریایی", status: "ok", unit: 2407230, total: 2407230000, days: { min: 45, max: 45 }, transit: { min: 30, max: 30 } },
+    { key: "rail", nameFa: "ریلی", status: "ok", unit: 2547230, total: 2547230000, days: null, transit: null },
   ];
-  const L = (o) => ({ status: "ready", qty: 1000, moq: 500, belowMoq: false, ratesDate: null, borderOnly: false, methods, ...o });
+  const L = (o) => ({ status: "ready", qty: 1000, moq: 500, belowMoq: false, ratesDate: null, borderOnly: false, leadDays: 15, methods, ...o });
   const full = buildQtyPriceReply({ title: T, unit: "piece", landed: L({}) }, 1000);
   const lines = full.split("\n");
   ok(lines[0] === `قیمت تمام‌شده‌ی تخمینی تا ایران برای ۱٬۰۰۰ عدد ${T}:`, `header (${lines[0]})`);
-  ok(lines.includes("- هوایی: هر عدد ۳٬۵۰۷٬۲۳۰ تومان، جمع ۳٬۵۰۷٬۲۳۰٬۰۰۰ تومان، ۲۹ تا ۳۴ روز"), "per unit + total + days");
-  ok(lines.includes("- دریایی: هر عدد ۲٬۴۰۷٬۲۳۰ تومان، جمع ۲٬۴۰۷٬۲۳۰٬۰۰۰ تومان، حدود ۴۵ روز"), "single day value");
+  ok(
+    lines.includes("- هوایی: هر عدد ۳٬۵۰۷٬۲۳۰ تومان، جمع ۳٬۵۰۷٬۲۳۰٬۰۰۰ تومان، حدود ۲۹ تا ۳۴ روز (۱۵ روز آماده‌سازی کارخانه + ۱۴ تا ۱۹ روز حمل)"),
+    "per unit + total + days (preparation + shipping)",
+  );
+  ok(lines.includes("- دریایی: هر عدد ۲٬۴۰۷٬۲۳۰ تومان، جمع ۲٬۴۰۷٬۲۳۰٬۰۰۰ تومان، حدود ۴۵ روز (۱۵ روز آماده‌سازی کارخانه + ۳۰ روز حمل)"), "single day value");
   ok(lines.includes("- ریلی: هر عدد ۲٬۵۴۷٬۲۳۰ تومان، جمع ۲٬۵۴۷٬۲۳۰٬۰۰۰ تومان، زمان: استعلام"), "no days → like the card");
   ok(
     lines.at(-2) === "این قیمت تخمینی است." && lines.at(-1) === QTY_REPLY_END && QTY_REPLY_END === "برای قیمت قطعی و ثبت سفارش، کارشناس یارچین راهنمایی‌تان می‌کند.",

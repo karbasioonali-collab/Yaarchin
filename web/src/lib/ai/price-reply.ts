@@ -4,6 +4,7 @@
 // دست‌کم یک کلمه‌ی قیمت (قیمت / چند / چقدر / تومن / دلار) هست. هر چیز دیگر ← مسیر قبلی (ماشین‌حساب یا مدل).
 import { fmtDayMonth, fmtNum, fmtUsd, unitFa } from "../format";
 import type { PublicLanded } from "../pricing/compute";
+import { arrivalText, LEAD_MISSING_NOTE, leadMissing } from "../pricing/arrival-text";
 import { round10 } from "../pricing/tiers";
 import { normFa } from "./normalize";
 
@@ -113,9 +114,10 @@ export function buildQtyPriceReply(d: { title: string; unit: string; landed: ({ 
         lines.push(`- ${m.nameFa}: استعلام از کارشناس`);
         continue;
       }
-      const days = m.days ? (m.days.min === m.days.max ? `حدود ${fmtNum(m.days.min)} روز` : `${fmtNum(m.days.min)} تا ${fmtNum(m.days.max)} روز`) : "زمان: استعلام";
-      lines.push(`- ${m.nameFa}: هر ${u} ${fmtNum(m.unit)} تومان، جمع ${fmtNum(m.total!)} تومان، ${days}`);
+      // زمان رسیدن با دو بخش آماده‌سازی + حمل (بخش ۵۴)
+      lines.push(`- ${m.nameFa}: هر ${u} ${fmtNum(m.unit)} تومان، جمع ${fmtNum(m.total!)} تومان، ${arrivalText(l.leadDays, m.transit)}`);
     }
+    if (leadMissing(l.leadDays, l.methods)) lines.push(LEAD_MISSING_NOTE);
     lines.push("این قیمت تخمینی است.");
   }
   lines.push(QTY_REPLY_END);
@@ -154,10 +156,10 @@ export function buildPriceReply(d: PriceReplyData): string | null {
     for (const m of l.methods) {
       if (m.status === "inquiry" || m.unit === null) lines.push(`- ${m.nameFa}: استعلام از کارشناس`);
       else {
-        const days = m.days ? (m.days.min === m.days.max ? `، حدود ${fmtNum(m.days.min)} روز` : `، ${fmtNum(m.days.min)} تا ${fmtNum(m.days.max)} روز`) : "";
-        lines.push(`- ${m.nameFa}: هر ${u} ${fmtNum(m.unit)} تومان${days}`);
+        lines.push(`- ${m.nameFa}: هر ${u} ${fmtNum(m.unit)} تومان${m.transit ? `، ${arrivalText(l.leadDays, m.transit)}` : ""}`);
       }
     }
+    if (leadMissing(l.leadDays, l.methods)) lines.push(LEAD_MISSING_NOTE);
   }
   lines.push("این قیمت تخمینی است.");
   lines.push(PRICE_REPLY_END);
@@ -190,13 +192,12 @@ export const TIME_REPLY_END = "زمان دقیق را هنگام سفارش کا
 export function buildTimeReply(d: { title: string; landed: ({ status: "ready" } & PublicLanded) | { status: "soon" } }): string | null {
   const l = d.landed;
   if (l.status !== "ready") return null;
-  const rows = l.methods.filter((m) => m.days && m.status !== "inquiry");
+  // روش با زمان حمل ثبت‌شده (بخش ۵۴: آماده‌سازی ثبت‌نشده دیگر کل زمان را حذف نمی‌کند)
+  const rows = l.methods.filter((m) => m.transit && m.status !== "inquiry");
   if (!rows.length) return null;
   const lines = [`زمان تقریبی رسیدن ${d.title} به ایران:`];
-  for (const m of rows) {
-    const x = m.days!;
-    lines.push(`- ${m.nameFa}: ${x.min === x.max ? `حدود ${fmtNum(x.min)} روز` : `${fmtNum(x.min)} تا ${fmtNum(x.max)} روز`}`);
-  }
+  for (const m of rows) lines.push(`- ${m.nameFa}: ${arrivalText(l.leadDays, m.transit)}`);
+  if (l.leadDays === null) lines.push(LEAD_MISSING_NOTE);
   lines.push(TIME_REPLY_END);
   return lines.join("\n");
 }

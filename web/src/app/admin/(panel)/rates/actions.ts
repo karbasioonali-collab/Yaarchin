@@ -121,7 +121,7 @@ export async function addShippingVersionAction(_prev: FormState, fd: FormData): 
   const currency = str(fd, "currency", 3);
   if (!Object.values(v).every(nonNeg)) return { error: "نرخ‌ها و حداقل هزینه باید عدد صفر یا بزرگ‌تر باشند (یا خالی)." };
   if (v.volumetricFactor === 0) return { error: "ضریب وزن حجمی باید بزرگ‌تر از صفر باشد (یا خالی)." };
-  for (const d of [tMin, tMax]) if (d !== null && (!Number.isInteger(d) || d < 1 || d > 365)) return { error: "زمان رسیدن باید عدد صحیح بین ۱ و ۳۶۵ روز باشد." };
+  for (const d of [tMin, tMax]) if (d !== null && (!Number.isInteger(d) || d < 1 || d > 365)) return { error: "زمان حمل باید عدد صحیح بین ۱ و ۳۶۵ روز باشد." };
   if (tMin !== null && tMax !== null && tMin > tMax) return { error: "حداقل روز نباید بیشتر از حداکثر باشد." };
   if (tMin === null && tMax !== null) return { error: "حداقل روز رسیدن را هم وارد کنید." };
   if (!(await activeCurrencyCodes()).has(currency)) return { error: "ارز نامعتبر یا غیرفعال است." };

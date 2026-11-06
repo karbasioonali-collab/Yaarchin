@@ -84,27 +84,33 @@ for (const q of ["چقدر طول می‌کشه برسه؟", "کی می‌رسه
 for (const q of ["۵۰۰ تا چند روزه میرسه؟", "قیمتش چنده؟", "چند روز گارانتی داره؟", "رنگ قرمز کی میرسه؟", "ارسال به شهرستان دارید؟"])
   ok(!isTimeOnlyQuestion(q, T), `not time-only: «${q}»`);
 ok(!isPriceOnlyQuestion("چقدر طول می‌کشه برسه؟", T), "time question is not a price question");
+// بخش ۵۴: روزها با دو بخش (آماده‌سازی ۱۲ + حمل هر روش)
 const landed = {
   status: "ready",
+  leadDays: 12,
   methods: [
-    { nameFa: "هوایی", status: "ok", unit: 1, total: 1, days: { min: 7, max: 10 } },
-    { nameFa: "زمینی", status: "ok", unit: 1, total: 1, days: { min: 20, max: 20 } },
-    { nameFa: "ریلی", status: "inquiry", unit: null, total: null, days: { min: 30, max: 40 } },
-    { nameFa: "دریایی", status: "ok", unit: 1, total: 1, days: null },
+    { nameFa: "هوایی", status: "ok", unit: 1, total: 1, days: { min: 19, max: 22 }, transit: { min: 7, max: 10 } },
+    { nameFa: "زمینی", status: "ok", unit: 1, total: 1, days: { min: 32, max: 32 }, transit: { min: 20, max: 20 } },
+    { nameFa: "ریلی", status: "inquiry", unit: null, total: null, days: { min: 42, max: 52 }, transit: { min: 30, max: 40 } },
+    { nameFa: "دریایی", status: "ok", unit: 1, total: 1, days: null, transit: null },
   ],
 };
 const tr = buildTimeReply({ title: T, landed });
-ok(tr === `زمان تقریبی رسیدن ${T} به ایران:\n- هوایی: ۷ تا ۱۰ روز\n- زمینی: حدود ۲۰ روز\n${TIME_REPLY_END}`, `time reply from product data (${tr})`);
+ok(
+  tr ===
+    `زمان تقریبی رسیدن ${T} به ایران:\n- هوایی: حدود ۱۹ تا ۲۲ روز (۱۲ روز آماده‌سازی کارخانه + ۷ تا ۱۰ روز حمل)\n- زمینی: حدود ۳۲ روز (۱۲ روز آماده‌سازی کارخانه + ۲۰ روز حمل)\n${TIME_REPLY_END}`,
+  `time reply from product data (${tr})`,
+);
 ok(
   buildTimeReply({ title: T, landed: { status: "soon" } }) === null &&
-    buildTimeReply({ title: T, landed: { status: "ready", methods: [{ nameFa: "x", status: "ok", days: null }] } }) === null,
-  "no days → model path",
+    buildTimeReply({ title: T, landed: { status: "ready", leadDays: 5, methods: [{ nameFa: "x", status: "ok", days: null, transit: null }] } }) === null,
+  "no shipping days → model path",
 );
 ok(timeIntent("۵۰۰ تا چند روزه میرسه؟") && timeIntent("زمان تحویل چقدره") && !timeIntent("قیمت چنده"), "mixed messages: shipping days sent to the model");
 
 // ---------- دستورالعمل و seed ----------
 ok(
-  PROMPT_VERSION === "2026-11-08.1" &&
+  PROMPT_VERSION >= "2026-11-08.1" &&
     /product data wins over the knowledge base/.test(SYSTEM_PROMPT) &&
     /online = any internet selling, incl\. an online store; shop = physical store only/.test(SYSTEM_PROMPT),
   "prompt: product-data priority and channel mapping",

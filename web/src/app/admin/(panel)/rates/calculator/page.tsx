@@ -7,6 +7,7 @@ import { products } from "@/db/schema";
 import { requireAnyPermission } from "@/lib/auth/can";
 import { PRODUCT_STATUS_FA } from "@/lib/catalog/admin-labels";
 import { fmtDate, fmtNum, unitFa } from "@/lib/format";
+import { arrivalText } from "@/lib/pricing/arrival-text";
 import { round10, round1000, type MethodResult } from "@/lib/pricing/compute";
 import { clampQty, landedCostFor } from "@/lib/pricing/landed";
 import { METHOD_FA, RATE_KIND_FA, RATE_PERMS } from "@/lib/pricing/labels";
@@ -138,7 +139,7 @@ export default async function CalculatorPage({ searchParams }: PageProps<"/admin
           </div>
 
           {methods.map((m) => (
-            <MethodCard key={m.key} m={m} unit={u} />
+            <MethodCard key={m.key} m={m} unit={u} leadDays={r.leadDays} />
           ))}
         </>
       )}
@@ -147,7 +148,7 @@ export default async function CalculatorPage({ searchParams }: PageProps<"/admin
   );
 }
 
-function MethodCard({ m, unit }: { m: MethodResult; unit: string }) {
+function MethodCard({ m, unit, leadDays }: { m: MethodResult; unit: string; leadDays: number | null }) {
   return (
     <div className={styles.card}>
       <h2 className={styles.cardTitle}>
@@ -200,13 +201,8 @@ function MethodCard({ m, unit }: { m: MethodResult; unit: string }) {
         ) : (
           "در سایت: «استعلام از کارشناس»"
         )}
-        {m.days && (
-          <>
-            {" "}
-            · زمان کل: {fmtNum(m.days.min)}
-            {m.days.max !== m.days.min && ` تا ${fmtNum(m.days.max)}`} روز
-          </>
-        )}
+        {/* زمان رسیدن با دو بخش (بخش ۵۴)؛ همان متن سایت */}
+        {m.transit && <> · زمان رسیدن: {arrivalText(leadDays, m.transit, { note: true })}</>}
       </p>
     </div>
   );
