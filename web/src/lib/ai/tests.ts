@@ -16,6 +16,7 @@ import { checkOutput } from "./guard";
 import { blacklistTerms } from "./guard-terms";
 import { BusyError, withSlot } from "./limiter";
 import { type CallLog, converse, HANDOFF_TEXT, modelHandoffReason, RESTRICTED_TEXT } from "./agent";
+import { withOfficeHours } from "./handoff-note";
 import { signalsFromMessage, signalTag } from "@/lib/leads/signals";
 import { marketRates } from "@/lib/leads/signals-store";
 import { PROMPT_VERSION } from "./prompt";
@@ -189,7 +190,7 @@ export async function evaluateQuestion(
   const kind = pleasantry(question);
   if (kind) return done({ path: "canned", source: "canned", handoff: null, answer: await cannedReply(kind, productId), guardHits: [] });
   const pre = preRule(question, { bigOrderQty: ctx.bigOrderQty });
-  if (pre) return done({ path: "rule", source: null, handoff: pre, answer: pre === "restricted" ? RESTRICTED_TEXT : HANDOFF_TEXT, guardHits: [] });
+  if (pre) return done({ path: "rule", source: null, handoff: pre, answer: withOfficeHours(pre === "restricted" ? RESTRICTED_TEXT : HANDOFF_TEXT), guardHits: [] });
   // «جواب قیمت با کد» (بخش ۴۶): همان مسیر چت؛ منبع «محصول»، بدون مدل و هزینه
   const priced = await priceAnswer(productId, question);
   if (priced) return done({ path: "price", source: priced.source, handoff: null, answer: priced.text, guardHits: [] });
@@ -247,21 +248,21 @@ export async function evaluateQuestion(
   const cost = out.usage.costToman;
   if (out.truncated) {
     const id = await rec("truncated", "truncated", base);
-    return done({ path: "model", source: null, handoff: "truncated", answer: HANDOFF_TEXT, guardHits: [] }, id, cost);
+    return done({ path: "model", source: null, handoff: "truncated", answer: withOfficeHours(HANDOFF_TEXT), guardHits: [] }, id, cost);
   }
   if (!decision) {
     const id = await rec("parse_error", "parse", base);
-    return done({ path: "model", source: null, handoff: "parse", answer: HANDOFF_TEXT, guardHits: [] }, id, cost);
+    return done({ path: "model", source: null, handoff: "parse", answer: withOfficeHours(HANDOFF_TEXT), guardHits: [] }, id, cost);
   }
   const reason = modelHandoffReason(decision);
   if (reason) {
     const id = await rec("handoff", reason, base);
-    return done({ path: "model", source: null, handoff: reason, answer: reason === "restricted" ? RESTRICTED_TEXT : HANDOFF_TEXT, guardHits: [] }, id, cost);
+    return done({ path: "model", source: null, handoff: reason, answer: withOfficeHours(reason === "restricted" ? RESTRICTED_TEXT : HANDOFF_TEXT), guardHits: [] }, id, cost);
   }
   // سوئیچ «جلوگیری از عدد خارج از داده» روشن ← همان ارجاع چت (بخش ۴۶)
   if (blockNumbers && out.suspects.length) {
     const id = await rec("number_block", "invented_number", base);
-    return done({ path: "model", source: null, handoff: "invented_number", answer: HANDOFF_TEXT, guardHits: [], suspectNumbers: out.suspects }, id, cost);
+    return done({ path: "model", source: null, handoff: "invented_number", answer: withOfficeHours(HANDOFF_TEXT), guardHits: [], suspectNumbers: out.suspects }, id, cost);
   }
   const g = checkOutput(decision.answer, ctx.blacklist);
   if (!g.ok) {

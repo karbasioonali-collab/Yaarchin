@@ -23,6 +23,7 @@ import { aiConfig } from "./config";
 import { buildContext, contextText, historyOf, runLandedTool, type SiteContext } from "./context";
 import { fakeModel } from "./fake";
 import { checkOutput, GUARD_REPLACEMENT } from "./guard";
+import { withOfficeHours } from "./handoff-note";
 import { blacklistTerms } from "./guard-terms";
 import { BusyError, withSlot } from "./limiter";
 import { type Decision, FORMAT_REMINDER, readReply } from "./decision";
@@ -132,7 +133,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
   const pre = preRule(msg.body, { bigOrderQty: limits.bigOrderQty });
   if (pre === "restricted") {
     const reqId = await rec("handoff", "restricted");
-    await postAi(c, RESTRICTED_TEXT, { source: "rule", requestId: reqId });
+    await postAi(c, withOfficeHours(RESTRICTED_TEXT), { source: "rule", requestId: reqId });
     return handoff(c, "restricted", null, reqId, { silentMessage: true });
   }
   if (pre) return handoff(c, pre, null, await rec("handoff", pre));
@@ -245,7 +246,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
     // detail با کد دلیل شروع می‌شود (تبدیل به آزمون، ارجاع مورد انتظار را از آن برمی‌دارد)
     await learn(kindForModelHandoff(reason), `${reason} · ${HANDOFF_FA[reason] ?? reason}${decision.handoff?.note ? ` — ${decision.handoff.note}` : ""}`);
     if (reason === "restricted") {
-      await postAi(c, RESTRICTED_TEXT, { source: "rule", requestId: reqId });
+      await postAi(c, withOfficeHours(RESTRICTED_TEXT), { source: "rule", requestId: reqId });
       return handoff(c, reason, decision.handoff?.note ?? null, reqId, { silentMessage: true });
     }
     return handoff(c, reason, decision.handoff?.note ?? null, reqId);
@@ -419,7 +420,8 @@ export async function handoff(c: RunCtx, reason: string, note: string | null, re
   const test = c.mode === "test";
   const label = HANDOFF_FA[reason] ?? reason;
   await silence(c.conversationId, `handoff:${reason}`, null);
-  if (!opts.silentMessage) await postAi(c, opts.replacement ? GUARD_REPLACEMENT : HANDOFF_TEXT, { source: "handoff", reason, requestId });
+  // جمله‌ی ساعت اداری با کد (بخش ۵۶)
+  if (!opts.silentMessage) await postAi(c, withOfficeHours(opts.replacement ? GUARD_REPLACEMENT : HANDOFF_TEXT), { source: "handoff", reason, requestId });
   await db.insert(chatMessages).values({
     conversationId: c.conversationId,
     senderType: "system",

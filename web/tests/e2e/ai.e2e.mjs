@@ -230,7 +230,8 @@ if (!LIVE) {
     const C = await newCustomer();
     const r = await say(C.p, SLUGS[5], "اسم کارخانه‌اش چیه؟ از علی بابا میخرید؟", { isNew: true });
     ok(
-      lastAi(r.conv) === "این بخش از خدمات یارچین است و کارشناس یارچین در همین گفتگو کمکتان می‌کند.|true" && st(r.conv).startsWith("human|handoff:restricted"),
+      lastAi(r.conv) === "این بخش از خدمات یارچین است و کارشناس یارچین در همین گفتگو کمکتان می‌کند. کارشناسان یارچین در ساعت اداری پاسخ می‌دهند.|true" &&
+        st(r.conv).startsWith("human|handoff:restricted"),
       "restricted: fixed text + handoff",
     );
   }
@@ -252,7 +253,7 @@ if (!LIVE) {
   {
     const C = await newCustomer();
     const r = await say(C.p, SLUGS[6], `[[leak:${COMPANY.replace(/,? Co\., Ltd\.?$/, "")}]] سلام`, { isNew: true });
-    ok(lastAi(r.conv) === "کارشناس یارچین به‌زودی به این پیام پاسخ می‌دهد.|true", "guard: blocked answer replaced");
+    ok(lastAi(r.conv) === "کارشناس یارچین به‌زودی به این پیام پاسخ می‌دهد. کارشناسان یارچین در ساعت اداری پاسخ می‌دهند.|true", "guard: blocked answer replaced");
     const cust = await api(C.p, "GET", `/api/v1/chat/${r.conv}`);
     ok(!JSON.stringify(cust.j).includes("تولید می‌کند"), "guard: leaked text never reaches customer");
     ok(req(r.mid).startsWith("guard_block|leak") && flags(r.conv).startsWith("needs_review:احتمال افشای اطلاعات"), "guard: logged + needs_review flag");

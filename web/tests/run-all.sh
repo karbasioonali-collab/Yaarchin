@@ -25,7 +25,7 @@ psql "$PG_URL/postgres" -qAtc "select 1" >/dev/null 2>&1 || { echo "Postgres م�
 # APARAT_OEMBED_BASE و APARAT_CHECK_CACHE_MS=0: oEmbed آپارات از همان mock، بدون کش ۶ ساعته (بخش ۵۵)
 MOCK_ENV=(AI_BASE_URL=http://127.0.0.1:3399/v1 AI_API_KEY=test AI_MODEL=mock/primary AI_FALLBACK_MODEL=mock/fallback AUTO_INSIGHT_HOUR=0 DASHBOARD_CACHE_MS=0 APARAT_OEMBED_BASE=http://127.0.0.1:3399 APARAT_CHECK_CACHE_MS=0)
 # ترتیب لازم: سایت ← محتوای سایت ← امتیاز …؛ کاتالوگ همیشه آخر
-ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live signals assistant53-test assistant53-live arrival aparat insight perms dashboard ai-costs alibaba-import alibaba-register catalog-4a border-price guide catalog-text-test catalog-text-live guest "$PRE_TEST" catalog)
+ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live signals assistant53-test assistant53-live arrival aparat insight perms password dashboard ai-costs alibaba-import alibaba-register catalog-4a border-price guide catalog-text-test catalog-text-live guest "$PRE_TEST" catalog)
 
 if [ "$SETUP" = 1 ]; then
   bash tests/e2e/setup-db.sh "$DB" || exit 1
