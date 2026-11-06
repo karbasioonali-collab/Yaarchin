@@ -196,7 +196,10 @@ const c8 = await newCustomer();
   // هر بار فقط یادداشت ← ارجاع «جواب قابل خواندن نبود»، بدون متن خالی به مشتری
   const r2 = await say(c8.p, conv, "باز هم [[onlynote]]");
   ok(psql(`select status || '|' || outcome from ai_requests where message_id=${r2.mid}`) === "parse_error|parse", "only-a-note twice → parse handoff");
-  ok(lastAi(conv) === "پیام شما به کارشناس یارچین سپرده شد؛ به‌زودی همین‌جا پاسخ می‌دهد.", "customer gets the handoff text, never an empty message");
+  ok(
+    lastAi(conv) === "پیام شما به کارشناس یارچین سپرده شد؛ به‌زودی همین‌جا پاسخ می‌دهد. کارشناسان یارچین در ساعت اداری پاسخ می‌دهند.",
+    "customer gets the handoff text, never an empty message",
+  );
   ok(psql(`select count(*) from chat_messages where conversation_id='${conv}' and sender_type='ai' and trim(body) = ''`) === "0", "no empty assistant message");
   // «آخرین درخواست‌ها»: خروجی خام مدل برای مدیر
   await ad.goto(B + "/admin/ai");
@@ -236,7 +239,7 @@ const c9 = await newCustomer();
   // بریده دو بار ← ارجاع «جواب دستیار ناقص بود»؛ متن بریده هرگز به مشتری نمی‌رسد
   const s3 = await say(c9.p, conv, "باز هم قیمت [[trunc]]");
   ok(psql(`select status || '|' || outcome from ai_requests where message_id=${s3.mid}`) === "truncated|truncated", "truncated twice → handoff truncated");
-  ok(lastAi(conv) === "پیام شما به کارشناس یارچین سپرده شد؛ به‌زودی همین‌جا پاسخ می‌دهد.", "customer gets the handoff text");
+  ok(lastAi(conv) === "پیام شما به کارشناس یارچین سپرده شد؛ به‌زودی همین‌جا پاسخ می‌دهد. کارشناسان یارچین در ساعت اداری پاسخ می‌دهند.", "customer gets the handoff text");
   ok(!(await customerSees(c9.p, conv)).includes("این ش"), "cut text never reaches the customer");
   ok(psql(`select count(*) from conversation_flags where conversation_id='${conv}' and reason like '%ناقص%'`) === "1", "flag: «جواب دستیار ناقص بود»");
   // «آخرین درخواست‌ها»: دکمه باز می‌شود (دسکتاپ و گوشی)
@@ -338,7 +341,10 @@ const c10 = await newCustomer();
     psql(`select status || '|' || outcome || '|' || (meta->>'retry') from ai_requests where message_id=${r9.mid}`) === "parse_error|parse|1",
     "reversed format → retried once → parse handoff",
   );
-  ok(lastAi(r9.conv) === "پیام شما به کارشناس یارچین سپرده شد؛ به‌زودی همین‌جا پاسخ می‌دهد.", "customer sees the handoff text, not the invented numbers");
+  ok(
+    lastAi(r9.conv) === "پیام شما به کارشناس یارچین سپرده شد؛ به‌زودی همین‌جا پاسخ می‌دهد. کارشناسان یارچین در ساعت اداری پاسخ می‌دهند.",
+    "customer sees the handoff text, not the invented numbers",
+  );
   ok(psql(`select count(*) from conversation_flags where conversation_id='${r9.conv}' and reason like '%قابل خواندن نبود%'`) === "1", "label «جواب دستیار قابل خواندن نبود»");
 
   // عدد خارج از داده: سوئیچ خاموش ← فقط ثبت

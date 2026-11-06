@@ -16,7 +16,10 @@ import { scoreBreakdown } from "@/lib/leads/score";
 import { SIGNAL_FA, type SignalKey } from "@/lib/leads/signals";
 import { customerSignalsView } from "@/lib/leads/signals-store";
 import { startImpersonationAction } from "../../users/actions";
-import { setCustomerStatusAction } from "../actions";
+import { setCustomerPasswordAction, setCustomerStatusAction } from "../actions";
+import { Field } from "@/components/ui/Field";
+import { RESET_PERMISSION } from "@/lib/auth/password-reset-core";
+import { CUSTOMER_PASSWORD_HINT, CUSTOMER_PASSWORD_MIN } from "@/lib/customer/password";
 import styles from "../../panel.module.css";
 
 export const metadata: Metadata = { title: "مشتری" };
@@ -82,6 +85,8 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
     can(a.user, "customers.manage"),
     can(a.user, "impersonate"),
   ]);
+  // تغییر رمز مشتری (بخش ۵۶): مدیر اصلی یا دسترسی customers.reset_password؛ حساب کارمند از این صفحه هرگز (سرور هم بررسی می‌کند)
+  const canResetPassword = a.user.isAdmin || (await can(a.user, RESET_PERMISSION));
 
   // اسم دسته‌ها و محصولات (برای دسته‌های مورد علاقه و پربازدیدها)
   const catIds = [...new Set([...profile.interestIds, ...summary.topCategories.map((t) => t.id).filter((x): x is string => !!x)])];
@@ -426,6 +431,20 @@ export default async function CustomerPage({ params }: PageProps<"/admin/custome
             <p className={styles.muted}>{disabled ? "غیرفعال" : "فعال"} (تغییرش دسترسی «فعال یا غیرفعال کردن مشتری» می‌خواهد)</p>
           )}
         </div>
+
+        {canResetPassword && (
+          <div className={styles.card} data-testid="customer-password-card">
+            <h2 className={styles.cardTitle}>تغییر رمز</h2>
+            <p className={styles.muted} style={{ marginTop: 0, fontSize: 13 }}>
+              رمز قبلی نمایش داده نمی‌شود. رمز تازه را به مشتری بگویید؛ بعد از تغییر، مشتری از همه‌ی دستگاه‌ها خارج می‌شود و باید با رمز تازه وارد شود.
+            </p>
+            <ActionForm action={setCustomerPasswordAction} submitLabel="ثبت رمز" submitVariant="secondary">
+              <input type="hidden" name="id" value={u.id} />
+              <Field label="رمز جدید" name="password" type="password" autoComplete="new-password" required ltr minLength={CUSTOMER_PASSWORD_MIN} hint={CUSTOMER_PASSWORD_HINT} />
+              <Field label="تکرار رمز جدید" name="passwordConfirm" type="password" autoComplete="new-password" required ltr minLength={CUSTOMER_PASSWORD_MIN} />
+            </ActionForm>
+          </div>
+        )}
 
         {canImpersonate && (
           <div className={styles.card}>

@@ -10,6 +10,7 @@ import { logActivity } from "@/lib/activity";
 import { ADMIN_ONLY_MSG, adminRoleId, isAdminUser } from "@/lib/auth/admin-guard";
 import { requirePermission } from "@/lib/auth/can";
 import { hashPassword, passwordError } from "@/lib/auth/password";
+import { resetUserPassword } from "@/lib/auth/password-reset";
 import { revokeAllSessions, updateSession } from "@/lib/auth/session";
 import { hasCustomerRole } from "@/lib/customer/auth";
 import { normalizeEmail, normalizeMobile } from "@/lib/validation";
@@ -36,11 +37,17 @@ function readProfile(fd: FormData): Profile | { error: string } {
 async function duplicateError(p: Profile, exceptId?: string): Promise<string | null> {
   const not = exceptId ? ne(users.id, exceptId) : undefined;
   if (p.mobile) {
-    const [d] = await db.select({ id: users.id }).from(users).where(and(eq(users.mobile, p.mobile), not));
+    const [d] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.mobile, p.mobile), not));
     if (d) return "این موبایل قبلاً ثبت شده.";
   }
   if (p.email) {
-    const [d] = await db.select({ id: users.id }).from(users).where(and(sql`lower(${users.email}) = ${p.email}`, not));
+    const [d] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(sql`lower(${users.email}) = ${p.email}`, not));
     if (d) return "این ایمیل قبلاً ثبت شده.";
   }
   return null;
@@ -66,7 +73,10 @@ export async function createUserAction(_prev: FormState, fd: FormData): Promise<
   if (adminId && roleIds.includes(adminId) && !a.user.isAdmin) return { error: ADMIN_ONLY_MSG.grantAdmin };
   // ادمین و کارشناس فقط با رمز وارد می‌شوند؛ پس برای نقش‌های پنل رمز اجباری است.
   const staffRoles = roleIds.length
-    ? await db.select({ id: roles.id }).from(roles).where(and(inArray(roles.id, roleIds), eq(roles.isStaff, true)))
+    ? await db
+        .select({ id: roles.id })
+        .from(roles)
+        .where(and(inArray(roles.id, roleIds), eq(roles.isStaff, true)))
     : [];
   if (staffRoles.length && !password) return { error: "برای ادمین و کارشناس، رمز عبور لازم است." };
   if (password) {
@@ -120,7 +130,10 @@ export async function updateUserAction(_prev: FormState, fd: FormData): Promise<
   }
 
   await db.transaction(async (tx) => {
-    await tx.update(users).set({ ...p, status }).where(eq(users.id, id));
+    await tx
+      .update(users)
+      .set({ ...p, status })
+      .where(eq(users.id, id));
     const toRemove = beforeRoles.filter((r) => !roleIds.includes(r));
     const toAdd = roleIds.filter((r) => !beforeRoles.includes(r));
     if (toRemove.length) await tx.delete(userRoles).where(and(eq(userRoles.userId, id), inArray(userRoles.roleId, toRemove)));
@@ -140,18 +153,20 @@ export async function updateUserAction(_prev: FormState, fd: FormData): Promise<
   return { ok: "ذخیره شد." };
 }
 
+// تغییر رمز کارمند (بخش ۵۶): فقط مدیر اصلی (نقش ادمین)، با تکرار رمز و قانون رمز پنل. مسیر مشترک: lib/auth/password-reset.ts
+// (بستن نشست‌ها، پاک کردن قفل موقت ورود، لاگ). قبلاً دارنده‌ی users.manage هم رمز کارشناس را عوض می‌کرد؛ به خواست مالک فقط مدیر.
 export async function setPasswordAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const a = await requirePermission("users.manage");
   const id = String(fd.get("id"));
   if (await hasCustomerRole(id)) return { error: CUSTOMER_MSG };
-  if (!a.user.isAdmin && (await isAdminUser(id))) return { error: ADMIN_ONLY_MSG.editAdmin };
-  const password = String(fd.get("password") ?? "");
-  const policy = passwordError(password);
-  if (policy) return { error: policy };
-  await db.update(users).set({ passwordHash: await hashPassword(password) }).where(eq(users.id, id));
-  await revokeAllSessions(id, id === a.user.id ? a.session.id : undefined);
-  await logActivity({ actorUserId: a.user.id, action: "user.set_password", entityType: "user", entityId: id });
-  return { ok: "رمز تغییر کرد و نشست‌های دیگر این کاربر بسته شدند." };
+  return resetUserPassword({
+    actor: { userId: a.user.id, isAdmin: a.user.isAdmin, sessionId: a.session.id, actingAs: a.session.impersonatingUserId },
+    hasPermission: false,
+    targetId: id,
+    expect: "staff",
+    password: String(fd.get("password") ?? ""),
+    confirm: String(fd.get("passwordConfirm") ?? ""),
+  });
 }
 
 export async function revokeSessionsAction(_prev: FormState, fd: FormData): Promise<FormState> {

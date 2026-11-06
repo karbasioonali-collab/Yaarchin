@@ -95,6 +95,11 @@
       "nameFa": "فعال یا غیرفعال کردن مشتری"
     },
     {
+      "key": "customers.reset_password",
+      "groupKey": "customers",
+      "nameFa": "تغییر رمز مشتری‌ها (رمز کارشناس و ادمین فقط با مدیر اصلی)"
+    },
+    {
       "key": "categories.manage",
       "groupKey": "categories",
       "nameFa": "مدیریت دسته‌بندی‌ها (ساخت، ویرایش، جابه‌جایی، حذف)"

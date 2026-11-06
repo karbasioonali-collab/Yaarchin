@@ -6,7 +6,9 @@ import { db } from "@/db/client";
 import { users } from "@/db/schema";
 import type { FormState } from "@/components/ui/ActionForm";
 import { logActivity } from "@/lib/activity";
-import { requirePermission } from "@/lib/auth/can";
+import { can, requirePermission } from "@/lib/auth/can";
+import { resetUserPassword } from "@/lib/auth/password-reset";
+import { RESET_PERMISSION } from "@/lib/auth/password-reset-core";
 import { revokeAllSessions } from "@/lib/auth/session";
 import { hasCustomerRole } from "@/lib/customer/auth";
 
@@ -33,4 +35,17 @@ export async function setCustomerStatusAction(_prev: FormState, fd: FormData): P
   });
   revalidatePath(`/admin/customers/${id}`);
   return { ok: status === "disabled" ? "مشتری غیرفعال شد و از همه‌ی دستگاه‌ها خارج شد." : "مشتری فعال شد." };
+}
+
+// تغییر رمز مشتری (بخش ۵۶): مدیر اصلی یا دارنده‌ی customers.reset_password؛ فقط حساب مشتری (بدون هیچ نقش پنلی)، قانون رمز ثبت‌نام مشتری
+export async function setCustomerPasswordAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("customers.view");
+  return resetUserPassword({
+    actor: { userId: a.user.id, isAdmin: a.user.isAdmin, sessionId: a.session.id, actingAs: a.session.impersonatingUserId },
+    hasPermission: await can(a.user, RESET_PERMISSION),
+    targetId: String(fd.get("id") ?? ""),
+    expect: "customer",
+    password: String(fd.get("password") ?? ""),
+    confirm: String(fd.get("passwordConfirm") ?? ""),
+  });
 }

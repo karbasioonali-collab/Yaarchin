@@ -9,12 +9,7 @@ import { Field } from "@/components/ui/Field";
 import { can, requirePermission } from "@/lib/auth/can";
 import { PASSWORD_HINT, PASSWORD_MIN_LENGTH } from "@/lib/auth/password";
 import { fmtDateTime } from "@/lib/format";
-import {
-  revokeSessionsAction,
-  setPasswordAction,
-  startImpersonationAction,
-  updateUserAction,
-} from "../actions";
+import { revokeSessionsAction, setPasswordAction, startImpersonationAction, updateUserAction } from "../actions";
 import { UserFields } from "../UserFields";
 import styles from "../../panel.module.css";
 
@@ -40,12 +35,7 @@ export default async function UserPage({ params }: PageProps<"/admin/users/[id]"
     .from(sessions)
     .where(and(eq(sessions.userId, id), isNull(sessions.revokedAt), gt(sessions.expiresAt, new Date())))
     .orderBy(desc(sessions.lastSeenAt));
-  const recent = await db
-    .select()
-    .from(activityLog)
-    .where(eq(activityLog.actorUserId, id))
-    .orderBy(desc(activityLog.createdAt))
-    .limit(10);
+  const recent = await db.select().from(activityLog).where(eq(activityLog.actorUserId, id)).orderBy(desc(activityLog.createdAt)).limit(10);
 
   // حساب یک ادمین فقط دست ادمین است (مشخصات، رمز، وضعیت، نشست‌ها)؛ بخش ۱۷ مستندات
   const targetIsAdmin = allRoles.some((r) => r.key === "admin" && roleIds.includes(r.id));
@@ -84,21 +74,17 @@ export default async function UserPage({ params }: PageProps<"/admin/users/[id]"
           )}
         </div>
 
-        {canManage && (
-          <div className={styles.card}>
-            <h2 className={styles.cardTitle}>تعیین رمز جدید</h2>
+        {/* تغییر رمز کارمند فقط با مدیر اصلی (بخش ۵۶)؛ سرور هم همین را بررسی می‌کند */}
+        {canManage && a.user.isAdmin && (
+          <div className={styles.card} data-testid="password-card">
+            <h2 className={styles.cardTitle}>تغییر رمز</h2>
+            <p className={styles.muted} style={{ marginTop: 0, fontSize: 13 }}>
+              رمز قبلی نمایش داده نمی‌شود. بعد از تغییر، این کاربر از همه‌ی دستگاه‌ها خارج می‌شود (اگر خودتان هستید، همین نشست می‌ماند).
+            </p>
             <ActionForm action={setPasswordAction} submitLabel="ثبت رمز" submitVariant="secondary">
               <input type="hidden" name="id" value={u.id} />
-              <Field
-                label="رمز جدید"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                ltr
-                minLength={PASSWORD_MIN_LENGTH}
-                hint={PASSWORD_HINT}
-              />
+              <Field label="رمز جدید" name="password" type="password" autoComplete="new-password" required ltr minLength={PASSWORD_MIN_LENGTH} hint={PASSWORD_HINT} />
+              <Field label="تکرار رمز جدید" name="passwordConfirm" type="password" autoComplete="new-password" required ltr minLength={PASSWORD_MIN_LENGTH} />
             </ActionForm>
           </div>
         )}
