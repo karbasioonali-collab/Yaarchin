@@ -80,6 +80,17 @@ export async function localFree(): Promise<number | null> {
   }
 }
 
+// فایل ویدیوی آپلودی هنوز هست؟ (بخش ۵۵) حالت آزمایشی: دیسک برنامه با هر استقرار پاک می‌شود. فضای ابری: فرض «هست»
+// (درخواست HEAD برای هر بازدید صفحه‌ی محصول گران است و فایل باکت با استقرار پاک نمی‌شود).
+export async function uploadedFileExists(file: string): Promise<boolean> {
+  if (s3Config()) return true;
+  try {
+    return (await stat(localPath(file))).isFile();
+  } catch {
+    return false;
+  }
+}
+
 // خواندن فایل حالت آزمایشی برای /files/… (با پشتیبانی Range برای ویدیو؛ Safari بدون آن ویدیو پخش نمی‌کند)
 export async function openLocal(file: string, range?: { start: number; end?: number }) {
   const p = localPath(file);

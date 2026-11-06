@@ -34,17 +34,27 @@ export function Gallery({ media, title }: { media: PublicMedia[]; title: string 
     swipe.current = null;
     if (!st) return;
     const dx = e.clientX - st.x;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(e.clientY - st.y)) go(index + (dx > 0 ? 1 : -1)); // RTL: کشیدن به راست = بعدی
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(e.clientY - st.y))
+      go(index + (dx > 0 ? 1 : -1)); // RTL: کشیدن به راست = بعدی
     else if (cur.kind === "image") setOpen(true);
   };
 
   return (
     <div className={styles.gallery}>
       <div className={styles.main}>
-        {cur.kind === "video" ? (
+        {cur.kind === "aparat" ? (
+          <AparatSlide key={cur.url} m={cur} />
+        ) : cur.kind === "video" ? (
           <video key={cur.url} className={styles.video} src={cur.url} poster={cur.posterUrl ?? undefined} controls playsInline preload="metadata" aria-label={cur.alt} />
         ) : (
-          <button type="button" className={styles.mainButton} onPointerDown={onDown} onPointerUp={onUp} onKeyDown={(e) => e.key === "Enter" && setOpen(true)} aria-label={`بزرگ‌نمایی: ${cur.alt}`}>
+          <button
+            type="button"
+            className={styles.mainButton}
+            onPointerDown={onDown}
+            onPointerUp={onUp}
+            onKeyDown={(e) => e.key === "Enter" && setOpen(true)}
+            aria-label={`بزرگ‌نمایی: ${cur.alt}`}
+          >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={cur.url} alt={cur.alt} width={cur.width ?? 800} height={cur.height ?? 800} draggable={false} fetchPriority="high" />
           </button>
@@ -63,13 +73,14 @@ export function Gallery({ media, title }: { media: PublicMedia[]; title: string 
               type="button"
               role="tab"
               aria-selected={i === index}
-              aria-label={m.kind === "video" ? `ویدیو: ${m.alt}` : m.alt}
+              aria-label={m.kind !== "image" ? `ویدیو: ${m.alt}` : m.alt}
+              data-kind={m.kind}
               className={`${styles.thumb} ${i === index ? styles.thumbActive : ""}`}
               onClick={() => setIndex(i)}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              {(m.kind === "image" || m.posterUrl) && <img src={m.thumbUrl} alt="" loading="lazy" />}
-              {m.kind === "video" && (
+              {(m.kind === "image" || (m.posterUrl && m.thumbUrl)) && <img src={m.thumbUrl} alt="" loading="lazy" referrerPolicy="no-referrer" />}
+              {m.kind !== "image" && (
                 <span className={styles.play}>
                   <Icon name="play" size={18} filled />
                 </span>
@@ -206,17 +217,15 @@ function Lightbox({ media, index, onIndex, onClose, title }: { media: PublicMedi
         onDoubleClick={() => (z.s > 1 ? setZ({ s: 1, x: 0, y: 0 }) : zoomTo(2.5))}
         style={{ cursor: cur.kind === "image" ? (z.s > 1 ? "grab" : "zoom-in") : "default" }}
       >
-        {cur.kind === "video" ? (
+        {cur.kind === "aparat" ? (
+          <div className={styles.lbAparat}>
+            <AparatSlide key={cur.url} m={cur} />
+          </div>
+        ) : cur.kind === "video" ? (
           <video key={cur.url} className={styles.lbVideo} src={cur.url} poster={cur.posterUrl ?? undefined} controls autoPlay playsInline />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={cur.zoomUrl}
-            alt={cur.alt}
-            draggable={false}
-            className={styles.lbImage}
-            style={{ transform: `translate(${z.x}px, ${z.y}px) scale(${z.s})` }}
-          />
+          <img src={cur.zoomUrl} alt={cur.alt} draggable={false} className={styles.lbImage} style={{ transform: `translate(${z.x}px, ${z.y}px) scale(${z.s})` }} />
         )}
       </div>
 
@@ -231,5 +240,40 @@ function Lightbox({ media, index, onIndex, onClose, title }: { media: PublicMedi
         </>
       )}
     </dialog>
+  );
+}
+
+// ویدیو آپارات (بخش ۵۵): اول فقط عکس پیش‌نمایش (یا زمینه‌ی ساده) با آیکون پخش؛ iframe آپارات فقط بعد از کلیک ساخته می‌شود تا صفحه
+// کند نشود. پخش همین‌جا، بدون رفتن به آپارات.
+// sandbox حداقلی: allow-scripts و allow-same-origin برای خود پخش‌کننده (HLS، تنظیمات)، allow-presentation؛ بدون allow-popups و
+// allow-top-navigation تا پخش‌کننده نتواند صفحه‌ی ما را عوض کند یا پنجره باز کند. تمام‌صفحه با allowFullScreen + allow="fullscreen"
+// (sandbox جلوی تمام‌صفحه را نمی‌گیرد).
+function AparatSlide({ m }: { m: PublicMedia }) {
+  const [playing, setPlaying] = useState(false);
+  if (playing)
+    return (
+      <div className={styles.aparat} data-testid="aparat-player">
+        <iframe
+          src={m.url}
+          title={`ویدیو: ${m.alt}`}
+          allow="autoplay; fullscreen; picture-in-picture"
+          allowFullScreen
+          sandbox="allow-scripts allow-same-origin allow-presentation"
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      </div>
+    );
+  return (
+    <button type="button" className={styles.aparatPoster} onClick={() => setPlaying(true)} aria-label={`پخش ویدیو: ${m.alt}`} data-testid="aparat-poster">
+      {m.posterUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={m.posterUrl} alt="" referrerPolicy="no-referrer" loading="lazy" />
+      ) : (
+        <span className={styles.aparatBlank} aria-hidden="true" />
+      )}
+      <span className={styles.aparatPlay}>
+        <Icon name="play" size={34} filled />
+      </span>
+    </button>
   );
 }

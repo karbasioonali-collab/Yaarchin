@@ -17,7 +17,8 @@ import { can } from "@/lib/auth/can";
 import { getAuth } from "@/lib/auth/current";
 import { mediaReady } from "@/lib/db-ready";
 import { isTrustedPanelRequest } from "@/lib/media/request-guard";
-import { fmtMb, maxInputBytes, mediaLimits, type MediaPurpose, storeMedia } from "@/lib/media/service";
+import { sniff, VIDEO_TYPES } from "@/lib/media/detect";
+import { fmtMb, maxInputBytes, mediaLimits, type MediaPurpose, storeMedia, videoUploadOn } from "@/lib/media/service";
 import { readCapped } from "@/lib/http/read-capped";
 import { mediaUrl } from "@/lib/storage";
 
@@ -46,11 +47,17 @@ export async function POST(req: NextRequest) {
   }
 
   const l = await mediaLimits();
-  const allowVideo = purpose === "product";
+  // آپلود فایل ویدیو با سوئیچ media.video_upload (بخش ۵۵؛ پیش‌فرض خاموش ← ویدیو محصول با لینک آپارات)
+  const videoOn = purpose === "product" && (await videoUploadOn());
+  const allowVideo = videoOn;
   const max = maxInputBytes(l, allowVideo ? "any" : "image");
   const body = await readCapped(req, max);
   if (body === "empty") return err("فایل خالی است.", 400);
-  if (body === "too_big") return err(`فایل بزرگ‌تر از حد مجاز است (حداکثر ${fmtMb(max)} مگابایت).`, 413);
+  if (body === "too_big")
+    return err(
+      `فایل بزرگ‌تر از حد مجاز است (حداکثر ${fmtMb(max)} مگابایت).${purpose === "product" && !videoOn ? " اگر ویدیو است: آپلود فایل ویدیو خاموش است؛ لینک آپارات را در خانه‌ی «لینک ویدیو آپارات» بگذارید." : ""}`,
+      413,
+    );
 
   const name = (() => {
     try {
@@ -59,6 +66,8 @@ export async function POST(req: NextRequest) {
       return null;
     }
   })();
+  if (purpose === "product" && !videoOn && VIDEO_TYPES.has(sniff(body)))
+    return err("آپلود فایل ویدیو خاموش است. برای ویدیو محصول، لینک آپارات را در خانه‌ی «لینک ویدیو آپارات» همین صفحه بگذارید.", 415);
   const r = await storeMedia({ buf: body, purpose, source: "upload", originalName: name, byUserId: a.user.id, allowVideo });
   if (!r.ok) return err(r.error, r.status);
   const f = r.file;

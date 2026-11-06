@@ -15,6 +15,9 @@ import { adminCategoryTree } from "@/lib/catalog/admin-tree";
 import { catalogAdminReady, catalogTextReady, mediaReady, ratesReady } from "@/lib/db-ready";
 import { fmtDateTime, fmtNum, fmtUsd, UNITS, unitFa } from "@/lib/format";
 import { isUploadKey, mediaUrl } from "@/lib/storage";
+import { aparatHash, aparatPageUrl, isAparatKey } from "@/lib/media/aparat";
+import { aparatHidden } from "@/lib/media/aparat-meta";
+import { uploadedFileExists } from "@/lib/media/store";
 import styles from "../../panel.module.css";
 import {
   addMediaAction,
@@ -23,7 +26,9 @@ import {
   createListingAction,
   mediaBulkAction,
   mediaCommandAction,
+  removeAparatAction,
   runTextDraftAction,
+  setAparatAction,
   setPosterAction,
   setReferenceQtyAction,
   updateProductAction,
@@ -39,7 +44,7 @@ import { MediaModeNote } from "@/components/admin/MediaModeNote";
 import { ProductMediaUploader } from "@/components/admin/ProductMediaUploader";
 import { ProductUrlImporter } from "@/components/admin/ProductUrlImporter";
 import { UploadImageField } from "@/components/admin/UploadImageField";
-import { mediaLimits } from "@/lib/media/service";
+import { mediaLimits, videoUploadOn } from "@/lib/media/service";
 import { ProductFields } from "../ProductFields";
 import { hsLookup } from "@/lib/pricing/admin";
 
@@ -87,7 +92,7 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
   if (!p) notFound();
 
   const seeCompanies = await can(a.user, "companies.view");
-  const [uploads, limits] = await Promise.all([mediaReady(), mediaLimits()]);
+  const [uploads, limits, videoUpload] = await Promise.all([mediaReady(), mediaLimits(), videoUploadOn()]);
   const videoMaxMb = limits.mode === "local" ? Math.min(limits.videoMaxMb, limits.testVideoMaxMb) : limits.videoMaxMb;
   const [tree, media, listings] = await Promise.all([
     adminCategoryTree(),
@@ -188,6 +193,12 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
   const PACK_FA = { unitWeightKg: "وزن هر عدد", unitsPerCarton: "تعداد در کارتن", cartonWeightKg: "وزن کارتن پر", cartonDims: "ابعاد کارتن" } as const;
   // فایل‌های واردشده از لینک یا اکستنشن (برای برچسب «از لینک» و لینک منبع)
   const uploadKeys = media.map((m) => m.storageKey).filter((k) => isUploadKey(k));
+  // ویدیو آپارات (بخش ۵۵) و ویدیوی آپلودی که فایلش دیگر نیست (دیسک موقت حالت آزمایشی؛ در سایت نشان داده نمی‌شود)
+  const aparatRow = media.find((m) => isAparatKey(m.storageKey)) ?? null;
+  const aparatCode = aparatRow ? aparatHash(aparatRow.storageKey) : null;
+  const aparatMissing = aparatRow && aparatCode ? await aparatHidden(aparatCode, aparatRow.posterKey) : false;
+  const lostFiles = new Set<string>();
+  for (const m of media) if (m.kind === "video" && isUploadKey(m.storageKey) && !(await uploadedFileExists(m.storageKey))) lostFiles.add(m.id);
   const imported = new Map(
     uploads && uploadKeys.length
       ? (
@@ -476,13 +487,52 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
           عکس اول «عکس اصلی» است (کارت محصول و اول گالری). «منتشر نشود» برای عکسی است که لوگو یا اسم کارخانه دارد: در پنل می‌ماند ولی هرگز در سایت نمایش داده نمی‌شود.
         </p>
         <MediaModeNote ready={uploads} />
-        {uploads && <ProductMediaUploader productId={p.id} batchMax={limits.batchMax} imageMaxMb={limits.imageMaxMb} videoMaxMb={videoMaxMb} />}
+        {uploads && <ProductMediaUploader productId={p.id} batchMax={limits.batchMax} imageMaxMb={limits.imageMaxMb} videoMaxMb={videoMaxMb} allowVideo={videoUpload} />}
         {uploads && (
           <details className={styles.detailsBox} style={{ marginTop: 10 }}>
             <summary>+ وارد کردن عکس از لینک (مثلاً علی‌بابا)</summary>
             <ProductUrlImporter productId={p.id} batchMax={limits.batchMax} listings={listings.map((l, i) => ({ id: l.id, label: companyLabel(l, i) }))} />
           </details>
         )}
+        <div className={styles.detailsBox} style={{ marginTop: 12 }} data-testid="aparat-box">
+          <h3 style={{ margin: "0 0 6px", fontSize: 15 }}>لینک ویدیو آپارات</h3>
+          <p className={styles.muted} style={{ margin: "0 0 8px", fontSize: 13 }}>
+            ویدیو را در کانال آپارات یارچین بگذارید و لینک صفحه‌ی ویدیو را اینجا پیست کنید (مثل https://www.aparat.com/v/abc12). در سایت اسلاید دوم گالری محصول می‌شود و همان‌جا پخش
+            می‌شود. آموزش قدم‌به‌قدم: <Link href="/admin/guide#product-video">ویدیو محصول با آپارات</Link>.
+          </p>
+          {aparatRow && aparatCode && (
+            <p style={{ margin: "0 0 8px", fontSize: 13 }} data-testid="aparat-current">
+              ویدیو فعلی:{" "}
+              <a href={aparatPageUrl(aparatCode)} target="_blank" rel="noreferrer noopener" className={styles.ltr}>
+                {aparatPageUrl(aparatCode)}
+              </a>{" "}
+              {aparatMissing ? (
+                <span className={`${styles.badge} ${styles.badgeWarn}`} data-testid="aparat-missing">
+                  در آپارات پیدا نشد (حذف یا خصوصی شده)؛ در سایت نشان داده نمی‌شود
+                </span>
+              ) : aparatRow.isPublic ? (
+                <span className={styles.badge}>در سایت</span>
+              ) : (
+                <span className={`${styles.badge} ${styles.badgeWarn}`}>منتشر نشود</span>
+              )}
+              {!aparatRow.posterKey && <span className={`${styles.badge} ${styles.badgeMuted}`}>بدون عکس پیش‌نمایش (پیش‌نمایش ساده)</span>}
+            </p>
+          )}
+          <ActionForm action={setAparatAction} submitLabel={aparatRow ? "ذخیره‌ی لینک تازه" : "ذخیره"}>
+            <input type="hidden" name="productId" value={p.id} />
+            <Field label="لینک ویدیو آپارات" name="link" defaultValue={aparatCode ? aparatPageUrl(aparatCode) : ""} ltr placeholder="https://www.aparat.com/v/…" />
+          </ActionForm>
+          {aparatRow && (
+            <ActionForm
+              action={removeAparatAction}
+              submitLabel="حذف ویدیو آپارات"
+              submitVariant="secondary"
+              confirm="ویدیو آپارات از صفحه‌ی محصول حذف شود؟ (خود ویدیو در آپارات می‌ماند)"
+            >
+              <input type="hidden" name="productId" value={p.id} />
+            </ActionForm>
+          )}
+        </div>
         {media.some((m) => m.kind === "image") && (
           <div style={{ display: "flex", gap: 8, marginTop: 12 }} data-testid="media-bulk">
             {(
@@ -515,7 +565,12 @@ export default async function ProductPage({ params, searchParams }: PageProps<"/
               )}
               <div className={styles.mediaMeta}>
                 {i === 0 && <span className={styles.badge}>عکس اصلی</span>}
-                {m.kind === "video" && <span className={styles.badge}>ویدیو</span>}
+                {m.kind === "video" && <span className={styles.badge}>{isAparatKey(m.storageKey) ? "ویدیو آپارات" : "ویدیو"}</span>}
+                {lostFiles.has(m.id) && (
+                  <span className={`${styles.badge} ${styles.badgeWarn}`} data-testid="media-lost">
+                    فایل در دسترس نیست (در سایت نشان داده نمی‌شود؛ حذفش کنید)
+                  </span>
+                )}
                 {m.listingId && listingIndex.has(m.listingId) && (
                   <span className={styles.badge} data-testid="media-listing">
                     از لیستینگ: {companyLabel(listings[listingIndex.get(m.listingId)!], listingIndex.get(m.listingId)!)}

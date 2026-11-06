@@ -11,7 +11,10 @@ import { db } from "@/db/client";
 import { categories, productMedia, products } from "@/db/schema";
 import { catalogAdminReady, catalogReady, importScoreReady, ratesReady } from "@/lib/db-ready";
 import { type ImportScore, toImportScore } from "./import-score";
-import { mediaUrl } from "@/lib/storage";
+import { isUploadKey, mediaUrl } from "@/lib/storage";
+import { aparatEmbedUrl, aparatHash } from "@/lib/media/aparat";
+import { aparatHidden } from "@/lib/media/aparat-meta";
+import { uploadedFileExists } from "@/lib/media/store";
 import { clampQty, type LandedCost, publicLandedCost } from "@/lib/pricing/landed";
 import { orderSpan, referencePrice, type RefListing } from "@/lib/pricing/reference";
 
@@ -57,8 +60,9 @@ export type ProductCard = {
 
 export type PublicSpec = { label: string; value: string };
 // url = اندازه‌ی صفحه‌ی محصول؛ thumbUrl = عکس کوچک؛ zoomUrl = بزرگ‌نمایی. برای عکس با آدرس دستی هر سه یکی است.
+// kind = aparat (بخش ۵۵): url = آدرس پخش‌کننده‌ی جاسازی آپارات (iframe فقط بعد از کلیک)؛ posterUrl = عکس oEmbed یا null
 export type PublicMedia = {
-  kind: "image" | "video";
+  kind: "image" | "video" | "aparat";
   url: string;
   thumbUrl: string;
   zoomUrl: string;
@@ -419,6 +423,23 @@ export async function getProduct(slug: string): Promise<PublicProduct | null> {
 
 // همان داده‌ی عمومی صفحه‌ی محصول، بدون connection() (برای کاری که بعد از پاسخ و بیرون از رندر صفحه اجرا می‌شود، مثل دستیار هوشمند).
 // مثل getProduct هیچ اطلاعات کارخانه‌ای ندارد.
+// رسانه‌ی قابل نمایش (بخش ۵۵): ویدیو آپارات حذف‌شده یا خصوصی، و ویدیوی آپلودی که فایلش دیگر نیست (دیسک موقت حالت آزمایشی)، کنار
+// گذاشته می‌شوند تا صفحه خراب دیده نشود. ویدیو آپارات اسلاید دوم است (بعد از عکس اصلی)، هر جای فهرست پنل که باشد.
+async function visibleMedia<T extends { kind: string; key: string; poster: string | null }>(rows: T[]): Promise<T[]> {
+  const keep: T[] = [];
+  for (const m of rows) {
+    const ap = aparatHash(m.key);
+    if (ap) {
+      if (!(await aparatHidden(ap, m.poster))) keep.push(m);
+    } else if (m.kind === "video" && isUploadKey(m.key)) {
+      if (await uploadedFileExists(m.key)) keep.push(m);
+    } else keep.push(m);
+  }
+  const i = keep.findIndex((m) => aparatHash(m.key));
+  if (i > 1) keep.splice(1, 0, ...keep.splice(i, 1));
+  return keep;
+}
+
 export async function loadPublishedProduct(slug: string): Promise<PublicProduct | null> {
   if (!(await catalogReady())) return null;
   const [p] = await db
@@ -457,7 +478,24 @@ export async function loadPublishedProduct(slug: string): Promise<PublicProduct 
     titleEn: p.titleEn,
     descriptionFa: p.descriptionFa,
     specs: publicSpecs(p.specs),
-    media: media.flatMap((m) => {
+    media: (await visibleMedia(media)).flatMap((m): PublicMedia[] => {
+      // ویدیو آپارات (بخش ۵۵)
+      const ap = aparatHash(m.key);
+      if (ap) {
+        const poster = mediaUrl(m.poster, "md");
+        return [
+          {
+            kind: "aparat",
+            url: aparatEmbedUrl(ap),
+            thumbUrl: mediaUrl(m.poster, "sm") ?? "",
+            zoomUrl: aparatEmbedUrl(ap),
+            posterUrl: poster,
+            alt: m.alt ?? p.titleFa,
+            width: null,
+            height: null,
+          },
+        ];
+      }
       const url = mediaUrl(m.key, "md");
       if (!url) return [];
       const img = m.kind === "image";
