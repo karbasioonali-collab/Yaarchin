@@ -142,7 +142,8 @@ setS("features.ai_agent", true);
 const c2 = await newCustomer();
 {
   const { conv } = await say(c2.p, SLUG, "قبلاً از چین وارد کردم و اینترنتی می‌فروشم [[sigA]]", { isNew: true });
-  ok(sig(c2.id) === "import_experience=1/ai,sales_channel=1/ai", `model signals saved (${sig(c2.id)})`);
+  // بخش ۵۳: «اینترنتی می‌فروشم» را کد می‌خواند (کانال مدل برای همین پیام نادیده)؛ سابقه‌ی واردات از مدل
+  ok(sig(c2.id) === "import_experience=1/ai,sales_channel=1/chat_code", `model + code signals saved (${sig(c2.id)})`);
   ok(psql(`select value_text from customer_signals where user_id='${c2.id}' and key='sales_channel'`) === "فروش اینترنتی", "channel label");
   const seen = await customerSees(c2.p, conv);
   ok(seen.includes("پاسخ ساختگی") && !/signals|import=|channel=/i.test(seen), "customer sees the answer, never the signals line");
@@ -442,7 +443,8 @@ const c3 = await newCustomer();
 const c4 = await newCustomer();
 {
   const { conv } = await say(c4.p, SLUG, "۲۰۰ تومن سرمایه دارم [[sigB]]", { isNew: true });
-  ok(sig(c4.id) === "budget_unclear=-/ai", `ambiguous budget stored without value (${sig(c4.id)})`);
+  // بخش ۵۳: «۲۰۰ تومن سرمایه دارم» را کد می‌خواند (کلمه‌ی سرمایه)؛ سؤال روشن‌کردن با markBudgetClarify علامت می‌خورد
+  ok(sig(c4.id) === "budget_unclear=-/chat_code", `ambiguous budget stored without value (${sig(c4.id)})`);
   ok(lastAi(conv).endsWith("راستی، منظورتان از «۲۰۰ تومان» چه مبلغی است؟ مثلاً ۲۰۰ میلیون تومان؟"), `clarify question appended (${lastAi(conv)})`);
   await say(c4.p, conv, "گفتم که ۲۰۰ تومن [[sigB]]");
   ok(psql(`select count(*) from chat_messages where conversation_id='${conv}' and sender_type='ai' and body like '%منظورتان از%'`) === "1", "asked only once per conversation");
@@ -466,7 +468,8 @@ const c4 = await newCustomer();
 const c6 = await newCustomer();
 {
   await say(c6.p, SLUG, "۵ میلیارد ریال سرمایه دارم [[sigR]]", { isNew: true });
-  ok(sig(c6.id) === "budget_mtoman=500/ai", `«۵ میلیارد ریال» → 500 million toman (${sig(c6.id)})`);
+  // بخش ۵۳: با کلمه‌ی سرمایه، کد می‌خواند
+  ok(sig(c6.id) === "budget_mtoman=500/chat_code", `«۵ میلیارد ریال» → 500 million toman (${sig(c6.id)})`);
   await ad.goto(B + `/admin/customers/${c6.id}`);
   ok((await ad.getByTestId("signal-budget_mtoman").innerText()).includes("۵۰۰ میلیون تومان"), "panel: ۵۰۰ میلیون تومان");
 }
