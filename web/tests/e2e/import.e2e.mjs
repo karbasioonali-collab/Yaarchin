@@ -54,7 +54,8 @@ ok(!!prod, "product created; redirected to #media");
 ok(await vis(ad.getByText("محصول ساخته شد. حالا عکس و ویدیوی آن را اینجا آپلود کنید")), "notice on product page");
 const box = await ad.locator("#media").boundingBox();
 ok(box && box.y >= -5 && box.y < 300, `media section scrolled into view (y=${box && Math.round(box.y)})`);
-ok(await ad.getByLabel("آپلود عکس و ویدیوی محصول").isVisible(), "uploader visible right away");
+// بخش ۵۵: آپلود فایل ویدیو پیش‌فرض خاموش ← دکمه فقط «آپلود عکس محصول»
+ok(await ad.getByLabel("آپلود عکس محصول").isVisible(), "uploader visible right away");
 
 // ---------- 2. import via panel ----------
 await ad.getByText("+ وارد کردن عکس از لینک").click();

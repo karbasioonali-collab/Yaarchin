@@ -23,6 +23,8 @@ for (const [k, v] of [
   ["media.video_max_mb", 50],
   ["media.test_total_mb", 150],
   ["media.test_video_max_mb", 20],
+  // بخش ۵۵: آپلود فایل ویدیو پیش‌فرض خاموش است؛ این تست مسیر آپلود ویدیو را با سوئیچ روشن می‌سنجد (قابل برگشت بودن)
+  ["media.video_upload", true],
 ])
   setS(k, v);
 const prod = psql("select id from products where slug='portable-blender'");
@@ -229,5 +231,6 @@ fx.cleanup();
 console.log("page errors:", errs.length ? errs : "none");
 ok(!errs.length, "no JS page errors");
 await b.close();
+setS("media.video_upload", false);
 done();
 process.exit();

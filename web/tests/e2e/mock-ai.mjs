@@ -47,6 +47,14 @@ http
     for await (const c of req) raw += c;
     if (req.url === "/__log") return out(res, 200, log);
     if (req.url === "/__reset") return ((log = []), out(res, 200, { ok: true }));
+    // oEmbed آپارات (بخش ۵۵؛ APARAT_OEMBED_BASE=http://127.0.0.1:3399): کد gone… ← ۴۰۴ (حذف یا خصوصی)؛ noemb… ← ۵۰۰ (oEmbed در دسترس نیست)
+    if (req.method === "GET" && req.url.startsWith("/oembed?")) {
+      const vu = new URL(req.url, "http://x").searchParams.get("url") ?? "";
+      const hash = /\/v\/([A-Za-z0-9]+)/.exec(vu)?.[1] ?? "";
+      if (!hash || hash.startsWith("gone")) return out(res, 404, { error: "not found" });
+      if (hash.startsWith("noemb")) return out(res, 500, { error: "down" });
+      return out(res, 200, { type: "video", title: `ویدیو ${hash}`, thumbnail_url: `https://static.cdn.asset.aparat.com/avt/${hash}-thumb.jpg`, provider_name: "Aparat" });
+    }
     if (req.method !== "POST" || !req.url.endsWith("/chat/completions")) return out(res, 404, { error: "not found" });
     if (req.headers.authorization !== "Bearer test") return out(res, 401, { error: "bad key" });
     const body = JSON.parse(raw);

@@ -9,7 +9,8 @@ import { IMAGE_ACCEPT, uploadFile, VIDEO_ACCEPT } from "./upload-client";
 
 type Row = { name: string; progress: number; error?: string; done?: boolean };
 
-export function ProductMediaUploader(props: { productId: string; batchMax: number; imageMaxMb: number; videoMaxMb: number }) {
+// allowVideo = سوئیچ media.video_upload (بخش ۵۵؛ پیش‌فرض خاموش ← فقط عکس؛ ویدیو با لینک آپارات)
+export function ProductMediaUploader(props: { productId: string; batchMax: number; imageMaxMb: number; videoMaxMb: number; allowVideo: boolean }) {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>([]);
   const [busy, setBusy] = useState(false);
@@ -62,8 +63,15 @@ export function ProductMediaUploader(props: { productId: string; batchMax: numbe
     >
       <div className={styles.pickRow}>
         <label className={styles.pick} aria-disabled={busy}>
-          ⬆ آپلود عکس و ویدیو
-          <input type="file" multiple accept={`${IMAGE_ACCEPT},${VIDEO_ACCEPT}`} onChange={pick} disabled={busy} aria-label="آپلود عکس و ویدیوی محصول" />
+          {props.allowVideo ? "⬆ آپلود عکس و ویدیو" : "⬆ آپلود عکس"}
+          <input
+            type="file"
+            multiple
+            accept={props.allowVideo ? `${IMAGE_ACCEPT},${VIDEO_ACCEPT}` : IMAGE_ACCEPT}
+            onChange={pick}
+            disabled={busy}
+            aria-label={props.allowVideo ? "آپلود عکس و ویدیوی محصول" : "آپلود عکس محصول"}
+          />
         </label>
         <label className={`${styles.pick} ${styles.camera}`} aria-disabled={busy}>
           📷 دوربین
@@ -72,9 +80,9 @@ export function ProductMediaUploader(props: { productId: string; batchMax: numbe
         <Checkbox label="دارای لوگوی کارخانه — منتشر نشود" checked={hasLogo} onChange={(e) => setHasLogo(e.target.checked)} disabled={busy} />
       </div>
       <span className={styles.status} style={{ color: "var(--muted)" }}>
-        چند فایل با هم (حداکثر {props.batchMax.toLocaleString("fa-IR")})؛ هر عکس تا {props.imageMaxMb.toLocaleString("fa-IR")} مگابایت (JPEG، PNG، WebP، GIF، AVIF)، ویدیو MP4 یا
-        WebM تا {props.videoMaxMb.toLocaleString("fa-IR")} مگابایت. می‌توانید فایل‌ها را اینجا بکشید و رها کنید. عکس‌ها خودکار کوچک و WebP می‌شوند و اطلاعات داخل فایل (EXIF، مکان)
-        پاک می‌شود.
+        چند فایل با هم (حداکثر {props.batchMax.toLocaleString("fa-IR")})؛ هر عکس تا {props.imageMaxMb.toLocaleString("fa-IR")} مگابایت (JPEG، PNG، WebP، GIF، AVIF)
+        {props.allowVideo ? `، ویدیو MP4 یا WebM تا ${props.videoMaxMb.toLocaleString("fa-IR")} مگابایت` : ""}. ویدیو محصول با «لینک ویدیو آپارات» (پایین‌تر) اضافه می‌شود.
+        می‌توانید فایل‌ها را اینجا بکشید و رها کنید. عکس‌ها خودکار کوچک و WebP می‌شوند و اطلاعات داخل فایل (EXIF، مکان) پاک می‌شود.
       </span>
       {note && <span className={styles.statusErr}>{note}</span>}
       {rows.length > 0 && (

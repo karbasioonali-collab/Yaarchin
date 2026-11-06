@@ -16,6 +16,8 @@ import { catalogAdminReady, catalogTextReady, importScoreReady, ratesReady } fro
 import { runDraft } from "@/lib/catalog/text-draft";
 import { hsLookup } from "@/lib/pricing/admin";
 import { releaseKey } from "@/lib/media/service";
+import { aparatKey, isAparatKey, parseAparatLink } from "@/lib/media/aparat";
+import { aparatInfo, okThumb } from "@/lib/media/aparat-meta";
 import { isUploadKey } from "@/lib/storage";
 
 // ثبت/ویرایش امتیاز «جذاب برای واردات». فقط با دسترسی products.rate (ادمین همیشه).
@@ -296,6 +298,77 @@ export async function mediaCommandAction(fd: FormData): Promise<void> {
     });
   }
   revalidatePath("/", "layout");
+}
+
+// ---------- ویدیو آپارات (بخش ۵۵) ----------
+// یک ویدیو آپارات برای هر محصول: ردیف product_media با kind = video و storage_key = «aparat:<کد>». بدون migration.
+// oEmbed آپارات (عنوان و عکس پیش‌نمایش) اختیاری است: شکستش جلوی ذخیره را نمی‌گیرد.
+export async function setAparatAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("products.manage");
+  const productId = str(fd, "productId", 40);
+  if (!UUID.test(productId)) return { error: "محصول نامعتبر است." };
+  const parsed = parseAparatLink(String(fd.get("link") ?? "").slice(0, 1000));
+  if ("error" in parsed) return { error: parsed.error };
+  const [p] = await db.select({ id: products.id }).from(products).where(eq(products.id, productId));
+  if (!p) return { error: "محصول پیدا نشد." };
+  const key = aparatKey(parsed.hash);
+  const existing = (await db.select().from(productMedia).where(eq(productMedia.productId, productId))).filter((m) => isAparatKey(m.storageKey));
+  if (existing.length === 1 && existing[0].storageKey === key) return { ok: "همین ویدیو از قبل ذخیره شده است." };
+  const info = await aparatInfo(parsed.hash);
+  const thumb = info.status === "ok" ? info.thumbnail : null;
+  const cur = existing[0];
+  // عکس پیش‌نمایشی که ادمین خودش گذاشته (نه از آپارات) با عوض شدن لینک می‌ماند
+  const poster = cur?.posterKey && !okThumb(cur.posterKey) ? cur.posterKey : thumb;
+  let id: string;
+  if (cur) {
+    await db.update(productMedia).set({ storageKey: key, posterKey: poster }).where(eq(productMedia.id, cur.id));
+    // ویدیو آپارات تکراری (نباید باشد) پاک می‌شود تا همیشه یکی بماند
+    for (const x of existing.slice(1)) await db.delete(productMedia).where(eq(productMedia.id, x.id));
+    id = cur.id;
+  } else {
+    const [{ n }] = await db.select({ n: count() }).from(productMedia).where(eq(productMedia.productId, productId));
+    const [row] = await db
+      .insert(productMedia)
+      .values({ productId, kind: "video", storageKey: key, posterKey: poster, isPublic: true, sortOrder: n })
+      .returning({ id: productMedia.id });
+    id = row.id;
+  }
+  await logActivity({
+    actorUserId: a.user.id,
+    actingAsUserId: a.session.impersonatingUserId,
+    action: "product.media.aparat",
+    entityType: "product",
+    entityId: productId,
+    before: cur ? { id: cur.id, key: cur.storageKey, poster: cur.posterKey } : null,
+    after: { id, key, poster, oembed: info.status },
+  });
+  revalidatePath("/", "layout");
+  const note =
+    info.status === "gone"
+      ? " آپارات این ویدیو را پیدا نکرد؛ اگر تازه آپلودش کرده‌اید، چند دقیقه صبر کنید تا پردازش تمام شود. اگر حذف یا خصوصی است، در سایت نشان داده نمی‌شود."
+      : thumb
+        ? " عکس پیش‌نمایش از آپارات گرفته شد."
+        : " عکس پیش‌نمایش از آپارات گرفته نشد؛ در سایت یک پیش‌نمایش ساده با آیکون پخش نشان داده می‌شود.";
+  return { ok: `${cur ? "لینک ویدیو عوض شد." : "ویدیو آپارات ذخیره شد."}${note}` };
+}
+
+export async function removeAparatAction(_prev: FormState, fd: FormData): Promise<FormState> {
+  const a = await requirePermission("products.manage");
+  const productId = str(fd, "productId", 40);
+  if (!UUID.test(productId)) return { error: "محصول نامعتبر است." };
+  const rows = (await db.select().from(productMedia).where(eq(productMedia.productId, productId))).filter((m) => isAparatKey(m.storageKey));
+  if (!rows.length) return { ok: "ویدیو آپاراتی ثبت نشده است." };
+  for (const r of rows) await db.delete(productMedia).where(eq(productMedia.id, r.id));
+  await logActivity({
+    actorUserId: a.user.id,
+    actingAsUserId: a.session.impersonatingUserId,
+    action: "product.media.aparat_remove",
+    entityType: "product",
+    entityId: productId,
+    before: rows.map((r) => ({ id: r.id, key: r.storageKey, poster: r.posterKey })),
+  });
+  revalidatePath("/", "layout");
+  return { ok: "ویدیو آپارات حذف شد." };
 }
 
 // عکس پیش‌نمایش ویدیو: کلید فایل آپلودی یا آدرس https (خالی = حذف)

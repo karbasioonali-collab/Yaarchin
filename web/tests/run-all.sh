@@ -22,9 +22,10 @@ export TEST_DB="$PG_URL/$DB"
 # بعد از ری‌استارت محیط توسعه Postgres خاموش است (بخش ۲۲)
 psql "$PG_URL/postgres" -qAtc "select 1" >/dev/null 2>&1 || { echo "Postgres محلی در دسترس نیست؛ اول: service postgresql start" >&2; exit 1; }
 # AUTO_INSIGHT_HOUR=0 و DASHBOARD_CACHE_MS=0 فقط برای تست داشبورد و نمودار هزینه (بخش ۵۱ و ۵۲): تحلیل خودکار در هر ساعت، داشبورد بدون کش ۶۰ ثانیه
-MOCK_ENV=(AI_BASE_URL=http://127.0.0.1:3399/v1 AI_API_KEY=test AI_MODEL=mock/primary AI_FALLBACK_MODEL=mock/fallback AUTO_INSIGHT_HOUR=0 DASHBOARD_CACHE_MS=0)
+# APARAT_OEMBED_BASE و APARAT_CHECK_CACHE_MS=0: oEmbed آپارات از همان mock، بدون کش ۶ ساعته (بخش ۵۵)
+MOCK_ENV=(AI_BASE_URL=http://127.0.0.1:3399/v1 AI_API_KEY=test AI_MODEL=mock/primary AI_FALLBACK_MODEL=mock/fallback AUTO_INSIGHT_HOUR=0 DASHBOARD_CACHE_MS=0 APARAT_OEMBED_BASE=http://127.0.0.1:3399 APARAT_CHECK_CACHE_MS=0)
 # ترتیب لازم: سایت ← محتوای سایت ← امتیاز …؛ کاتالوگ همیشه آخر
-ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live signals assistant53-test assistant53-live arrival insight perms dashboard ai-costs alibaba-import alibaba-register catalog-4a border-price guide catalog-text-test catalog-text-live guest "$PRE_TEST" catalog)
+ORDER=(site admin-site score rates chat customer icons guard followup media import reports ai-test ai-live ai-tests-test ai-tests-live signals assistant53-test assistant53-live arrival aparat insight perms dashboard ai-costs alibaba-import alibaba-register catalog-4a border-price guide catalog-text-test catalog-text-live guest "$PRE_TEST" catalog)
 
 if [ "$SETUP" = 1 ]; then
   bash tests/e2e/setup-db.sh "$DB" || exit 1
@@ -62,6 +63,7 @@ for t in "${ORDER[@]}"; do
     assistant53-test) file=tests/e2e/assistant53.e2e.mjs; env=(AI_E2E=test); serve normal ;;
     assistant53-live) file=tests/e2e/assistant53.e2e.mjs; env=(AI_E2E=live); serve live ;;
     arrival) serve live; reset_data ;;
+    aparat) serve live; reset_data ;;
     insight) serve live; reset_data ;;
     dashboard) serve live; reset_data ;;
     ai-costs) serve live; reset_data ;;

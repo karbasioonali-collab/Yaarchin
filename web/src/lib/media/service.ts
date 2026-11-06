@@ -44,6 +44,11 @@ export async function mediaLimits(): Promise<MediaLimits> {
 }
 
 // بیشترین حجم ورودی مجاز (بایت) برای خواندن بدنه‌ی درخواست
+// سوئیچ «آپلود فایل ویدیو برای محصول» (بخش ۵۵؛ پیش‌فرض خاموش؛ قبل از seed ردیفش نیست ← خاموش). کد آپلود ویدیو دست نخورده و با روشن کردن برمی‌گردد.
+export async function videoUploadOn(): Promise<boolean> {
+  return (await getSetting<boolean>("media.video_upload").catch(() => null)) === true;
+}
+
 export function maxInputBytes(l: MediaLimits, kind: "image" | "video" | "any"): number {
   const video = (l.mode === "local" ? Math.min(l.videoMaxMb, l.testVideoMaxMb) : l.videoMaxMb) * MB;
   if (kind === "image") return l.imageMaxMb * MB;
