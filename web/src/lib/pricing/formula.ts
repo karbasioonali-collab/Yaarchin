@@ -4,7 +4,7 @@
 //   مجاز: عدد (ارقام فارسی هم)، + − × ÷ * /، پرانتز، متغیرهای VARIABLES و تابع‌های max، min، ceil، floor، round
 //   مثال: max(۵۰۰۰۰۰، وزن × ۲۰۰۰۰)     ارزش_کالا × ۰٫۰۰۵ + ۱۰۰۰۰۰
 // بدون server-only تا فرم پنل و تست هم بتوانند استفاده کنند.
-import { toLatinDigits } from "@/lib/validation";
+import { toLatinDigits } from "../validation";
 
 export const VARIABLES = {
   goods_value: { fa: "ارزش_کالا", label: "ارزش کالا (به ارز همین آیتم)" },

@@ -101,7 +101,7 @@ export default async function ShippingPage() {
                       <Field label="حداقل هزینه" name="minCharge" defaultValue={n(current?.minCharge ?? null)} inputMode="decimal" ltr placeholder="خالی = ندارد" />
                     </div>
                     <div className={styles.row}>
-                      <Field label="زمان رسیدن: حداقل روز" name="transitMinDays" defaultValue={current?.transitMinDays ?? ""} inputMode="numeric" ltr />
+                      <Field label="زمان حمل (بدون آماده‌سازی کارخانه): حداقل روز" name="transitMinDays" defaultValue={current?.transitMinDays ?? ""} inputMode="numeric" ltr />
                       <Field label="حداکثر روز" name="transitMaxDays" defaultValue={current?.transitMaxDays ?? ""} inputMode="numeric" ltr />
                     </div>
                     <JalaliDateInput
@@ -143,7 +143,8 @@ function Summary({ v, cur }: { v: Version; cur: string }) {
     v.ratePerCbm !== null && `هر م³ ${fmtNum(Number(v.ratePerCbm))} ${cur}`,
     v.volumetricFactor !== null && `ضریب ${fmtNum(Number(v.volumetricFactor))}`,
     v.minCharge !== null && `حداقل ${fmtNum(Number(v.minCharge))} ${cur}`,
-    v.transitMinDays !== null && `${fmtNum(v.transitMinDays)}${v.transitMaxDays !== v.transitMinDays && v.transitMaxDays !== null ? ` تا ${fmtNum(v.transitMaxDays)}` : ""} روز`,
+    v.transitMinDays !== null &&
+      `حمل ${fmtNum(v.transitMinDays)}${v.transitMaxDays !== v.transitMinDays && v.transitMaxDays !== null ? ` تا ${fmtNum(v.transitMaxDays)}` : ""} روز`,
   ].filter(Boolean);
   return <div style={{ fontSize: 14 }}>{parts.join(" · ") || "—"}</div>;
 }

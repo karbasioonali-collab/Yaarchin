@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PublicLanded } from "@/lib/pricing/compute";
 import { fmtDate, fmtNum, unitFa } from "@/lib/format";
+import { arrivalText, LEAD_MISSING_NOTE, leadMissing } from "@/lib/pricing/arrival-text";
 import { toLatinDigits } from "@/lib/validation";
 import styles from "./product.module.css";
 
@@ -87,8 +88,8 @@ export function LandedCalculator({ slug, unit, initial }: { slug: string; unit: 
               ) : (
                 <div className={styles.methodInquiry}>استعلام از کارشناس</div>
               )}
-              <div className={styles.methodDays}>
-                {m.days ? (m.days.min === m.days.max ? `حدود ${fmtNum(m.days.min)} روز` : `${fmtNum(m.days.min)} تا ${fmtNum(m.days.max)} روز`) : "زمان: استعلام"}
+              <div className={styles.methodDays} data-testid="method-days">
+                {arrivalText(data.leadDays, m.transit)}
               </div>
             </div>
           ))}
@@ -96,10 +97,15 @@ export function LandedCalculator({ slug, unit, initial }: { slug: string; unit: 
       ) : (
         <p className={styles.muted}>روش حملی فعال نیست؛ برای قیمت تمام‌شده از کارشناس استعلام بگیرید.</p>
       )}
+      {leadMissing(data.leadDays, data.methods) && (
+        <p className={styles.muted} data-testid="lead-missing">
+          {LEAD_MISSING_NOTE}
+        </p>
+      )}
 
       <p id="landed-note" className={styles.priceNote}>
         {data.ratesDate && <>با نرخ‌های {fmtDate(data.ratesDate)}. </>}
-        زمان کل = آماده‌سازی در کارخانه + حمل. قیمت تخمینی است و قیمت نهایی توسط کارشناس اعلام می‌شود.
+        زمان رسیدن = آماده‌سازی در کارخانه + حمل. قیمت تخمینی است و قیمت نهایی توسط کارشناس اعلام می‌شود.
       </p>
     </>
   );
