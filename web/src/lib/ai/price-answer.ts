@@ -2,20 +2,26 @@ import "server-only";
 // «جواب قیمت با کد» (بخش ۴۶): داده‌ی همان صفحه‌ی محصول (loadPublishedProduct؛ بدون اطلاعات کارخانه) ← price-reply.ts
 import { landedForSlug, loadPublishedProduct } from "@/lib/catalog/public";
 import { slugOf } from "./context";
-import { buildPriceReply, buildQtyPriceReply, isPriceOnlyQuestion, priceQtyQuestion } from "./price-reply";
+import { buildPriceReply, buildQtyPriceReply, buildTimeReply, isPriceOnlyQuestion, isTimeOnlyQuestion, priceQtyQuestion } from "./price-reply";
 
 // پیش‌صافی ارزان قبل از دیتابیس: یک کلمه‌ی قیمت (رقم بعد از حذف اسم محصول سنجیده می‌شود)
-const MAYBE = /قیمت|چند|چقد|تومن|تومان|دلار|درمیاد|در میاد|تموم/;
+const MAYBE = /قیمت|چند|چقد|تومن|تومان|دلار|درمیاد|در میاد|تموم|طول|رس|زمان|تحویل|کی|مدت/;
 
-// kind: price = بدون تعداد (منبع «محصول»)، qty_price = برای یک تعداد (بخش ۴۷؛ منبع «ماشین‌حساب»)
-export type PriceAnswer = { text: string; kind: "price" | "qty_price"; source: "product" | "calculator"; qty?: number };
+// kind: price = بدون تعداد (منبع «محصول»)، qty_price = برای یک تعداد (بخش ۴۷؛ منبع «ماشین‌حساب»)، time = زمان حمل (بخش ۵۳؛ منبع «محصول»)
+export type PriceAnswer = { text: string; kind: "price" | "qty_price" | "time"; source: "product" | "calculator"; qty?: number };
 
 // متن جواب قیمت، یا null (سؤال فقط قیمت نیست، محصول منتشرشده نیست، یا قیمت ندارد) ← مسیر قبلی
 export async function priceAnswer(productId: string | null, text: string): Promise<PriceAnswer | null> {
   if (!productId || !MAYBE.test(text.replace(/ي/g, "ی").replace(/ك/g, "ک"))) return null;
   const slug = await slugOf(productId);
   const p = slug ? await loadPublishedProduct(slug) : null;
-  if (!p || !p.price) return null;
+  if (!p) return null;
+  // زمان حمل: فقط روزهای روش‌های حمل (به قیمت نیاز ندارد، ولی روزها از قیمت تمام‌شده‌ی حداقل سفارش می‌آید)
+  if (isTimeOnlyQuestion(text, p.titleFa)) {
+    const t = buildTimeReply({ title: p.titleFa, landed: p.landedCost });
+    return t ? { text: t, kind: "time", source: "product" } : null;
+  }
+  if (!p.price) return null;
   if (isPriceOnlyQuestion(text, p.titleFa)) {
     const t = buildPriceReply({ title: p.titleFa, unit: p.price.unit, price: p.price, toman: p.priceToman, landed: p.landedCost });
     return t ? { text: t, kind: "price", source: "product" } : null;

@@ -2,7 +2,7 @@
 // خالص، بدون import با «@/» (تست واحد مستقیم اجرایش می‌کند).
 //   ۴ نوع (کلید customer_signals):
 //     order_qty          تعداد سفارش (کد از متن مشتری؛ اگر کد نگرفت، از خط signals مدل)
-//     budget_mtoman      سرمایه/بودجه به میلیون تومان (فقط مدل؛ تبدیل واحد با کد)
+//     budget_mtoman      سرمایه/بودجه به میلیون تومان (کد از متن مشتری با کلمه‌ی بودجه، وگرنه خط مدل؛ تبدیل واحد با کد؛ بخش ۵۳)
 //     budget_unclear     بودجه‌ی مبهم («۲۰۰ تومن» بدون هزار/میلیون/میلیارد): فقط نمایش، هیچ قانون امتیازی رویش نیست
 //     import_experience  سابقه‌ی واردات (۱ = دارد، ۰ = ندارد)
 //     sales_channel      کانال فروش (۱؛ اسم کانال در value_text)
@@ -65,6 +65,17 @@ function buyVerbNear(rest: string): boolean {
   return !!m && clause.slice(0, m.index).trim().split(/\s+/).filter(Boolean).length <= MAX_GAP_WORDS;
 }
 
+// «۵۰۰ تا چند میشه؟» (بخش ۵۳): بعد از «تا» کلمه‌ی سؤال قیمت با حداکثر ۳ کلمه فاصله در همان جمله ← تعداد با برچسب «سؤال قیمت».
+// اگر بین «تا» و کلمه‌ی قیمت اسمی مثل «سؤال»، «مورد» یا «نکته» بیاید، تعداد نیست («۲ تا سؤال دارم قیمتش چنده؟»).
+const NOT_ITEM = /^(سوال|سوالم|سوالی|سؤال|سؤالم|مورد|موردی|نکته|چیز|چیزی|مدل|رنگ|روش|راه|بار|دفعه|نفر|روز|هفته|ماه|سال|ساعت)$/;
+function priceWordNear(rest: string): boolean {
+  const clause = rest.split(SENTENCE_END)[0];
+  const m = PRICE_Q.exec(clause);
+  if (!m) return false;
+  const gap = clause.slice(0, m.index).trim().split(/\s+/).filter(Boolean);
+  return gap.length <= MAX_GAP_WORDS && !gap.some((w) => NOT_ITEM.test(w));
+}
+
 // متن یکسان‌شده برای تعداد: نیم‌فاصله حذف، رقم لاتین، بدون جداکننده‌ی هزارگان، بدون تلفن
 function qtyText(text: string): string {
   const n = normFa(text.replace(/\u200c/g, ""))
@@ -91,6 +102,7 @@ export function qtyAttached(customerText: string, qty: number): boolean {
     if (new RegExp(`^\\s*${UNIT}(?![\\p{L}])`, "u").test(rest)) return true;
     const ta = /^\s*تا(?![\p{L}])/u.exec(rest);
     if (buyVerbNear(ta ? rest.slice(ta[0].length) : rest)) return true;
+    if (ta && priceWordNear(rest.slice(ta[0].length))) return true;
   }
   return false;
 }
@@ -108,7 +120,7 @@ export function extractOrderQty(text: string): { qty: number; priceQuestion: boo
     // «۱۰ تا ۲۰ روز» بازه است، نه تعداد (عدد دوم با واحد خودش جدا خوانده می‌شود)
     if (unit === "تا" && nextDigit && /^\s*$/.test(after ?? "")) continue;
     const rest = clean.slice((m.index ?? 0) + whole.length);
-    if ((unit === "تا" || (!unit && scale)) && !buyVerbNear(rest)) continue;
+    if (unit === "تا" ? !buyVerbNear(rest) && !priceWordNear(rest) : !unit && scale && !buyVerbNear(rest)) continue;
     let v = Number(numRaw);
     if (scale === "هزار" || scale === "k") v *= 1000;
     if (scale === "میلیون") v *= 1_000_000;
@@ -149,6 +161,22 @@ const CURRENCIES: Record<string, "toman" | "rial" | "usd" | "cny"> = {
   rmb: "cny",
 };
 
+// «میلیارد»، «تومن»، … ← کلمه‌ی انگلیسی همان قالب (فاصله دورش، تا «1میلیارد» هم خوانده شود)
+const FA_BUDGET_WORDS: [RegExp, string][] = [
+  [/هزار/g, "thousand"],
+  [/م[ی]?لیون/g, "million"],
+  [/م[ی]?لیارد/g, "billion"],
+  [/تومان|تومن/g, "toman"],
+  [/ریال/g, "rial"],
+  [/دلار/g, "dollar"],
+  [/یوان/g, "yuan"],
+];
+export function budgetWords(v: string): string {
+  let out = v.toLowerCase();
+  for (const [re, en] of FA_BUDGET_WORDS) out = out.replace(re, ` ${en} `);
+  return out.replace(/\s+/g, " ").trim();
+}
+
 export function parseSignalsLine(content: string): RawSignals {
   const out: RawSignals = {};
   const line = content
@@ -167,7 +195,8 @@ export function parseSignalsLine(content: string): RawSignals {
       const n = Number(v.replace(/[,\s]/g, ""));
       if (Number.isInteger(n) && n >= 1 && n <= 100_000_000) out.qty = n;
     } else if (k === "budget") {
-      const b = /^([\d.,]+)\s*(thousand|million|billion|k|m|b)?\s*([a-z]+)?$/.exec(v.replace(/\s+/g, " "));
+      // واحد فارسی، انگلیسی یا ترکیبشان («1 میلیارد toman»، «200 million تومان»؛ بخش ۵۳)
+      const b = /^([\d.,]+)\s*(thousand|million|billion|k|m|b)?\s*([a-z]+)?$/.exec(budgetWords(v));
       if (!b) continue;
       const amount = Number(b[1].replace(/,/g, ""));
       const currency = CURRENCIES[b[3] ?? "toman"];
@@ -247,6 +276,42 @@ export function budgetSignal(b: NonNullable<RawSignals["budget"]>, customerText:
   return { key: "budget_mtoman", valueNum: Math.round((toman / 1e6) * 100) / 100, valueText: label, confidence: 0.8, via: "ai" };
 }
 
+// ---------- بودجه با کد از متن مشتری (بخش ۵۳) ----------
+// عدد + (هزار|میلیون|میلیارد) و/یا (تومان|تومن|ریال|دلار|یوان)، با یکی از کلمه‌های بودجه در همان جمله.
+// «قیمتش ۱ میلیون تومنه؟» بودجه نیست (کلمه‌ی بودجه ندارد). قاعده‌های ریال، «تومن» مبهم و دلار/یوان همان budgetSignal است.
+const BUDGET_WORD = /(سرمایه|بودجه|پول|نقدینگی|نقدینگیم|سرمایم|بودجم)/;
+const BUDGET_RE = /(\d+(?:\.\d+)?)\s*(هزار|میلیون|ملیون|میلیارد|ملیارد)?\s*(تومان|تومن|ریال|دلار|یوان)?/g;
+export function extractBudget(text: string): NonNullable<RawSignals["budget"]> | null {
+  const clean = normFa(text.replace(/\u200c/g, ""))
+    .replace(/(\d)[,٬](?=\d{3}\b)/g, "$1")
+    .replace(/٫/g, ".");
+  // مرز جمله مثل تعداد، ولی نقطه‌ی بین دو رقم («۱.۵ میلیارد») مرز نیست
+  for (const clause of clean.split(/[:：؟?،,!؛;\n]|\.(?!\d)/)) {
+    if (!BUDGET_WORD.test(clause)) continue;
+    for (const m of clause.matchAll(BUDGET_RE)) {
+      const [, num, scaleFa, curFa] = m;
+      if (!scaleFa && !curFa) continue;
+      const parsed = parseSignalsLine(`signals: budget=${num} ${scaleFa ?? ""} ${curFa ?? ""}`).budget;
+      if (parsed) return parsed;
+    }
+  }
+  return null;
+}
+
+// ---------- کانال فروش اینترنتی با کد (بخش ۵۳) ----------
+// مدل «فروشگاه اینترنتی» را shop گذاشته بود. عبارت‌های روشن فروش اینترنتی ← online، حتی اگر مدل چیز دیگری گفت.
+// «سایت» تنها («توی سایت شما دیدم») کانال نیست؛ فقط «سایت دارم»، «سایت خودم»، «سایت فروشگاهی».
+const ONLINE = new RegExp(
+  [
+    "(فروشگاه|فروش|مغازه|غرفه|کسب ?و ?کار|بیزینس|شاپ)\\s*(اینترنتی|انترنتی|آنلاین|انلاین|مجازی)",
+    "(اینترنتی|آنلاین|انلاین)\\s*(میفروشم|میفروشیم|می فروشم|می فروشیم|فروش|کار میکنم|کار می کنم)",
+    "(پیج|صفحه|کانال)\\s*(اینستاگرام|اینستا|تلگرام|ایتا|روبیکا)",
+    "(اینستاگرام|اینستا|تلگرام|ایتا|روبیکا|دیجی ?کالا|باسلام|دیوار|ترب|اسنپ ?شاپ|امازون|آمازون)",
+    "سایت\\s*(دارم|داریم|خودم|خودمون|خودمان|فروشگاهی|فروش)",
+  ].join("|"),
+);
+export const onlineChannel = (text: string): boolean => ONLINE.test(normFa(text.replace(/\u200c/g, "")));
+
 // نشانه‌های یک پیام مشتری: تعداد با کد + خط signals مدل (اگر جواب مدل در کار بود). مدل فقط وقتی معتبر است که:
 //   مشتری خودش قالب نشانه ننوشته باشد، و عدد تعداد/بودجه واقعاً در متن مشتری باشد.
 export function signalsFromMessage(
@@ -258,18 +323,24 @@ export function signalsFromMessage(
   const q = extractOrderQty(customerText);
   if (q)
     out.push({ key: "order_qty", valueNum: q.qty, valueText: q.qty.toLocaleString("fa-IR"), confidence: q.priceQuestion ? 0.6 : 0.9, via: "code", priceQuestion: q.priceQuestion });
+  // بودجه و کانال اینترنتی با کد از متن مشتری (بخش ۵۳)؛ اگر کد گرفت، همان کلید از خط مدل نادیده گرفته می‌شود
+  const cb = extractBudget(customerText);
+  const codeBudget = cb ? budgetSignal(cb, customerText, rateToman) : null;
+  if (codeBudget) out.push({ ...codeBudget, via: "code" });
+  const online = onlineChannel(customerText);
+  if (online) out.push({ key: "sales_channel", valueNum: 1, valueText: CHANNEL_FA.online, confidence: 0.9, via: "code", channel: "online" });
   if (!modelContent) return { signals: out, ignoredModel: false };
   if (looksLikeInjection(customerText)) return { signals: out, ignoredModel: true };
   const raw = parseSignalsLine(modelContent);
   const nums = numbersIn(customerText);
   if (!q && raw.qty && nums.has(String(raw.qty)) && qtyAttached(customerText, raw.qty))
     out.push({ key: "order_qty", valueNum: raw.qty, valueText: raw.qty.toLocaleString("fa-IR"), confidence: 0.7, via: "ai" });
-  if (raw.budget && nums.has(String(raw.budget.amount))) {
+  if (!codeBudget && raw.budget && nums.has(String(raw.budget.amount))) {
     const b = budgetSignal(raw.budget, customerText, rateToman);
     if (b) out.push(b);
   }
   if (raw.import !== undefined) out.push({ key: "import_experience", valueNum: raw.import ? 1 : 0, valueText: raw.import ? "دارد" : "ندارد", confidence: 0.8, via: "ai" });
-  if (raw.channel) out.push({ key: "sales_channel", valueNum: 1, valueText: CHANNEL_FA[raw.channel], confidence: 0.8, via: "ai", channel: raw.channel });
+  if (raw.channel && !online) out.push({ key: "sales_channel", valueNum: 1, valueText: CHANNEL_FA[raw.channel], confidence: 0.8, via: "ai", channel: raw.channel });
   return { signals: out, ignoredModel: false };
 }
 

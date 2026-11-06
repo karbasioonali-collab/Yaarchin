@@ -16,7 +16,7 @@ import type { CustomerPostResult } from "@/lib/chat/service";
 import { reportsReady } from "@/lib/db-ready";
 import { scoresFor } from "@/lib/leads/score";
 import { clarifyBudget, signalsFromMessage } from "@/lib/leads/signals";
-import { budgetClarifyAsked, marketRates, recordSignals } from "@/lib/leads/signals-store";
+import { budgetClarifyAsked, markBudgetClarify, marketRates, recordSignals } from "@/lib/leads/signals-store";
 import { absoluteUrl, siteUrl } from "@/lib/site/url";
 import { addUsage, AiCallError, chatCompletion, type ChatMsg, type ModelReply, type Usage, ZERO_USAGE } from "./client";
 import { aiConfig } from "./config";
@@ -146,7 +146,8 @@ export async function runAgent(c: RunCtx): Promise<void> {
   const priced = await priceAnswer(conv.productId, msg.body);
   if (priced) {
     // outcome: site_price (بدون تعداد) | site_qty_price (برای یک تعداد، از ماشین‌حساب؛ بخش ۴۷)
-    const kind = priced.kind === "price" ? "site_price" : "site_qty_price";
+    // site_time = زمان حمل با کد (بخش ۵۳)
+    const kind = priced.kind === "price" ? "site_price" : priced.kind === "time" ? "site_time" : "site_qty_price";
     const reqId = await rec("ok", kind, { meta: { promptVersion: PROMPT_VERSION, path: "price", ...(priced.qty ? { qty: priced.qty } : {}) } });
     const m = await postAi(c, priced.text, { source: priced.source, kind, requestId: reqId });
     await db.update(aiRequests).set({ replyMessageId: m.id }).where(eq(aiRequests.id, reqId));
@@ -187,7 +188,7 @@ export async function runAgent(c: RunCtx): Promise<void> {
     return handoff(c, kind, (e as Error).message, reqId);
   }
   // نشانه‌های جدیت از خط signals مدل (بخش ۴۳). خط signals و هر تکه‌ی جامانده‌اش هرگز به مشتری نمی‌رسد.
-  // تعداد با کد قبلاً در API چت ثبت شده (via=code)؛ اینجا فقط نشانه‌های مدل. ذخیره فقط در حالت زنده.
+  // تعداد، بودجه و کانال اینترنتی با کد قبلاً در API چت ثبت شده (via=code)؛ اینجا فقط نشانه‌های مدل. ذخیره فقط در حالت زنده.
   // decision.answer از قبل پاک شده (readReply ← clean-answer.ts)
   const sig = decision ? signalsFromMessage(msg.body, content, await marketRates()) : null;
   const modelSigs = sig?.signals.filter((s) => s.via === "ai") ?? [];
@@ -262,10 +263,12 @@ export async function runAgent(c: RunCtx): Promise<void> {
   }
   // بودجه‌ی مبهم («۲۰۰ تومن»): یک سؤال کوتاه در آخر همین جواب، فقط یک بار در هر گفتگو
   let answer = decision.answer.trim().slice(0, 2000);
-  const unclear = modelSigs.find((s) => s.key === "budget_unclear");
+  // بودجه‌ی مبهم از خط مدل یا (بخش ۵۳) از متن مشتری با کد؛ دومی را API چت قبلاً ثبت کرده ← فقط علامت «پرسیده شد»
+  const unclear = sig?.signals.find((s) => s.key === "budget_unclear");
   const clarify = !!unclear && c.mode === "live" && !(await budgetClarifyAsked(conv.id));
   if (clarify) answer = `${answer}\n\n${clarifyBudget(unclear!.valueText)}`;
   await saveSigs(clarify);
+  if (clarify && unclear!.via === "code") await markBudgetClarify(conv.id, msg.id).catch((e) => console.error("budget clarify mark failed", e));
   const reqId = await rec("ok", decision.source, base);
   const m = await postAi(c, answer, { source: decision.source, requestId: reqId, ...(clarify ? { budgetClarify: true } : {}) });
   await db.update(aiRequests).set({ replyMessageId: m.id }).where(eq(aiRequests.id, reqId));

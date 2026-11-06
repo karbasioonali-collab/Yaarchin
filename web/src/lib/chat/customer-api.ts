@@ -14,7 +14,7 @@ import { db } from "@/db/client";
 import { products } from "@/db/schema";
 import { onCustomerMessage } from "@/lib/ai/agent";
 import { aiStatus } from "@/lib/ai/state";
-import { recordSignals } from "@/lib/leads/signals-store";
+import { marketRates, recordSignals } from "@/lib/leads/signals-store";
 import { signalsFromMessage } from "@/lib/leads/signals";
 import { alertNewChat } from "./alerts";
 import type { CustomerPostResult } from "./service";
@@ -62,6 +62,7 @@ export async function queueNewChatAlert(r: CustomerPostResult, customerName: str
 }
 
 async function recordCodeSignals(r: CustomerPostResult): Promise<void> {
-  const { signals } = signalsFromMessage(r.message.body ?? "", null);
+  // تعداد، بودجه و کانال اینترنتی با کد (بخش ۵۳)؛ نرخ بازار برای بودجه‌ی دلاری/یوانی
+  const { signals } = signalsFromMessage(r.message.body ?? "", null, await marketRates());
   await recordSignals({ userId: r.conversation.customerId, conversationId: r.conversation.id, messageId: r.message.id, quote: r.message.body ?? "", signals });
 }

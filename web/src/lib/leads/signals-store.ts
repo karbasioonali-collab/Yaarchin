@@ -66,6 +66,16 @@ export async function recordSignals(o: {
   }
 }
 
+// بودجه‌ی مبهمی که کد از متن مشتری خواند (API چت، قبل از دستیار) و دستیار درباره‌اش سؤال روشن‌کردن پرسید ← علامت روی همان رویداد
+// (تا سؤال در این گفتگو تکرار نشود؛ بخش ۵۳). اگر رویدادی نبود (مثلاً ترتیب اجرا)، هیچ.
+export async function markBudgetClarify(conversationId: string, messageId: number): Promise<void> {
+  if (!(await reportsReady())) return;
+  await db.execute(sql`
+    update events set props = props || '{"clarifyAsked": true}'::jsonb
+    where type = ${SIGNAL_EVENT} and entity_type = 'conversation' and entity_id = ${conversationId}
+      and props->>'key' = 'budget_unclear' and props->>'messageId' = ${String(messageId)}`);
+}
+
 // سؤال «منظورتان از ۲۰۰ تومان…» در این گفتگو قبلاً پرسیده شده؟ (فقط یک بار در هر گفتگو)
 export async function budgetClarifyAsked(conversationId: string): Promise<boolean> {
   const [r] = await db

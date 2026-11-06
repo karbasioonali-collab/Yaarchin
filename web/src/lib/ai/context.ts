@@ -8,7 +8,19 @@ import { chatMessages, products } from "@/db/schema";
 import { loadPublishedProduct, loadLandedAt } from "@/lib/catalog/public";
 import { getSetting } from "@/lib/settings";
 import { clampQty, publicLandedCost } from "@/lib/pricing/landed";
-import { compactLanded, contextJson, DEFAULT_GENERIC_WORDS, LIMITS, priceIntent, shapeKb, shapeProduct, titleMention, trimHistory, type LandedCompact } from "./context-shape";
+import {
+  compactLanded,
+  contextJson,
+  DEFAULT_GENERIC_WORDS,
+  LIMITS,
+  priceIntent,
+  shapeKb,
+  shapeProduct,
+  timeIntent,
+  titleMention,
+  trimHistory,
+  type LandedCompact,
+} from "./context-shape";
 import { searchKb, type KbHit } from "./kb";
 
 export type ProductCtx = {
@@ -98,6 +110,8 @@ export type SiteContext = {
   products: ProductCtx[];
   kb: KbHit[];
   withPrice: boolean;
+  // سؤال زمان حمل (بخش ۵۳): روزهای هر روش حمل
+  withDays?: boolean;
   landedForQty: { slug: string; qty: number; result: LandedCompact } | null;
 };
 
@@ -111,13 +125,13 @@ export async function buildContext(text: string, convProductId: string | null, q
     const r = await runLandedTool({ product_slug: products[0].slug, qty });
     if (!("error" in r)) landedForQty = { slug: products[0].slug, qty, result: r };
   }
-  return { products, kb, withPrice: priceIntent(text) || !!landedForQty, landedForQty };
+  return { products, kb, withPrice: priceIntent(text) || !!landedForQty, withDays: timeIntent(text), landedForQty };
 }
 
 export function contextText(c: SiteContext): string {
   // قیمت حداقل سفارش وقتی قیمت همان تعداد از قبل حساب شده، تکراری است
   const withMoqPrice = c.withPrice && !c.landedForQty;
-  return contextJson({ products: c.products.map((p) => shapeProduct(p, withMoqPrice)), kb: shapeKb(c.kb), landedForQty: c.landedForQty });
+  return contextJson({ products: c.products.map((p) => shapeProduct(p, withMoqPrice, !!c.withDays)), kb: shapeKb(c.kb), landedForQty: c.landedForQty });
 }
 
 // اجرای ابزار ماشین‌حساب (فقط محصول منتشرشده)

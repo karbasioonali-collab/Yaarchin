@@ -136,18 +136,37 @@ export async function activeLeads(limit = 5): Promise<{ id: string; name: string
 
 // ---------- نرخ ارز ----------
 // نرخ بازار امروز و دیروز هر ارز فعال (غیر از تومان). آخرین نرخ ثبت‌شده هر روز همان روز.
-export type RateCard = { code: string; nameFa: string; today: number | null; yesterday: number | null; lastDate: string | null };
+// prev (بخش ۵۳): آخرین نرخ ثبت‌شده‌ی قبل از امروز (هر تاریخی) با تاریخش؛ وقتی امروز یا دیروز نرخ ندارد، به‌جای «—» نشان داده می‌شود
+export type RateCard = {
+  code: string;
+  nameFa: string;
+  today: number | null;
+  yesterday: number | null;
+  lastDate: string | null;
+  prev: { rate: number; date: string } | null;
+};
 export async function ratesCard(): Promise<RateCard[] | null> {
   if (!(await ratesReady())) return null;
   const today = tehranYmd();
   const y = addDays(today, -1);
-  const r = await db.execute<{ code: string; name_fa: string; t: string | null; y: string | null; last_date: string | null }>(sql`
+  const r = await db.execute<{ code: string; name_fa: string; t: string | null; y: string | null; last_date: string | null; p_rate: string | null; p_date: string | null }>(sql`
     select c.code, c.name_fa,
       (select rate_toman from exchange_rates e where e.currency_code = c.code and e.kind = 'market' and e.rate_date = ${today}::date order by created_at desc, id desc limit 1) as t,
       (select rate_toman from exchange_rates e where e.currency_code = c.code and e.kind = 'market' and e.rate_date = ${y}::date order by created_at desc, id desc limit 1) as y,
-      (select to_char(max(rate_date), 'YYYY-MM-DD') from exchange_rates e where e.currency_code = c.code and e.kind = 'market') as last_date
-    from currencies c where c.is_active and not c.is_base order by c.sort_order, c.code`);
-  return r.rows.map((x) => ({ code: x.code, nameFa: x.name_fa, today: x.t === null ? null : Number(x.t), yesterday: x.y === null ? null : Number(x.y), lastDate: x.last_date }));
+      (select to_char(max(rate_date), 'YYYY-MM-DD') from exchange_rates e where e.currency_code = c.code and e.kind = 'market') as last_date,
+      p.rate_toman as p_rate, to_char(p.rate_date, 'YYYY-MM-DD') as p_date
+    from currencies c
+    left join lateral (select rate_toman, rate_date from exchange_rates e where e.currency_code = c.code and e.kind = 'market' and e.rate_date < ${today}::date
+                       order by rate_date desc, created_at desc, id desc limit 1) p on true
+    where c.is_active and not c.is_base order by c.sort_order, c.code`);
+  return r.rows.map((x) => ({
+    code: x.code,
+    nameFa: x.name_fa,
+    today: x.t === null ? null : Number(x.t),
+    yesterday: x.y === null ? null : Number(x.y),
+    lastDate: x.last_date,
+    prev: x.p_rate !== null && x.p_date ? { rate: Number(x.p_rate), date: x.p_date } : null,
+  }));
 }
 
 // ---------- هزینه‌ی هوش مصنوعی ----------

@@ -10,7 +10,7 @@ import { testLimits } from "@/lib/ai/usage";
 import { autoInsightDue, autoInsightHour, autoInsightRange, nextTestDue, sparkPath, waitText, waitTone } from "@/lib/dashboard/core";
 import { activeLeads, aiCostCard, chatsWaiting, chatsYesterday, lastFullTest, newCustomersCard, ratesCard, visitsCard } from "@/lib/dashboard/data";
 import { aiReady, aiTestsReady } from "@/lib/db-ready";
-import { fmtDate, fmtDateTime, fmtNum } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtDayMonth, fmtNum } from "@/lib/format";
 import { scoreTone, SCORE_TONE_STYLE } from "@/lib/leads/score-tone";
 import { RATE_PERMS } from "@/lib/pricing/labels";
 import { autoInsightToday, insightSettings } from "@/lib/reports/insight";
@@ -297,12 +297,31 @@ export default async function DashboardPage() {
             {rates.map((r) => (
               <div key={r.code} className={d.rateRow} data-testid={`rate-${r.code}`}>
                 <span>
-                  {r.nameFa}: <strong>{r.today === null ? "—" : `${fmtNum(r.today)} تومان`}</strong>
-                  {r.yesterday !== null && (
+                  {/* نرخ امروز یا دیروز نیست ← آخرین نرخ ثبت‌شده با تاریخش (بخش ۵۳) */}
+                  {r.nameFa}:{" "}
+                  {r.today !== null ? (
+                    <strong>{fmtNum(r.today)} تومان</strong>
+                  ) : r.prev ? (
+                    <span data-testid="rate-last">
+                      آخرین نرخ <strong>{fmtNum(r.prev.rate)} تومان</strong> ({fmtDayMonth(r.prev.date)})
+                    </span>
+                  ) : (
+                    <span className={d.sub}>هنوز هیچ نرخی</span>
+                  )}
+                  {r.today !== null && (r.yesterday !== null || r.prev) && (
                     <span className={d.sub}>
                       {" "}
-                      · دیروز {fmtNum(r.yesterday)}
-                      {r.today !== null && r.today !== r.yesterday && <span className={r.today > r.yesterday ? d.up : d.down}> {r.today > r.yesterday ? "▲" : "▼"}</span>}
+                      ·{" "}
+                      {r.yesterday !== null ? (
+                        <>
+                          دیروز {fmtNum(r.yesterday)}
+                          {r.today !== r.yesterday && <span className={r.today > r.yesterday ? d.up : d.down}> {r.today > r.yesterday ? "▲" : "▼"}</span>}
+                        </>
+                      ) : (
+                        <span data-testid="rate-prev">
+                          قبلی {fmtNum(r.prev!.rate)} ({fmtDayMonth(r.prev!.date)})
+                        </span>
+                      )}
                     </span>
                   )}
                 </span>

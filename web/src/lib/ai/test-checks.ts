@@ -1,6 +1,6 @@
 // آزمون دستیار: بررسی‌های خودکار و تخمین هزینه (بدون server-only تا تست واحد مستقیم اجرایش کند). docs/infoyaarchin.md بخش ۳۳.
 import { compact } from "./normalize";
-import { isPriceOnlyQuestion, priceQtyQuestion } from "./price-reply";
+import { isPriceOnlyQuestion, isTimeOnlyQuestion, priceQtyQuestion } from "./price-reply";
 import { pleasantry, preRule } from "./rules";
 
 export type TestExpect = { handoff: string | null; source: string | null; forbidden: string[]; mustInclude: string[]; signals?: string[] };
@@ -76,7 +76,9 @@ export const allPass = (checks: Check[]) => checks.every((c) => c.ok);
 export function ruleCaught(question: string, bigOrderQty: number, productTitle?: string | null): "canned" | "rule" | "price" | null {
   if (pleasantry(question)) return "canned";
   if (preRule(question, { bigOrderQty })) return "rule";
-  return productTitle && (isPriceOnlyQuestion(question, productTitle) || priceQtyQuestion(question, productTitle) !== null) ? "price" : null;
+  return productTitle && (isPriceOnlyQuestion(question, productTitle) || priceQtyQuestion(question, productTitle) !== null || isTimeOnlyQuestion(question, productTitle))
+    ? "price"
+    : null;
 }
 
 // پیش‌فرض میانگین هزینه‌ی هر جواب مدل وقتی هنوز درخواست زنده‌ای نیست (عدد واقعی بعد از PR #28 حدود ۶۰۰ تا ۱٬۲۰۰ تومان؛ بخش ۳۲)
