@@ -11,6 +11,7 @@
 //   شکستن خط یا tab خام داخل رشته (JSON.parse آن را نمی‌پذیرد)؛ اسم دیگر فیلد جواب (reply/response/text/message)؛
 //   handoff به‌شکل رشته‌ی "null" یا فقط اسم دلیل.
 import { SIGNALS_LINE } from "../leads/signals";
+import { normalizeFa } from "../text/fa-normalize";
 import { cleanAnswer, type CleanResult } from "./clean-answer";
 
 export type Decision = { answer: string; source: string; handoff: { reason: string; note?: string } | null };
@@ -155,7 +156,9 @@ export function readReply(content: string): (Decision & { clean: CleanResult }) 
   if (!d) return null;
   const clean = cleanAnswer(d.answer);
   if (clean.tooShort && !d.handoff) return null;
-  return { ...d, answer: clean.text, clean };
+  // یکسان‌سازی متن فارسی (همان تابع متن محصول، بخش ۴۰ و ۴۱؛ بخش ۵۳): ی/ک عربی، رقم عربی، نیم‌فاصله‌ی «می»، «ها»، «تر»، فاصله‌ها.
+  // قبل از سنجش «عدد خارج از داده» (agent.ts) تا عددها یکدست باشند؛ متنی که مشتری می‌بیند هم همین است.
+  return { ...d, answer: normalizeFa(clean.text), clean };
 }
 
 export function parseDecision(content: string): Decision | null {

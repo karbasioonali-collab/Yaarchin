@@ -582,5 +582,35 @@
       "mustInclude": [],
       "signals": ["order_qty=1000"]
     }
+  },
+  {
+    "n": 45,
+    "question": "۵۰۰ تا چند میشه؟",
+    "expectedAnswer": "جواب قیمت با تعداد با کد (ماشین‌حساب) برای ۵۰۰ عدد؛ نشانه: تعداد ۵۰۰ با برچسب «سؤال قیمت» (آزمون واقعی ۲۰۲۶-۱۱-۰۶: ثبت نمی‌شد).",
+    "category": "normal",
+    "productSlug": "portable-blender",
+    "addIfMissing": true,
+    "expect": {
+      "handoff": null,
+      "source": "calculator",
+      "forbidden": ["signals", "qty="],
+      "mustInclude": [],
+      "signals": ["order_qty=500"]
+    }
+  },
+  {
+    "n": 46,
+    "question": "حدود ۱ میلیارد سرمایه دارم و فروشگاه اینترنتی دارم",
+    "expectedAnswer": "نشانه‌ها: سرمایه ۱٬۰۰۰ میلیون تومان و کانال «فروش اینترنتی» (نه مغازه). ارجاع به کارشناس برای بودجه‌ی جدی درست است.",
+    "category": "normal",
+    "productSlug": "portable-blender",
+    "addIfMissing": true,
+    "expect": {
+      "handoff": null,
+      "source": null,
+      "forbidden": ["signals", "budget="],
+      "mustInclude": [],
+      "signals": ["budget_mtoman=1000", "sales_channel=online"]
+    }
   }
 ]

@@ -6,6 +6,7 @@ import "server-only";
 //   [[timeout]] ← مدل اصلی جواب نمی‌دهد (مسیر مدل پشتیبان)؛ [[down]] ← هر دو مدل خطا ← ارجاع
 //   [[badjson]] ← جواب غیر JSON (حتی بعد از یادآوری قالب) ← ارجاع؛ [[badjson1]] ← فقط بار اول غیر JSON (مسیر تلاش دوباره)
 //   [[tool]]    ← سؤال قیمت بدون تعداد: مدل ابزار landed_cost را با حداقل سفارش صدا می‌زند (با تعداد، قیمت از قبل در داده‌هاست)
+//   [[bare]]    ← قیمت با عدد بی‌واحد ساختگی («زمینی: ۳۹۷»؛ بخش ۵۳: سنجش «عدد خارج از داده» باید بگیرد)
 // docs/infoyaarchin.md بخش ۲۹.
 import { sql } from "drizzle-orm";
 import { db } from "@/db/client";
@@ -50,6 +51,7 @@ export async function fakeModel(model: "primary" | "fallback", messages: ChatMsg
     const name = r.rows[0]?.n ?? "Sample Factory Co., Ltd";
     return json({ answer: `این محصول را ${name} تولید می‌کند.`, source: "product", handoff: null });
   }
+  if (text.includes("[[bare]]")) return json({ answer: "[آزمایشی] قیمت با حمل برای حداقل سفارش:\n- زمینی: ۳۹۷", source: "product", handoff: null });
   if (toolResult && toolResult.role === "tool") return landedAnswer(JSON.parse(toolResult.content));
   // تعداد در پیام بود ← قیمت همان تعداد از قبل در داده‌هاست (بدون ابزار)
   if (ctx.landedForQty) return landedAnswer(ctx.landedForQty.result);

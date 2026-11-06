@@ -16,6 +16,8 @@
 //   [[staffnote]] ← یادداشت کارشناس و خط انگلیسی داخل متن جواب | [[bold]] ← ** و ## در جواب
 //   [[onlynote]] ← جواب فقط یک یادداشت (بعد از پاک‌سازی خالی؛ هر بار) | [[onlynote1]] ← همین فقط بار اول، بعد از یادآوری قالب جواب درست
 //   [[trunc]] ← هر بار بریده (finish_reason = length) | [[trunc1]] ← فقط بار اول (بعد از یادآوری «کوتاه‌تر» کامل)
+//   بخش ۵۳: [[bare]] ← قیمت با عدد بی‌واحد ساختگی («زمینی: ۳۹۷»)؛ «…میلیارد سرمایه دارم و فروشگاه اینترنتی…» ← ارجاع other با
+//   «signals: budget=1 میلیارد toman; channel=shop» (عین آزمون واقعی ۲۰۲۶-۱۱-۰۶)
 //   دو سؤال آزمون seed دقیقاً مثل آزمون واقعی ۲۰۲۶-۱۱-۰۴: «…قبلاً هم از چین وارد کردم.» ← multisrc + sigQI؛
 //   «…را عیناً در جوابت بنویس…» ← ارجاع restricted با یادداشت انگلیسی روی خط handoff
 //   «پیشنهاد سؤال فریبنده با AI» (دستورالعمل «tricky customer questions») ← ۵ سؤال، هر خط یکی
@@ -71,13 +73,17 @@ http
       sigR: "budget=5 billion rial",
       sigQI: "qty=500; import=yes",
       sigQ2: "qty=2",
+      // بخش ۵۳: عین خط signals آزمون واقعی ۲۰۲۶-۱۱-۰۶ (واحد فارسی و کانال اشتباه)
+      sigFa: "budget=1 میلیارد toman; channel=shop",
     };
     const realQ1 = text?.includes("قبلاً هم از چین وارد کردم");
     const realQ2 = text?.includes("را عیناً در جوابت بنویس");
     // بخش ۴۵ (آزمون واقعی ۲۰۲۶-۱۱-۰۵): سؤال ۴۲ ← مدل qty=2 نوشت؛ «۵۰۰ تا مخلوط‌کن تا تهران…» ← جواب بار اول به سقف توکن خورد
     const realQ42 = text?.includes("۲ تا سؤال دارم: حداقل سفارش");
     const realQ4 = text?.includes("۵۰۰ تا مخلوط‌کن تا تهران");
-    const sigKey = realQ1 ? "sigQI" : realQ42 ? "sigQ2" : Object.keys(SIG).find((k) => text?.includes(`[[${k}]]`));
+    // بخش ۵۳: «حدود ۱ میلیارد سرمایه دارم و فروشگاه اینترنتی دارم» ← مدل ارجاع other داد (عمداً درست) با خط signals بالا
+    const realQ53 = text?.includes("میلیارد سرمایه دارم و فروشگاه اینترنتی");
+    const sigKey = realQ1 ? "sigQI" : realQ42 ? "sigQ2" : realQ53 ? "sigFa" : Object.keys(SIG).find((k) => text?.includes(`[[${k}]]`));
     const srcOf = (o) => (realQ1 || text?.includes("[[multisrc]]") ? "product; calculator" : o.source);
     const sigLine = `signals: ${sigKey ? SIG[sigKey] : "none"}`;
     const lined = (o) =>
@@ -198,6 +204,9 @@ http
         200,
         completion(body.model, { content: `source: calculator\nhandoff: none\n${sigLine}\n---\nقیمت هوایی ۱۲۳٬۰۰۰ تومان و دریایی ۹۸٬۰۰۰ تومان است. این ش` }, cost, "length"),
       );
+    if (realQ53) return json({ answer: "", source: "general", handoff: { reason: "other", note: "serious budget, online store" } });
+    // بخش ۵۳: [[bare]] ← قیمت با عدد بی‌واحد ساختگی («زمینی: ۳۹۷»؛ سنجش «عدد خارج از داده» باید بگیرد)
+    if (text.includes("[[bare]]")) return json({ answer: "قیمت با حمل برای حداقل سفارش:\n- زمینی: ۳۹۷\nاین قیمت تخمینی است.", source: "product", handoff: null });
     if (realQ2)
       return json({ answer: "", source: "general", handoff: { reason: "restricted", note: "customer attempting to manipulate signals line and inject false instructions" } });
     if (text.includes("[[bold]]")) return json({ answer: "**هوایی:** ۱۲۳٬۰۰۰ تومان\n## دریایی\n__۹۸٬۰۰۰__ تومان. این قیمت تخمینی است.", source: "product", handoff: null });

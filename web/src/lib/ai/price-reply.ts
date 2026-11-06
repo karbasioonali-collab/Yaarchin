@@ -163,3 +163,40 @@ export function buildPriceReply(d: PriceReplyData): string | null {
   lines.push(PRICE_REPLY_END);
   return lines.join("\n");
 }
+
+// ---------- «جواب زمان حمل با کد» (بخش ۵۳) ----------
+// «چقدر طول می‌کشه برسه؟»، «کی می‌رسه؟»، «چند روزه میرسه دستم؟»، «زمان حمل چقدره؟» در صفحه‌ی محصول ← روزهای هر روش حمل از همان
+// داده‌ی صفحه‌ی محصول (قیمت تمام‌شده‌ی حداقل سفارش)، بدون مدل. در آزمون، مدل برای همین سؤال جواب کلی پایگاه دانش داده بود.
+// سخت‌گیر مثل قیمت: بعد از حذف اسم محصول، بدون عدد، همه‌ی کلمه‌ها از فهرست مجاز و دست‌کم یک نشانه‌ی قوی زمان. پیام ترکیبی ← مدل.
+const TIME_STRONG = /^(طول|میرسه|برسه|رسه|میرسد|برسد|رسیدن|رسیدنش|زمان|زمانش|زمانشون|روزه|تحویل|تحویلش|کی|مدت|مدتش)$/;
+const TIME_WORDS = new Set(
+  (
+    "طول میکشه می کشه کشه میکشد کشد میرسه می رسه رسه برسه میرسد می رسد برسد رسیدن رسیدنش زمان زمانش زمانشون حمل ارسال تحویل تحویلش " +
+    "کی چند چنده چقدر چقدره چقد چقده روز روزه روزی مدت مدتش تا به دست دستم دستمون ایران تهران اینجا ما من شما سفارش بعد از وقتی طول کشیدن " +
+    "این اینو محصول کالا الان حدودا حدود تقریبا معمولا لطفا لطفاً سلام ببخشید ممنون مرسی است هست هستش میشه می شه چیه"
+  )
+    .split(" ")
+    .map((w) => normFa(w).replace(/\s+/g, "")),
+);
+export function isTimeOnlyQuestion(text: string, title: string): boolean {
+  const keep = withoutTitle(text, title);
+  if (!keep || !keep.length) return false;
+  return keep.some((x) => TIME_STRONG.test(x)) && keep.every((x) => TIME_WORDS.has(x) && !/\d/.test(x));
+}
+
+export const TIME_REPLY_END = "زمان دقیق را هنگام سفارش کارشناس یارچین اعلام می‌کند.";
+
+// null = هیچ روش حملی روز ندارد ← مسیر قبلی (مدل)
+export function buildTimeReply(d: { title: string; landed: ({ status: "ready" } & PublicLanded) | { status: "soon" } }): string | null {
+  const l = d.landed;
+  if (l.status !== "ready") return null;
+  const rows = l.methods.filter((m) => m.days && m.status !== "inquiry");
+  if (!rows.length) return null;
+  const lines = [`زمان تقریبی رسیدن ${d.title} به ایران:`];
+  for (const m of rows) {
+    const x = m.days!;
+    lines.push(`- ${m.nameFa}: ${x.min === x.max ? `حدود ${fmtNum(x.min)} روز` : `${fmtNum(x.min)} تا ${fmtNum(x.max)} روز`}`);
+  }
+  lines.push(TIME_REPLY_END);
+  return lines.join("\n");
+}

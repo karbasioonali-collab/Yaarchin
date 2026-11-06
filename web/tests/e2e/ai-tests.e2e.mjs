@@ -31,7 +31,8 @@ psql("delete from ai_test_cases where source <> 'seed'");
 psql("delete from ai_test_case_versions");
 psql("update ai_test_cases set question='Tritan چه جنسیه؟' where question like 'Tritan %'");
 const SEEDED = Number(psql("select count(*) from ai_test_cases where status='active'"));
-ok(SEEDED === 44, `44 seeded test cases (${SEEDED})`);
+// ۴۴ ← ۴۶: دو سؤال بخش ۵۳ («۵۰۰ تا چند میشه؟»، بودجه‌ی ۱ میلیارد و فروشگاه اینترنتی)
+ok(SEEDED === 46, `46 seeded test cases (${SEEDED})`);
 const SLUGS = psql("select slug from products where status='published' order by slug").split("\n");
 
 let mock;
@@ -68,7 +69,7 @@ const caseId = (n) => psql(`select id from ai_test_cases where question=${q(n)}`
 // ---------- صفحه‌ها و هشدار «هنوز اجرا نشده» ----------
 {
   await ad.goto(B + "/admin/ai/tests");
-  ok((await ad.locator('input[name="ids"]').count()) === 44, "tests page lists 44 cases");
+  ok((await ad.locator('input[name="ids"]').count()) === SEEDED, `tests page lists ${SEEDED} cases`);
   ok(await vis(ad.getByText("آزمون کامل دستیار هنوز اجرا نشده.")), "panel banner: full test never run");
   ok(await vis(ad.locator("nav").getByText("آزمون دستیار")), "nav: tests item");
   ok(await vis(ad.locator("nav").getByText("پیشنهاد سؤال تازه")), "nav: suggestions item");
@@ -88,7 +89,7 @@ if (LIVE) {
   // هشدار «مدل یا دستورالعمل عوض شده»: آخرین آزمون کامل با مدل ساختگی بود
   const pv = psql("select prompt_version from ai_test_runs limit 1") || "x";
   psql(
-    `insert into ai_test_runs (status, mode, scope, model, prompt_version, total, done) values ('done', 'test', '{"kind":"all"}', 'test/fake', '${pv === "x" ? "2026-10-28.1" : pv}', 44, 44)`,
+    `insert into ai_test_runs (status, mode, scope, model, prompt_version, total, done) values ('done', 'test', '{"kind":"all"}', 'test/fake', '${pv === "x" ? "2026-10-28.1" : pv}', ${SEEDED}, ${SEEDED})`,
   );
   await ad.goto(B + "/admin/ai/tests");
   ok(await vis(ad.getByText("مدل یا دستورالعمل دستیار بعد از آخرین آزمون کامل عوض شده؛ آزمون را دوباره اجرا کنید.")), "banner: model changed since last full run");
@@ -101,24 +102,24 @@ let FREE;
 {
   await toConfirm("all");
   ok(await vis(ad.getByText("تأیید اجرای آزمون: همه")), "confirm page");
-  ok((await statText("سؤال")) === fa(44), "confirm: 44 questions");
+  ok((await statText("سؤال")) === fa(SEEDED), `confirm: ${SEEDED} questions`);
   // تعداد رایگان روی صفحه؛ بعد از اجرا با مسیر واقعی هر سؤال مقایسه می‌شود
   const free = await statText("رایگان (قاعده‌ی کد یا جواب آماده)");
   FREE = Number(free.replace(/[۰-۹]/g, (c) => String(c.charCodeAt(0) - 0x06f0)));
-  ok(FREE >= 18 && FREE < 44, `confirm: free count ${FREE}`);
+  ok(FREE >= 18 && FREE < SEEDED, `confirm: free count ${FREE}`);
   const est = await statText("هزینه‌ی تخمینی (تومان)");
-  ok(est === fa(LIVE ? (44 - FREE) * 1000 : 0), `confirm: estimate ${est}`);
+  ok(est === fa(LIVE ? (SEEDED - FREE) * 1000 : 0), `confirm: estimate ${est}`);
   if (LIVE) ok(await vis(ad.getByText("(۳۰ درخواست زنده‌ی اخیر)")), "confirm: avg from last 30 live requests");
   else ok(await vis(ad.getByText(/حالت آزمایشی \(کلید لیارا تعریف نشده\)/)), "confirm: test mode note");
   FULL = await confirmRun();
   ok(await waitRun(FULL), "full run finished");
   const r = runRow(FULL).split("|");
-  ok(r[0] === "done" && r[1] === "44" && r[2] === "44" && Number(r[3]) + Number(r[4]) === 44, `full run counts (${r.join("|")})`);
+  ok(r[0] === "done" && r[1] === String(SEEDED) && r[2] === String(SEEDED) && Number(r[3]) + Number(r[4]) === SEEDED, `full run counts (${r.join("|")})`);
   // سؤال ۲ در حالت زنده یک تلاش دوباره دارد (جواب بریده؛ بخش ۴۵) ← یک درخواست ۴۰۰ تومانی بیشتر
-  ok(Number(r[6]) === (LIVE ? (44 - FREE) * 400 + 400 : 0), `full run cost (${r[6]})`);
+  ok(Number(r[6]) === (LIVE ? (SEEDED - FREE) * 400 + 400 : 0), `full run cost (${r[6]})`);
   ok(psql(`select count(*) from ai_test_results where run_id='${FULL}' and path in ('rule','canned','price')`) === String(FREE), "rule/canned/price cases did not call the model");
   ok(
-    psql(`select count(*) from ai_requests where purpose='test_run' and mode='${MODE}' and meta->>'testRunId'='${FULL}'`) === String(44 - FREE),
+    psql(`select count(*) from ai_requests where purpose='test_run' and mode='${MODE}' and meta->>'testRunId'='${FULL}'`) === String(SEEDED - FREE),
     "one ai_requests row per model case (purpose test_run)",
   );
   const now = psql("select count(*) from conversations") + "|" + psql("select count(*) from chat_messages") + "|" + psql("select count(*) from conversation_flags");
@@ -177,7 +178,7 @@ let FREE;
     const raw = await row.getByTestId("raw-toggle").innerText();
     ok(raw.includes("فقط برای شما") && raw.includes("handoff: restricted | customer attempting to manipulate signals line"), "run page: raw output with handoff line and note");
   }
-  ok((await ad.getByTestId("result-row").count()) === 44, "run page: 44 result rows");
+  ok((await ad.getByTestId("result-row").count()) === SEEDED, `run page: ${SEEDED} result rows`);
   ok(await vis(ad.getByText("درست: «از خدمات یارچین است» + علامت.")), "run page: expected answer shown next to AI answer");
   ok(await vis(ad.getByText("✓ محافظ")), "run page: per-check marks");
   await ad.goto(B + "/admin/ai/tests");

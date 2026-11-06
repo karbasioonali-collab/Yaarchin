@@ -178,7 +178,7 @@ export async function evaluateQuestion(
     : [];
   const productId = p?.id ?? null;
   // نشانه‌هایی که این پیام در چت واقعی ثبت می‌کرد (آزمون چیزی ذخیره نمی‌کند؛ بخش ۴۳). بدون جواب مدل = فقط تعداد با کد.
-  let signals = signalsFromMessage(question, null).signals.map(signalTag);
+  let signals = signalsFromMessage(question, null, await marketRates()).signals.map(signalTag);
   const done = (outcome: TestOutcome, requestId: number | null = null, costToman = 0): Evaluated => ({
     outcome: { ...outcome, signals },
     requestId,

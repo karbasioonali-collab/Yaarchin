@@ -17,6 +17,11 @@ export const LIMITS = {
 const PRICE_RE = /(قیمت|هزینه|تمام ?شده|در ?میاد|در ?می ?آید|چند (میشه|می شود|درمیاد|تموم)|تومن|تومان|ارزون|ارزان|گرون|گران|price|cost)/;
 export const priceIntent = (text: string): boolean => PRICE_RE.test(normFa(text));
 
+// سؤال درباره‌ی زمان رسیدن/حمل؟ (بخش ۵۳) ← روزهای هر روش حمل محصول هم فرستاده می‌شود، بدون قیمت
+const TIME_RE =
+  /(طول (میکشه|می کشه|میکشد|می کشد)|(کی|چند روزه|چند روز|چقدر) (میرسه|می رسه|برسه|میرسد|می رسد|میاد|می آید)|زمان (حمل|ارسال|تحویل|رسیدن)|مدت (حمل|ارسال)|چند روز|delivery|shipping time)/;
+export const timeIntent = (text: string): boolean => TIME_RE.test(normFa(text));
+
 export type LandedCompact =
   | { available: false }
   | {
@@ -43,7 +48,8 @@ export type ProductInput = {
 };
 
 // محصول برای مدل: بدون فیلد خالی، توضیح و مشخصات با سقف، قیمت تمام‌شده‌ی حداقل سفارش فقط برای سؤال قیمت
-export function shapeProduct(p: ProductInput, withPrice: boolean): Record<string, unknown> {
+// withDays (سؤال زمان بدون قیمت؛ بخش ۵۳): روزهای هر روش حمل از همان قیمت تمام‌شده‌ی حداقل سفارش، بدون مبلغ
+export function shapeProduct(p: ProductInput, withPrice: boolean, withDays = false): Record<string, unknown> {
   const out: Record<string, unknown> = { slug: p.slug, title: p.title };
   if (p.summary) out.summary = p.summary;
   if (p.description) out.description = p.description.length > LIMITS.descriptionChars ? p.description.slice(0, LIMITS.descriptionChars) + "…" : p.description;
@@ -51,6 +57,10 @@ export function shapeProduct(p: ProductInput, withPrice: boolean): Record<string
   if (p.moq !== null) out.moq = p.moq;
   if (p.leadTimeDays) out.leadTimeDays = p.leadTimeDays;
   if (withPrice) out.landedAtMoq = p.landedAtMoq;
+  else if (withDays && p.landedAtMoq.available) {
+    const days = p.landedAtMoq.methods.filter((m) => m.days).map((m) => ({ method: m.method, days: m.days }));
+    if (days.length) out.shippingDays = days;
+  }
   return out;
 }
 

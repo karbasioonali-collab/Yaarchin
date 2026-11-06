@@ -51,6 +51,7 @@ const SOURCE_FA: Record<string, string> = {
   pleasantry: "جواب آماده (احوال‌پرسی/تشکر)",
   site_price: "جواب قیمت با کد",
   site_qty_price: "جواب قیمت با تعداد (کد)",
+  site_time: "جواب زمان حمل (کد)",
 };
 const CANNED_FIELDS: [keyof typeof CANNED_DEFAULTS, string, string][] = [
   ["ai.reply_greeting_product", "greetingProduct", "«سلام» در گفتگوی محصول ({product} = اسم محصول)"],

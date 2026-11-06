@@ -78,7 +78,7 @@ ok(CURRENCY_ERROR.includes("قیمت از داده‌های سایت می‌آی
 
 // ---- سؤال‌های آزمون seed
 const drafts = JSON.parse(readFileSync(new URL("../../src/db/test-drafts.json", import.meta.url), "utf8"));
-ok(drafts.length === 44, `44 drafts (${drafts.length})`);
+ok(drafts.length === 46, `46 drafts (${drafts.length})`);
 ok(new Set(drafts.map((d) => suggestionKey(d.question))).size === drafts.length, "drafts unique");
 const HANDOFFS = new Set(["none", "any", ...Object.keys(HANDOFF_FA)]);
 const SRC = new Set(["product", "calculator", "knowledge", "general", "canned"]);
